@@ -1,0 +1,9 @@
+{
+  "name": "AI OLLY - Split Knowledge Base",
+  "description": "POI, ROUTES, ROOM GUIDE, INFO",
+  "metadata": {
+    "city": "split",
+    "scope": "poi_long,route_long,room_guide,info_article",
+    "version": "v2025-11"
+  }
+}

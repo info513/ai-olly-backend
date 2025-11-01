@@ -1,0 +1,16 @@
+{
+  "name": "ai-olly-vector-sync",
+  "version": "1.0.0",
+  "description": "AI Olly backend i sinkronizacija s Airtableom",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0"
+  }
+}
