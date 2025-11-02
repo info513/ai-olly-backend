@@ -10,7 +10,6 @@ const {
   PORT = 8080,
   AIRTABLE_API_KEY,
   AIRTABLE_BASE_ID,
-  // novo:
   CORS_ORIGINS = "",
   AIRTABLE_TABLE_REQUESTS = "REQUESTS",
 } = process.env;
@@ -54,25 +53,22 @@ const app = express();
 // JSON body parser (za POST requeste)
 app.use(express.json({ limit: "1mb" }));
 
-// CORS s whitelistom iz .env (zarezom odvojene domene)
+// CORS whitelist iz .env (comma-separated)
 const allowed = CORS_ORIGINS.split(",").map(s => s.trim()).filter(Boolean);
 
-// CORS
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin) return cb(null, true);      // dopušta curl/Postman
+      // dopušta zahtjeve bez Origin headera (curl/Postman)
+      if (!origin) return cb(null, true);
       return cb(null, allowed.includes(origin));
     },
     credentials: true,
   })
 );
 
-// ZA PREFLIGHT u Express 5 koristimo (.*) umjesto "*"
+// Preflight u Express 5: koristimo (.*), ne "*"
 app.options("(.*)", cors());
-
-);
-app.options("*", cors());
 
 // ------------------------------
 // Health
@@ -97,7 +93,7 @@ app.get("/api/airtable-test", async (_req, res) => {
 // 1) POI
 app.get("/api/poi", async (req, res) => {
   try {
-    const view = req.query.view || undefined; // možeš proslijediti ?view=
+    const view = req.query.view || undefined; // opcionalno ?view=
     const data = await readTable("POI", { view, maxRecords: 100 });
     res.json(data);
   } catch (err) {
@@ -152,19 +148,18 @@ app.get("/api/info", async (_req, res) => {
 
 /** ========== WRITE ENDPOINT: REQUESTS ========== **/
 
-// Mapiranje body -> Airtable kolone (promijeni desne nazive ako ti se kolone razlikuju)
+// Mapiranje body -> Airtable kolone (po potrebi prilagodi desne nazive)
 const FIELD_MAP = {
-  hotelSlug: "Hotel Slug",      // Single line text (ili Lookup)
-  roomNumber: "Naziv sobe",     // Single line text (ili promijeni ako koristiš Link na ROOM GUIDE)
-  category: "Kategorija",       // Single select
-  priority: "Prioritet",        // Single select (Low/Normal/High)
-  message: "Poruka",            // Long text
-  guestName: "Gost - ime",      // Single line text
-  phone: "Telefon",             // Single line text
-  status: "Status",             // Single select (New/In progress/Done)
+  hotelSlug: "Hotel Slug",
+  roomNumber: "Naziv sobe",
+  category: "Kategorija",
+  priority: "Prioritet",
+  message: "Poruka",
+  guestName: "Gost - ime",
+  phone: "Telefon",
+  status: "Status",
 };
 
-// Minimalna validacija + priprema fields
 function buildRequestFields(body = {}) {
   const {
     hotelSlug,
@@ -206,16 +201,11 @@ function buildRequestFields(body = {}) {
 app.post("/api/requests", async (req, res) => {
   try {
     const fields = buildRequestFields(req.body);
-
     const created = await base(AIRTABLE_TABLE_REQUESTS).create([{ fields }], {
-      typecast: true, // pomaže kod Single select i sl.
+      typecast: true,
     });
-
     const rec = created[0];
-    return res.status(201).json({
-      id: rec.id,
-      fields: rec.fields,
-    });
+    return res.status(201).json({ id: rec.id, fields: rec.fields });
   } catch (e) {
     console.error("REQUESTS create error:", e);
     const code = e.statusCode || 500;
