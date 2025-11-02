@@ -21,10 +21,14 @@ if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
 const base = new Airtable({ apiKey: AIRTABLE_API_KEY }).base(AIRTABLE_BASE_ID);
 
 // Pomoćna funkcija: čitanje tablice s paginacijom
-async function readTable(tableName, { view = undefined, maxRecords = 100 } = {}) {
+async function readTable(tableName, { view, maxRecords = 100 } = {}) {
+  const params = { maxRecords };
+  if (typeof view === "string" && view.trim()) {
+    params.view = view.trim();
+  }
   const records = [];
   await base(tableName)
-    .select({ view, maxRecords })
+    .select(params)
     .eachPage((pageRecords, fetchNextPage) => {
       records.push(
         ...pageRecords.map((r) => ({
@@ -36,6 +40,7 @@ async function readTable(tableName, { view = undefined, maxRecords = 100 } = {})
     });
   return records;
 }
+
 
 // Express init
 const app = express();
