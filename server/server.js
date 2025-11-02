@@ -68,7 +68,7 @@ app.use(
 );
 
 // Preflight u Express 5: koristimo (.*), ne "*"
-app.options("(.*)", cors());
+app.options(/.*/, cors());
 
 // ------------------------------
 // Health
