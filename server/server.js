@@ -57,15 +57,20 @@ app.use(express.json({ limit: "1mb" }));
 // CORS s whitelistom iz .env (zarezom odvojene domene)
 const allowed = CORS_ORIGINS.split(",").map(s => s.trim()).filter(Boolean);
 
+// CORS
 app.use(
   cors({
     origin: (origin, cb) => {
-      // dozvoli i “no-origin” (curl/Postman)
-      if (!origin) return cb(null, true);
+      if (!origin) return cb(null, true);      // dopušta curl/Postman
       return cb(null, allowed.includes(origin));
     },
     credentials: true,
   })
+);
+
+// ZA PREFLIGHT u Express 5 koristimo (.*) umjesto "*"
+app.options("(.*)", cors());
+
 );
 app.options("*", cors());
 
