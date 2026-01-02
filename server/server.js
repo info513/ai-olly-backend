@@ -45,14 +45,22 @@ app.use(cors({
     // allow server-to-server or curl without origin
     if (!origin) return cb(null, true);
 
-    // if not set, allow all (not recommended, but safe fallback)
+    // if not set, allow all (fallback)
     if (!allowedOrigins.length) return cb(null, true);
 
     if (allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(new Error(`CORS blocked: ${origin}`));
+    return cb(new Error(`CORS_BLOCKED:${origin}`));
   },
   credentials: false,
 }));
+
+// CORS error -> 403 JSON (instead of generic 500 HTML)
+app.use((err, req, res, next) => {
+  if (err && typeof err.message === 'string' && err.message.startsWith('CORS_BLOCKED:')) {
+    return res.status(403).json({ ok: false, error: 'CORS blocked', origin: err.message.replace('CORS_BLOCKED:', '') });
+  }
+  return next(err);
+});
 
 app.use(express.json({ limit: '1mb' }));
 
@@ -94,6 +102,19 @@ async function airtableSelectAll(tableName, options) {
   return records;
 }
 
+function normalizeText(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function tokenize(s) {
+  const t = normalizeText(s);
+  if (!t) return [];
+  return t.split(/\s+/).filter(Boolean);
+}
+
 // -------------------------
 // Cache (simple in-memory) — good enough for a single Render instance
 // -------------------------
@@ -123,7 +144,7 @@ async function getIntentPatternsForWeb() {
       intent: pickFirstNonEmpty(f.Intent, f.intent),
       phrases: pickFirstNonEmpty(f.Phrases, f.phrases),
       appliesTo: asArray(f['Applies to'] ?? f.AppliesTo ?? f.applies_to),
-      outputScope: pickFirstNonEmpty(f['Output Scope'], f.OutputScope, f.output_scope),
+      outputScope: pickFirstNonEmpty(f['Output Scope'], f.OutputScope, f.output_scope), // e.g. "General", "Room Guide", "City Guide"
       servicesLink: f['Services link'] ?? f.ServicesLink ?? f.services_link,
       roomsLink: f['Rooms link'] ?? f.RoomsLink ?? f.rooms_link,
     };
@@ -137,9 +158,9 @@ async function getIntentPatternsForWeb() {
 }
 
 // -------------------------
-// Load AI_OUTPUT_RULES for (Scope=General, AI_SOURCE=WEB)
+// Load AI_OUTPUT_RULES (cached)
 // -------------------------
-async function getOutputRuleForWebGeneral() {
+async function loadOutputRules() {
   if (!cacheFresh(CACHE.outputRules.ts) || !CACHE.outputRules.data.length) {
     const recs = await airtableSelectAll(TABLE_OUTPUT_RULES, { pageSize: 100 });
 
@@ -148,44 +169,53 @@ async function getOutputRuleForWebGeneral() {
       return {
         id: r.id,
         refId: pickFirstNonEmpty(f['Ref ID'], f.RefID, f.ref_id),
-        scope: pickFirstNonEmpty(f.Scope, f.scope),
+        scope: pickFirstNonEmpty(f.Scope, f.scope), // "General", "Room Guide", "City Guide", "Requests"
         format: pickFirstNonEmpty(f.Format, f.format),
         style: pickFirstNonEmpty(f.Style, f.style),
         example: pickFirstNonEmpty(f['Example Output'], f.ExampleOutput, f.example_output),
         priority: Number(f.Priority ?? f.priority ?? 0),
         isActive: (f['Is Active'] ?? f.IsActive ?? f.is_active ?? true) === true,
-        aiSource: asArray(f.AI_SOURCE ?? f.ai_source),
+        aiSource: asArray(f.AI_SOURCE ?? f.ai_source), // WEB/PWA/POI/ROUTES...
       };
     });
 
     CACHE.outputRules = { ts: Date.now(), data: rules };
   }
+  return CACHE.outputRules.data;
+}
 
-  const rules = CACHE.outputRules.data
+async function getOutputRule({ scopeWanted = 'General', aiSourceWanted = 'WEB' }) {
+  const rulesAll = await loadOutputRules();
+
+  const scopeNorm = String(scopeWanted || 'General').toLowerCase();
+  const filtered = rulesAll
     .filter(r => r.isActive)
-    .filter(r => String(r.scope).toLowerCase() === 'general')
-    .filter(r => fieldHasAny(r.aiSource, ['WEB']));
+    .filter(r => String(r.scope || '').toLowerCase() === scopeNorm)
+    .filter(r => fieldHasAny(r.aiSource, [aiSourceWanted]));
 
-  rules.sort((a, b) => (b.priority || 0) - (a.priority || 0));
-  return rules[0] || null;
+  filtered.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+  return filtered[0] || null;
 }
 
 // -------------------------
 // Choose intent (GPT-assisted) from patterns list
 // -------------------------
 async function chooseIntent(question, patterns) {
-  if (!patterns.length) return { intent: null, confidence: 0, note: 'no_patterns' };
+  if (!patterns.length) return { intent: null, confidence: 0, note: 'no_patterns', outputScope: 'General' };
+
+  const validIntents = new Set(patterns.map(p => String(p.intent)));
 
   // Keep list concise
   const compact = patterns.map(p => ({
     intent: p.intent,
     phrases: (p.phrases || '').slice(0, 240),
+    outputScope: p.outputScope || 'General',
   }));
 
   const sys = `You are an intent router for a HOTEL WEB CHAT WIDGET.
 Pick exactly one intent from the provided list if it clearly matches the user's question.
 If none match, return null.
-Return JSON only with keys: intent, confidence (0-1), note.`;
+Return JSON only with keys: intent, confidence (0-1), outputScope, note.`;
 
   const payload = { question, intents: compact };
 
@@ -203,13 +233,17 @@ Return JSON only with keys: intent, confidence (0-1), note.`;
     const raw = resp.choices?.[0]?.message?.content || '{}';
     const parsed = JSON.parse(raw);
 
-    const intent = (typeof parsed.intent === 'string' && parsed.intent.trim()) ? parsed.intent.trim() : null;
+    let intent = (typeof parsed.intent === 'string' && parsed.intent.trim()) ? parsed.intent.trim() : null;
     const confidence = Number(parsed.confidence ?? 0);
+    const outputScope = (typeof parsed.outputScope === 'string' && parsed.outputScope.trim()) ? parsed.outputScope.trim() : 'General';
 
-    return { intent, confidence, note: parsed.note || '' };
+    // Safety: if model returns an intent not in list, ignore it
+    if (intent && !validIntents.has(intent)) intent = null;
+
+    return { intent, confidence, outputScope, note: parsed.note || '' };
   } catch (e) {
     console.error('chooseIntent error:', e);
-    return { intent: null, confidence: 0, note: 'intent_router_failed' };
+    return { intent: null, confidence: 0, outputScope: 'General', note: 'intent_router_failed' };
   }
 }
 
@@ -244,42 +278,78 @@ async function getServicesForHotelWeb(hotelSlug) {
   return bySourceWeb;
 }
 
-async function fetchServiceRows({ hotelSlug, intent }) {
+function pickFallbackRecords(question, allForHotelWeb, limit = 3) {
+  const qTokens = tokenize(question);
+  if (!qTokens.length) return [];
+
+  const scored = allForHotelWeb.map(r => {
+    const hay = normalizeText([
+      r.naziv,
+      r.kategorija.join(' '),
+      r.opis,
+      r.radnoVrijeme,
+      r.aiIntent.join(' '),
+    ].join(' '));
+
+    let score = 0;
+    for (const t of qTokens) {
+      if (t.length < 3) continue;
+      if (hay.includes(t)) score += 1;
+    }
+
+    return { r, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const top = scored.filter(x => x.score > 0).slice(0, limit).map(x => x.r);
+  return top;
+}
+
+async function fetchServiceRows({ hotelSlug, intent, question }) {
   const allForHotelWeb = await getServicesForHotelWeb(hotelSlug);
 
   const matched = intent
     ? allForHotelWeb.filter(r => r.aiIntent.map(String).includes(String(intent)))
     : [];
 
-  return { matched, allForHotelWeb };
+  // Fallback candidates if no match
+  const fallback = (!matched.length)
+    ? pickFallbackRecords(question, allForHotelWeb, 3)
+    : [];
+
+  return { matched, fallback, allForHotelWeb };
 }
 
 // -------------------------
-// Build answer using matched records + output rules
+// Build answer using records + output rules
 // -------------------------
-async function generateAnswer({ question, hotelSlug, intentPick, matchedRows, outputRule }) {
+async function generateAnswer({ question, hotelSlug, intentPick, recordsToUse, outputRule }) {
   const styleText = outputRule
     ? `OUTPUT RULE (Scope=${outputRule.scope}, Format=${outputRule.format}):
 STYLE: ${outputRule.style}
 EXAMPLE: ${outputRule.example}`
     : 'OUTPUT RULE: none (use clear short paragraphs).';
 
-  const contextBlocks = matchedRows.map((r, idx) => {
+  // Keep context tight
+  const contextBlocks = recordsToUse.map((r, idx) => {
+    const aiPromptShort = (r.aiPrompt || '').slice(0, 600);
+    const opisShort = (r.opis || '').slice(0, 1200);
+
     return `# RECORD ${idx + 1}
 Naziv: ${r.naziv}
 Kategorija: ${r.kategorija.join(', ')}
 Radno vrijeme: ${r.radnoVrijeme || '-'}
-Opis: ${r.opis}
-AI_PROMPT (internal): ${r.aiPrompt || '-'}`;
+Opis: ${opisShort}
+AI_PROMPT (internal): ${aiPromptShort || '-'}`;
   });
 
   const sys = `You are "AI Olly" — a hotel web assistant for website visitors.
 CRITICAL RULES:
-- This is the WEB widget (visitors). Do NOT assume the user is a checked-in guest.
+- This is the WEB widget (website visitors). Do NOT assume the user is a checked-in guest.
 - HOTEL-SPECIFIC facts MUST come from provided RECORDS. If missing, say you don't have that info and suggest contacting reception.
 - You MAY answer general tourist questions about Split / Diocletian's Palace in a safe general way (what it is, history basics, typical visiting tips).
   You MUST NOT invent hotel details, prices, schedules, or internal procedures.
-- If the question is unclear, ask ONE short clarifying question.
+- If you have multiple possible interpretations, ask ONE short clarifying question.
 
 ${styleText}
 
@@ -331,21 +401,37 @@ app.post('/api/web-ask', async (req, res) => {
     // 2) Pick intent
     const intentPick = await chooseIntent(question, patterns);
 
-    // 3) Fetch matching SERVICES records
-    const { matched, allForHotelWeb } = await fetchServiceRows({
+    // Determine scope from picked intent (fallback General)
+    let scopeWanted = 'General';
+    if (intentPick?.intent) {
+      const p = patterns.find(x => String(x.intent) === String(intentPick.intent));
+      scopeWanted = (p?.outputScope || intentPick.outputScope || 'General');
+    } else {
+      scopeWanted = (intentPick.outputScope || 'General');
+    }
+
+    // 3) Fetch SERVICES records
+    const { matched, fallback, allForHotelWeb } = await fetchServiceRows({
       hotelSlug,
       intent: intentPick.intent,
+      question,
     });
 
-    // 4) Output rule (General, WEB)
-    const outputRule = await getOutputRuleForWebGeneral();
+    // records to use in prompt:
+    const recordsToUse = matched.length ? matched : fallback;
+
+    // 4) Output rule (by scopeWanted, source WEB). If missing, fallback to General/WEB
+    let outputRule = await getOutputRule({ scopeWanted, aiSourceWanted: 'WEB' });
+    if (!outputRule && String(scopeWanted).toLowerCase() !== 'general') {
+      outputRule = await getOutputRule({ scopeWanted: 'General', aiSourceWanted: 'WEB' });
+    }
 
     // 5) Generate answer
     const answer = await generateAnswer({
       question,
       hotelSlug,
       intentPick,
-      matchedRows: matched,
+      recordsToUse,
       outputRule,
     });
 
@@ -358,7 +444,9 @@ app.post('/api/web-ask', async (req, res) => {
         hotelSlug,
         intent: intentPick.intent,
         confidence: intentPick.confidence ?? null,
-        matchedRecords: matched.map(r => ({ naziv: r.naziv, id: r.id })),
+        scopeWanted,
+        usedRecords: recordsToUse.map(r => ({ naziv: r.naziv, id: r.id })),
+        usedFallback: (!matched.length && fallback.length) ? true : false,
         totalWebRecordsForHotel: allForHotelWeb.length,
         ms,
       },
