@@ -135,6 +135,21 @@ async function airtableSelectFirst(tableName, options = {}) {
   return recs[0] || null;
 }
 
+// ✅ čitanje linked recorda po ID (ne ovisi o filterima i slugovima)
+async function airtableFindByIds(tableName, ids = [], limit = 30) {
+  const uniq = Array.from(new Set(asArray(ids).map(String).filter(Boolean))).slice(0, limit);
+  if (!uniq.length) return [];
+
+  const out = await Promise.allSettled(
+    uniq.map(id => base(tableName).find(id))
+  );
+
+  // vrati samo uspješne
+  return out
+    .filter(x => x.status === 'fulfilled' && x.value)
+    .map(x => x.value);
+}
+
 function normalizeText(s) {
   return String(s || '')
     .toLowerCase()
@@ -174,7 +189,8 @@ function isHotelSpecificQuestion(question) {
   const keys = [
     'recepcija','reception','wifi','wi fi','internet','parking','parkiranje','doručak','breakfast',
     'mini bar','minibar','check in','check-out','checkout','checkin','policy','pravila','pet','dog',
-    'laundry','dry cleaning','cleaning','housekeeping','room','rooms','soba','sobe','bed','krevet'
+    'laundry','dry cleaning','cleaning','housekeeping','room','rooms','soba','sobe','bed','krevet',
+    'view','pogled','floor','kat','size','kvadratura','capacity','kapacitet'
   ];
   return keys.some(k => q.includes(k));
 }
@@ -216,8 +232,11 @@ async function getIntentPatternsForWeb() {
       phrases: pickFirstNonEmpty(f.Phrases, f.phrases),
       appliesTo: asArray(f['Applies to'] ?? f.AppliesTo ?? f.applies_to),
       outputScope: pickFirstNonEmpty(f['Output Scope'], f.OutputScope, f.output_scope),
-      servicesLink: asArray(f['Services link'] ?? f.ServicesLink ?? f.services_link), // record IDs
-      roomsLink: asArray(f['Rooms link'] ?? f.RoomsLink ?? f.rooms_link),             // record IDs
+
+      // linked record IDs (Airtable već vraća array record ID-jeva)
+      servicesLink: asArray(f['Services link'] ?? f.ServicesLink ?? f.services_link),
+      roomsLink: asArray(f['Rooms link'] ?? f.RoomsLink ?? f.rooms_link),
+
       active: (f.Active ?? true) === true,
     };
   }).filter(p => p.intent && p.active);
@@ -375,6 +394,64 @@ function allowForWeb(aiSourceArr) {
   return isEmptyArray(src) || fieldHasAny(src, ['WEB']);
 }
 
+// ✅ izvuci hotel slug iz različitih naziva polja (sigurnije)
+function getHotelSlugRaw(fields) {
+  const f = fields || {};
+  return (
+    f['Hotel Slug (text)'] ??
+    f['Hotel Slug (Text)'] ??
+    f['Hotel Slug text'] ??
+    f['Hotel Slug'] ??
+    f.HotelSlug ??
+    f.hotel_slug ??
+    null
+  );
+}
+
+// ---- MAPPERS (da možemo mapirati i linked-find recorde) ----
+function mapServiceRecord(r) {
+  const f = r?.fields || {};
+  return {
+    type: 'SERVICE',
+    id: r.id,
+    naziv: pickFirstNonEmpty(f['Naziv usluge'], f.Naziv, f.Name, f.Title, f.naziv),
+    kategorija: asArray(f.Kategorija ?? f.kategorija),
+    opis: pickFirstNonEmpty(f.Opis, f.opis),
+    radnoVrijeme: pickFirstNonEmpty(f['Radno vrijeme'], f.Radno, f.radno_vrijeme),
+    aiPrompt: pickFirstNonEmpty(f.AI_PROMPT, f.ai_prompt),
+    aiIntent: asArray(f.AI_INTENT ?? f.ai_intent),
+    aiSource: asArray(f.AI_SOURCE ?? f.ai_source),
+    hotelSlugRaw: getHotelSlugRaw(f),
+    active: (f.Active ?? true) === true,
+  };
+}
+
+function mapRoomRecord(r) {
+  const f = r?.fields || {};
+  return {
+    type: 'ROOM',
+    id: r.id,
+    naziv: pickFirstNonEmpty(f['Soba oznaka'], f.Naziv, f.Name),
+    tipSobe: pickFirstNonEmpty(f['Tip sobe'], f.Tip, f.tip),
+    slug: pickFirstNonEmpty(f.Slug, f.slug),
+    opis: pickFirstNonEmpty(f['Opis sobe'], f.Opis, f.opis),
+
+    // ✅ nova “čista” polja
+    kapacitet: f['Kapacitet (osoba)'] ?? f.Kapacitet ?? f.kapacitet ?? null,
+    kvadratura: f.Kvadratura ?? f.kvadratura ?? null,
+    kat: f.Kat ?? f.kat ?? null,
+    pogled: f.Pogled ?? f.pogled ?? null,
+    kreveti: asArray(f.Kreveti ?? f.kreveti),
+    roomAmenities: asArray(f['Room Amenities'] ?? f['Room amenities'] ?? f.room_amenities ?? f['Room Amenities (sadržaj sobe)']),
+
+    aiPrompt: pickFirstNonEmpty(f.AI_PROMPT, f.ai_prompt),
+    aiIntent: asArray(f.AI_INTENT ?? f.ai_intent),
+    aiSource: asArray(f.AI_SOURCE ?? f.ai_source),
+    hotelSlugRaw: getHotelSlugRaw(f),
+    active: (f.Active ?? true) === true,
+  };
+}
+
 async function getServicesForHotelWeb(hotelSlug) {
   const cached = CACHE.servicesByHotel.get(String(hotelSlug));
   if (cached && cacheFresh(cached.ts) && Array.isArray(cached.rows)) return cached.rows;
@@ -386,26 +463,12 @@ async function getServicesForHotelWeb(hotelSlug) {
     filterByFormula: `{Hotel Slug}='${slugEsc}'`,
   });
 
+  // fallback: ako filter ne radi (lookup/array), uzmi sve pa filtriraj ručno
   if (!recs.length) {
     recs = await airtableSelectAll(TABLE_SERVICES, { pageSize: 100 });
   }
 
-  const rows = recs.map(r => {
-    const f = r.fields || {};
-    return {
-      type: 'SERVICE',
-      id: r.id,
-      naziv: pickFirstNonEmpty(f['Naziv usluge'], f.Naziv, f.Name, f.Title, f.naziv),
-      kategorija: asArray(f.Kategorija ?? f.kategorija),
-      opis: pickFirstNonEmpty(f.Opis, f.opis),
-      radnoVrijeme: pickFirstNonEmpty(f['Radno vrijeme'], f.Radno, f.radno_vrijeme),
-      aiPrompt: pickFirstNonEmpty(f.AI_PROMPT, f.ai_prompt),
-      aiIntent: asArray(f.AI_INTENT ?? f.ai_intent),
-      aiSource: asArray(f.AI_SOURCE ?? f.ai_source),
-      hotelSlugRaw: (f['Hotel Slug'] ?? f.HotelSlug ?? f.hotel_slug),
-      active: (f.Active ?? true) === true,
-    };
-  });
+  const rows = recs.map(mapServiceRecord);
 
   const webRows = rows.filter(r =>
     r.active &&
@@ -428,26 +491,12 @@ async function getRoomsForHotelWeb(hotelSlug) {
     filterByFormula: `{Hotel Slug}='${slugEsc}'`,
   });
 
+  // fallback: ako filter ne radi (lookup/array), uzmi sve pa filtriraj ručno
   if (!recs.length) {
     recs = await airtableSelectAll(TABLE_ROOMS, { pageSize: 100 });
   }
 
-  const rows = recs.map(r => {
-    const f = r.fields || {};
-    return {
-      type: 'ROOM',
-      id: r.id,
-      naziv: pickFirstNonEmpty(f['Soba oznaka'], f.Naziv, f.Name),
-      tipSobe: pickFirstNonEmpty(f['Tip sobe'], f.Tip, f.tip),
-      slug: pickFirstNonEmpty(f.Slug, f.slug),
-      opis: pickFirstNonEmpty(f['Opis sobe'], f.Opis, f.opis),
-      aiPrompt: pickFirstNonEmpty(f.AI_PROMPT, f.ai_prompt),
-      aiIntent: asArray(f.AI_INTENT ?? f.ai_intent),
-      aiSource: asArray(f.AI_SOURCE ?? f.ai_source),
-      hotelSlugRaw: (f['Hotel Slug'] ?? f.HotelSlug ?? f.hotel_slug),
-      active: (f.Active ?? true) === true,
-    };
-  });
+  const rows = recs.map(mapRoomRecord);
 
   const webRows = rows.filter(r =>
     r.active &&
@@ -469,6 +518,12 @@ function pickFallbackRecords(question, allRecords, limit = 3) {
       r.naziv,
       r.tipSobe,
       (Array.isArray(r.kategorija) ? r.kategorija.join(' ') : ''),
+      (Array.isArray(r.kreveti) ? r.kreveti.join(' ') : ''),
+      (Array.isArray(r.roomAmenities) ? r.roomAmenities.join(' ') : ''),
+      (r.pogled ? String(r.pogled) : ''),
+      (r.kat ? String(r.kat) : ''),
+      (r.kvadratura ? String(r.kvadratura) : ''),
+      (r.kapacitet ? String(r.kapacitet) : ''),
       r.opis,
       r.radnoVrijeme,
       (Array.isArray(r.aiIntent) ? r.aiIntent.join(' ') : ''),
@@ -517,7 +572,13 @@ function renderRoomTypesAnswer(rooms, lang = 'HR') {
   }
 
   const lines = rooms
-    .map(r => `• ${r.naziv || r.tipSobe || r.slug || 'Room'}`)
+    .map(r => {
+      const name = r.naziv || r.tipSobe || r.slug || 'Room';
+      const tip = r.tipSobe ? ` — ${r.tipSobe}` : '';
+      const view = r.pogled ? ` — view: ${Array.isArray(r.pogled) ? r.pogled.join(', ') : String(r.pogled)}` : '';
+      const beds = (r.kreveti && r.kreveti.length) ? ` — beds: ${r.kreveti.join(', ')}` : '';
+      return `• ${name}${tip}${view}${beds}`;
+    })
     .slice(0, 20);
 
   return lang === 'EN'
@@ -560,13 +621,19 @@ Parking: ${hotelRec.parking || '-'}` : '# HOTEL CORE\n(no hotel record found)';
 Naziv: ${r.naziv || '-'}
 Tip sobe: ${r.tipSobe || '-'}
 Slug: ${r.slug || '-'}
+Kapacitet (osoba): ${r.kapacitet ?? '-'}
+Kvadratura: ${r.kvadratura ?? '-'}
+Kat: ${r.kat ?? '-'}
+Pogled: ${Array.isArray(r.pogled) ? r.pogled.join(', ') : (r.pogled ?? '-')}
+Kreveti: ${(r.kreveti || []).join(', ') || '-'}
+Room Amenities: ${(r.roomAmenities || []).join(', ') || '-'}
 Opis: ${opisShort || '-'}
 AI_PROMPT (internal): ${aiPromptShort || '-'}`;
     }
 
     return `# RECORD ${idx + 1} (SERVICE)
 Naziv: ${r.naziv || '-'}
-Kategorija: ${(r.kategorija || []).join(', ')}
+Kategorija: ${(r.kategorija || []).join(', ') || '-'}
 Radno vrijeme: ${r.radnoVrijeme || '-'}
 Opis: ${opisShort || '-'}
 AI_PROMPT (internal): ${aiPromptShort || '-'}`;
@@ -578,8 +645,10 @@ ABSOLUTE RULES (no exceptions):
 - You MUST answer hotel-specific facts ONLY using HOTEL CORE or RECORDS provided.
 - If a detail is not present there, you MUST say it's not available and suggest contacting reception.
 - You MUST NOT guess prices, policies, times, services, amenities, room features, phone numbers, addresses, or procedures.
+- This is WEB (website visitor). Do NOT handle in-room complaints or troubleshooting flows; if user reports an in-room issue, direct them to reception.
 - Do NOT repeat greetings (e.g., "Dobrodošli") unless user greets first.
-- Keep answers short (1–4 sentences).
+- Keep answers short (1–4 sentences) unless user asks for details.
+- If multiple items match (e.g., multiple rooms with a view), list ALL relevant items you have in RECORDS.
 
 ${styleText}
 
@@ -658,14 +727,14 @@ app.post('/api/web-ask', async (req, res) => {
     const patterns = await getIntentPatternsForWeb();
     const intentPick = await chooseIntent(question, patterns);
 
-    // 2) load knowledge
+    // 2) load knowledge (cached filtered lists)
     const { hotelRec, services, rooms, matched, fallback, all } = await fetchKnowledgeRows({
       hotelSlug,
       intent: intentPick.intent,
       question,
     });
 
-    // 3) "vrste soba" -> direktno listaj sobe (bez GPT-a)
+    // 3) "vrste soba" -> deterministički (bez GPT-a)
     if (isRoomTypesQuestion(question)) {
       const answer = renderRoomTypesAnswer(rooms, lang);
       const ms = Date.now() - started;
@@ -679,14 +748,14 @@ app.post('/api/web-ask', async (req, res) => {
           scopeWanted: 'General',
           usedRecords: rooms.slice(0, 20).map(r => ({ type: r.type, naziv: r.naziv, id: r.id })),
           usedFallback: false,
-          usedLinked: true,
+          usedLinked: false,
           totalWebRecordsForHotel: all.length,
           ms,
         },
       });
     }
 
-    // 4) Ako intent postoji i pattern ima linked recorde -> koristi njih (glavni fix)
+    // 4) Ako intent postoji i pattern ima linked recorde -> koristi njih (PRIMARNO)
     let recordsToUse = [];
     let usedLinked = false;
 
@@ -695,8 +764,24 @@ app.post('/api/web-ask', async (req, res) => {
       const svcIds = asArray(p?.servicesLink);
       const roomIds = asArray(p?.roomsLink);
 
-      const linkedServices = svcIds.map(id => services.find(s => s.id === id)).filter(Boolean);
-      const linkedRooms = roomIds.map(id => rooms.find(r => r.id === id)).filter(Boolean);
+      // ✅ učitaj linked recorde direktno po ID-ju (ne ovisi o filteru po slug-u)
+      const [svcRecs, roomRecs] = await Promise.all([
+        airtableFindByIds(TABLE_SERVICES, svcIds, 30),
+        airtableFindByIds(TABLE_ROOMS, roomIds, 30),
+      ]);
+
+      const linkedServices = svcRecs.map(mapServiceRecord).filter(r =>
+        r.active &&
+        allowForWeb(r.aiSource) &&
+        // ako je hotel slug upisan, neka mora matchati; ako je prazno, pusti (da te ne blokira tijekom sređivanja)
+        (!valuesToStrings(r.hotelSlugRaw).length || matchesHotelSlug(r.hotelSlugRaw, hotelSlug))
+      );
+
+      const linkedRooms = roomRecs.map(mapRoomRecord).filter(r =>
+        r.active &&
+        allowForWeb(r.aiSource) &&
+        (!valuesToStrings(r.hotelSlugRaw).length || matchesHotelSlug(r.hotelSlugRaw, hotelSlug))
+      );
 
       const linked = [...linkedServices, ...linkedRooms];
 
@@ -711,9 +796,10 @@ app.post('/api/web-ask', async (req, res) => {
       recordsToUse = matched.length ? matched : fallback;
     }
 
-    // 6) HARD STOP: ako je pitanje hotel-specific i nemamo records -> nema GPT-a
-    // (ovo ti ubija halucinacije tipa kids corner, cijene, extra bed i sl.)
-    if (isHotelSpecificQuestion(question) && !recordsToUse.length && !hotelRec) {
+    // 6) HARD STOP:
+    // - ako je hotel-specific i nemamo ništa (core + records), NE PUŠTAMO GPT da izmišlja
+    // - ali gradska pitanja (Split/Palace) mogu ići dalje
+    if (isHotelSpecificQuestion(question) && !recordsToUse.length && !hotelRec && !isCityQuestion(question)) {
       const ms = Date.now() - started;
       return res.json({
         ok: true,
@@ -745,8 +831,6 @@ app.post('/api/web-ask', async (req, res) => {
     }
 
     // 8) Generate answer (strict)
-    // Napomena: gradska pitanja (Split/Palace) će i dalje moći odgovoriti općenito,
-    // ali hotelske činjenice samo iz records/core.
     const answer = await generateAnswer({
       question,
       hotelSlug,
