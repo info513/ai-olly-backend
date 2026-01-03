@@ -17,9 +17,9 @@ const {
   HOTEL_SLUG_DEFAULT = 'antique-split',
 
   // Airtable table names
-  TABLE_HOTELS = 'HOTELI',
-  TABLE_ROOMS = 'SOBE',
   TABLE_SERVICES = 'SERVICES',
+  TABLE_ROOMS = 'SOBE',
+  TABLE_HOTELS = 'HOTELI',
   TABLE_INTENTS = 'AI_INTENT_PATTERNS',
   TABLE_OUTPUT_RULES = 'AI_OUTPUT_RULES',
 
@@ -84,6 +84,49 @@ function asArray(v) {
   return [v];
 }
 
+function fieldHasAny(fieldsValue, allowed) {
+  const arr = asArray(fieldsValue).map(String);
+  const allowedSet = new Set(allowed.map(String));
+  return arr.some(v => allowedSet.has(v));
+}
+
+function clampPageSize(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 50;
+  if (x < 1) return 1;
+  if (x > 100) return 100;
+  return Math.floor(x);
+}
+
+function escapeAirtableFormulaString(s) {
+  // Airtable formule koriste single-quote. Escape je duplanje.
+  return String(s ?? '').replace(/'/g, "''");
+}
+
+async function airtableSelectAll(tableName, options = {}) {
+  const records = [];
+  const safe = { ...options };
+
+  // ✅ ključni fix: pageSize uvijek validan
+  safe.pageSize = clampPageSize(safe.pageSize ?? 50);
+
+  await base(tableName).select(safe).eachPage((pageRecords, fetchNextPage) => {
+    records.push(...pageRecords);
+    fetchNextPage();
+  });
+
+  return records;
+}
+
+async function airtableSelectFirst(tableName, options = {}) {
+  const safe = { ...options };
+  safe.pageSize = clampPageSize(safe.pageSize ?? 1);
+  safe.maxRecords = 1;
+
+  const recs = await airtableSelectAll(tableName, safe);
+  return recs[0] || null;
+}
+
 function normalizeText(s) {
   return String(s || '')
     .toLowerCase()
@@ -97,49 +140,16 @@ function tokenize(s) {
   return t.split(/\s+/).filter(Boolean);
 }
 
-// Treat missing AI_SOURCE as "allowed everywhere" (so you don't break older rows)
-function aiSourceAllows(fieldsValue, wanted /* 'WEB' or 'PWA' */) {
-  const arr = asArray(fieldsValue).map(String);
-  if (!arr.length) return true; // IMPORTANT: empty = allowed
-  return arr.includes(String(wanted));
-}
-
-function isActiveTrue(f) {
-  // standard: Active checkbox
-  if (typeof f?.Active === 'boolean') return f.Active === true;
-
-  // legacy variants (keep compatibility)
-  if (typeof f?.['Is Active'] === 'boolean') return f['Is Active'] === true;
-  if (typeof f?.IsActive === 'boolean') return f.IsActive === true;
-  if (typeof f?.['Is Active?'] === 'boolean') return f['Is Active?'] === true;
-
-  // status single select like "Active"
-  const status = pickFirstNonEmpty(f?.Status, f?.status);
-  if (status) return String(status).toLowerCase() === 'active';
-
-  // if nothing exists, default allow
-  return true;
-}
-
-async function airtableSelectAll(tableName, options) {
-  const records = [];
-  await base(tableName).select(options).eachPage((pageRecords, fetchNextPage) => {
-    records.push(...pageRecords);
-    fetchNextPage();
-  });
-  return records;
-}
-
 // -------------------------
-// Cache (simple in-memory) — single Render instance
+// Cache (simple in-memory)
 // -------------------------
 const CACHE_TTL_MS = 60 * 1000; // 60s
 let CACHE = {
   intents: { ts: 0, data: [] },
   outputRules: { ts: 0, data: [] },
-  hotels: { ts: 0, data: [] },
-  roomsByHotel: new Map(),     // hotelSlug -> {ts, rows}
-  servicesByHotel: new Map(),  // hotelSlug -> {ts, rows}
+  servicesByHotel: new Map(), // hotelSlug -> { ts, rows }
+  roomsByHotel: new Map(),    // hotelSlug -> { ts, rows }
+  hotelBySlug: new Map(),     // hotelSlug -> { ts, row }
 };
 
 function cacheFresh(ts) {
@@ -147,196 +157,79 @@ function cacheFresh(ts) {
 }
 
 // -------------------------
-// Load AI_INTENT_PATTERNS (WEB)
-// Optional: support Hotel Slug column (per-hotel overrides)
+// Load AI_INTENT_PATTERNS (WEB only)
 // -------------------------
-async function getIntentPatternsForWeb(hotelSlug) {
-  if (cacheFresh(CACHE.intents.ts) && CACHE.intents.data.length) {
-    // If we support per-hotel patterns, still filter at runtime
-    return CACHE.intents.data.filter(p => !p.hotelSlug || p.hotelSlug === String(hotelSlug));
-  }
+async function getIntentPatternsForWeb() {
+  if (cacheFresh(CACHE.intents.ts) && CACHE.intents.data.length) return CACHE.intents.data;
 
-  const recs = await airtableSelectAll(TABLE_INTENTS, { pageSize: 100 });
+  const recs = await airtableSelectAll(TABLE_INTENTS, { pageSize: 50 });
 
-  const patternsAll = recs.map(r => {
+  const patterns = recs.map(r => {
     const f = r.fields || {};
     return {
       id: r.id,
       intent: pickFirstNonEmpty(f.Intent, f.intent),
       phrases: pickFirstNonEmpty(f.Phrases, f.phrases),
-      appliesTo: asArray(f['Applies to'] ?? f.AppliesTo ?? f.applies_to), // WEB/PWA (multi)
+      appliesTo: asArray(f['Applies to'] ?? f.AppliesTo ?? f.applies_to),
       outputScope: pickFirstNonEmpty(f['Output Scope'], f.OutputScope, f.output_scope),
-      servicesLink: f['Services link'] ?? f.ServicesLink ?? f.services_link, // optional linked
-      roomsLink: f['Rooms link'] ?? f.RoomsLink ?? f.rooms_link,             // optional linked
-      hotelSlug: pickFirstNonEmpty(f['Hotel Slug'], f.HotelSlug, f.hotel_slug), // optional
-      active: isActiveTrue(f),
+      servicesLink: f['Services link'] ?? f.ServicesLink ?? f.services_link,
+      roomsLink: f['Rooms link'] ?? f.RoomsLink ?? f.rooms_link,
     };
-  }).filter(p => p.intent && p.active);
+  }).filter(p => p.intent);
 
-  // WEB widget: allow patterns whose Applies to contains WEB.
-  // If Applies to is empty (legacy), treat as allowed.
-  const filtered = patternsAll.filter(p => {
-    const a = p.appliesTo.map(String);
-    if (!a.length) return true;
-    return a.includes('WEB');
-  });
+  // ✅ WEB widget: pattern mora imati WEB
+  const filtered = patterns.filter(p => fieldHasAny(p.appliesTo, ['WEB']));
 
   CACHE.intents = { ts: Date.now(), data: filtered };
-  return filtered.filter(p => !p.hotelSlug || p.hotelSlug === String(hotelSlug));
+  return filtered;
 }
 
 // -------------------------
 // Load AI_OUTPUT_RULES (cached)
-// Optional: support Hotel Slug column (per-hotel overrides)
 // -------------------------
 async function loadOutputRules() {
-  if (cacheFresh(CACHE.outputRules.ts) && CACHE.outputRules.data.length) return CACHE.outputRules.data;
+  if (!cacheFresh(CACHE.outputRules.ts) || !CACHE.outputRules.data.length) {
+    const recs = await airtableSelectAll(TABLE_OUTPUT_RULES, { pageSize: 50 });
 
-  const recs = await airtableSelectAll(TABLE_OUTPUT_RULES, { pageSize: 100 });
+    const rules = recs.map(r => {
+      const f = r.fields || {};
+      return {
+        id: r.id,
+        refId: pickFirstNonEmpty(f['Ref ID'], f.RefID, f.ref_id),
+        scope: pickFirstNonEmpty(f.Scope, f.scope),
+        format: pickFirstNonEmpty(f.Format, f.format),
+        style: pickFirstNonEmpty(f.Style, f.style),
+        example: pickFirstNonEmpty(f['Example Output'], f.ExampleOutput, f.example_output),
+        priority: Number(f.Priority ?? f.priority ?? 0),
 
-  const rules = recs.map(r => {
-    const f = r.fields || {};
-    return {
-      id: r.id,
-      refId: pickFirstNonEmpty(f['Ref ID'], f.RefID, f.ref_id),
-      scope: pickFirstNonEmpty(f.Scope, f.scope), // General / Room Guide / City Guide / Requests
-      format: pickFirstNonEmpty(f.Format, f.format),
-      style: pickFirstNonEmpty(f.Style, f.style),
-      example: pickFirstNonEmpty(f['Example Output'], f.ExampleOutput, f.example_output),
-      priority: Number(f.Priority ?? f.priority ?? 0),
-      active: isActiveTrue(f),
-      aiSource: asArray(f.AI_SOURCE ?? f.ai_source), // WEB/PWA (multi)
-      hotelSlug: pickFirstNonEmpty(f['Hotel Slug'], f.HotelSlug, f.hotel_slug), // optional
-    };
-  });
+        // ✅ Active checkbox support (i fallback na Is Active)
+        isActive: (f.Active ?? f['Is Active'] ?? f.IsActive ?? f.is_active ?? true) === true,
 
-  CACHE.outputRules = { ts: Date.now(), data: rules };
-  return rules;
+        // ✅ AI_SOURCE = multi-select WEB/PWA (nema BOTH)
+        aiSource: asArray(f.AI_SOURCE ?? f.ai_source),
+      };
+    });
+
+    CACHE.outputRules = { ts: Date.now(), data: rules };
+  }
+  return CACHE.outputRules.data;
 }
 
-async function getOutputRule({ scopeWanted = 'General', aiSourceWanted = 'WEB', hotelSlug = '' }) {
+async function getOutputRule({ scopeWanted = 'General', aiSourceWanted = 'WEB' }) {
   const rulesAll = await loadOutputRules();
-  const scopeNorm = String(scopeWanted || 'General').toLowerCase();
 
+  const scopeNorm = String(scopeWanted || 'General').toLowerCase();
   const filtered = rulesAll
-    .filter(r => r.active)
+    .filter(r => r.isActive)
     .filter(r => String(r.scope || '').toLowerCase() === scopeNorm)
-    .filter(r => aiSourceAllows(r.aiSource, aiSourceWanted))
-    .filter(r => !r.hotelSlug || r.hotelSlug === String(hotelSlug));
+    .filter(r => fieldHasAny(r.aiSource, [aiSourceWanted]));
 
   filtered.sort((a, b) => (b.priority || 0) - (a.priority || 0));
   return filtered[0] || null;
 }
 
 // -------------------------
-// Load HOTELI (cached)
-// -------------------------
-async function loadHotels() {
-  if (cacheFresh(CACHE.hotels.ts) && CACHE.hotels.data.length) return CACHE.hotels.data;
-
-  const recs = await airtableSelectAll(TABLE_HOTELS, { pageSize: 50 });
-
-  const hotels = recs.map(r => {
-    const f = r.fields || {};
-    return {
-      id: r.id,
-      naziv: pickFirstNonEmpty(f['Hotel naziv'], f.Naziv, f.Name),
-      slug: pickFirstNonEmpty(f.Slug, f.slug),
-      active: isActiveTrue(f),
-      opisKratki: pickFirstNonEmpty(f['Opis (kratki)'], f.Opis, f.opis),
-      adresa: pickFirstNonEmpty(f.Adresa, f.Address),
-      grad: pickFirstNonEmpty(f.Grad, f.City),
-      telefon: pickFirstNonEmpty(f.Telefon, f.Phone),
-      email: pickFirstNonEmpty(f.Email, f['E-mail'], f.Mail),
-      mapsUrl: pickFirstNonEmpty(f['Google Maps'], f.Maps, f.MapsURL, f['Maps URL']),
-      parking: pickFirstNonEmpty(f.Parking, f['Parking info']),
-      checkin: pickFirstNonEmpty(f['Check-in'], f.Checkin),
-      checkout: pickFirstNonEmpty(f['Check-out'], f.Checkout),
-      aiSource: asArray(f.AI_SOURCE ?? f.ai_source), // if you add later, ok
-    };
-  }).filter(h => h.slug && h.active);
-
-  CACHE.hotels = { ts: Date.now(), data: hotels };
-  return hotels;
-}
-
-async function getHotelBySlug(hotelSlug) {
-  const hotels = await loadHotels();
-  return hotels.find(h => String(h.slug) === String(hotelSlug)) || null;
-}
-
-// -------------------------
-// Load SOBE rows per hotel (cached) and filter for WEB
-// -------------------------
-async function getRoomsForHotelWeb(hotelSlug) {
-  const cached = CACHE.roomsByHotel.get(String(hotelSlug));
-  if (cached && cacheFresh(cached.ts) && Array.isArray(cached.rows)) return cached.rows;
-
-  const recs = await airtableSelectAll(TABLE_ROOMS, { pageSize: 100 });
-
-  const rows = recs.map(r => {
-    const f = r.fields || {};
-    return {
-      id: r.id,
-      sobaOznaka: pickFirstNonEmpty(f['Soba oznaka'], f.Soba, f.Name, f.Naziv),
-      tipSobe: pickFirstNonEmpty(f['Tip sobe'], f.Tip, f.Type),
-      slug: pickFirstNonEmpty(f.Slug, f.slug),
-      opis: pickFirstNonEmpty(f['Opis sobe'], f.Opis, f.opis),
-      aiPrompt: pickFirstNonEmpty(f.AI_PROMPT, f.ai_prompt),
-      aiIntent: asArray(f.AI_INTENT ?? f.ai_intent),
-      aiSource: asArray(f.AI_SOURCE ?? f.ai_source),
-      hotelSlug: pickFirstNonEmpty(f['Hotel Slug'], f.HotelSlug, f.hotel_slug),
-      active: isActiveTrue(f),
-    };
-  });
-
-  const byHotel = rows
-    .filter(r => r.active)
-    .filter(r => String(r.hotelSlug) === String(hotelSlug));
-
-  const bySourceWeb = byHotel.filter(r => aiSourceAllows(r.aiSource, 'WEB'));
-
-  CACHE.roomsByHotel.set(String(hotelSlug), { ts: Date.now(), rows: bySourceWeb });
-  return bySourceWeb;
-}
-
-// -------------------------
-// Load SERVICES rows per hotel (cached) and filter for WEB
-// -------------------------
-async function getServicesForHotelWeb(hotelSlug) {
-  const cached = CACHE.servicesByHotel.get(String(hotelSlug));
-  if (cached && cacheFresh(cached.ts) && Array.isArray(cached.rows)) return cached.rows;
-
-  const recs = await airtableSelectAll(TABLE_SERVICES, { pageSize: 200 });
-
-  const rows = recs.map(r => {
-    const f = r.fields || {};
-    return {
-      id: r.id,
-      naziv: pickFirstNonEmpty(f['Naziv usluge'], f.Naziv, f.Name, f.Title, f.naziv),
-      kategorija: asArray(f.Kategorija ?? f.kategorija),
-      opis: pickFirstNonEmpty(f.Opis, f.opis),
-      radnoVrijeme: pickFirstNonEmpty(f['Radno vrijeme'], f.Radno, f.radno_vrijeme),
-      aiPrompt: pickFirstNonEmpty(f.AI_PROMPT, f.ai_prompt),
-      aiIntent: asArray(f.AI_INTENT ?? f.ai_intent),
-      aiSource: asArray(f.AI_SOURCE ?? f.ai_source),
-      hotelSlug: pickFirstNonEmpty(f['Hotel Slug'], f.HotelSlug, f.hotel_slug),
-      active: isActiveTrue(f),
-    };
-  });
-
-  const byHotel = rows
-    .filter(r => r.active)
-    .filter(r => String(r.hotelSlug) === String(hotelSlug));
-
-  const bySourceWeb = byHotel.filter(r => aiSourceAllows(r.aiSource, 'WEB'));
-
-  CACHE.servicesByHotel.set(String(hotelSlug), { ts: Date.now(), rows: bySourceWeb });
-  return bySourceWeb;
-}
-
-// -------------------------
-// Intent router (GPT-assisted) from patterns list
+// Choose intent (GPT-assisted)
 // -------------------------
 async function chooseIntent(question, patterns) {
   if (!patterns.length) return { intent: null, confidence: 0, note: 'no_patterns', outputScope: 'General' };
@@ -384,156 +277,218 @@ Return JSON only with keys: intent, confidence (0-1), outputScope, note.`;
 }
 
 // -------------------------
-// Fallback search across records (services + rooms + hotel)
+// Load HOTELI (one record) + SERVICES + SOBE per hotel (cached)
 // -------------------------
-function scoreRecord(question, text) {
-  const qTokens = tokenize(question);
-  if (!qTokens.length) return 0;
-  const hay = normalizeText(text);
-  let score = 0;
-  for (const t of qTokens) {
-    if (t.length < 3) continue;
-    if (hay.includes(t)) score += 1;
-  }
-  return score;
+async function getHotelRecord(hotelSlug) {
+  const cached = CACHE.hotelBySlug.get(String(hotelSlug));
+  if (cached && cacheFresh(cached.ts)) return cached.row;
+
+  const slugEsc = escapeAirtableFormulaString(hotelSlug);
+
+  // očekujemo polje u tablici HOTELI: "Slug"
+  const rec = await airtableSelectFirst(TABLE_HOTELS, {
+    pageSize: 1,
+    maxRecords: 1,
+    filterByFormula: `{Slug}='${slugEsc}'`,
+  });
+
+  const f = rec?.fields || {};
+  const row = rec ? {
+    id: rec.id,
+    hotelNaziv: pickFirstNonEmpty(f['Hotel naziv'], f.Naziv, f.Name),
+    slug: pickFirstNonEmpty(f.Slug, f.slug),
+    opis: pickFirstNonEmpty(f['Opis (kratki)'], f.Opis, f.opis),
+    adresa: pickFirstNonEmpty(f.Adresa, f.adresa),
+    telefon: pickFirstNonEmpty(f.Telefon, f.telefon),
+    email: pickFirstNonEmpty(f.Email, f.email),
+    web: pickFirstNonEmpty(f.Web, f.web),
+    checkIn: pickFirstNonEmpty(f['Check-in'], f.CheckIn),
+    checkOut: pickFirstNonEmpty(f['Check-out'], f.CheckOut),
+    parking: pickFirstNonEmpty(f.Parking, f.parking),
+  } : null;
+
+  CACHE.hotelBySlug.set(String(hotelSlug), { ts: Date.now(), row });
+  return row;
 }
 
-function pickFallbackRecords(question, candidates, limit = 3) {
-  const scored = candidates.map(r => ({ r, score: r._score || 0 }));
+async function getServicesForHotelWeb(hotelSlug) {
+  const cached = CACHE.servicesByHotel.get(String(hotelSlug));
+  if (cached && cacheFresh(cached.ts) && Array.isArray(cached.rows)) return cached.rows;
+
+  const slugEsc = escapeAirtableFormulaString(hotelSlug);
+
+  const recs = await airtableSelectAll(TABLE_SERVICES, {
+    pageSize: 50,
+    filterByFormula: `{Hotel Slug}='${slugEsc}'`,
+  });
+
+  const rows = recs.map(r => {
+    const f = r.fields || {};
+    return {
+      type: 'SERVICE',
+      id: r.id,
+      naziv: pickFirstNonEmpty(f['Naziv usluge'], f.Naziv, f.Name, f.Title, f.naziv),
+      kategorija: asArray(f.Kategorija ?? f.kategorija),
+      opis: pickFirstNonEmpty(f.Opis, f.opis),
+      radnoVrijeme: pickFirstNonEmpty(f['Radno vrijeme'], f.Radno, f.radno_vrijeme),
+      aiPrompt: pickFirstNonEmpty(f.AI_PROMPT, f.ai_prompt),
+      aiIntent: asArray(f.AI_INTENT ?? f.ai_intent),
+      aiSource: asArray(f.AI_SOURCE ?? f.ai_source),
+      hotelSlug: pickFirstNonEmpty(f['Hotel Slug'], f.HotelSlug, f.hotel_slug),
+      active: (f.Active ?? true) === true,
+    };
+  });
+
+  const bySourceWeb = rows.filter(r =>
+    r.active &&
+    String(r.hotelSlug) === String(hotelSlug) &&
+    fieldHasAny(r.aiSource, ['WEB'])
+  );
+
+  CACHE.servicesByHotel.set(String(hotelSlug), { ts: Date.now(), rows: bySourceWeb });
+  return bySourceWeb;
+}
+
+async function getRoomsForHotelWeb(hotelSlug) {
+  const cached = CACHE.roomsByHotel.get(String(hotelSlug));
+  if (cached && cacheFresh(cached.ts) && Array.isArray(cached.rows)) return cached.rows;
+
+  const slugEsc = escapeAirtableFormulaString(hotelSlug);
+
+  const recs = await airtableSelectAll(TABLE_ROOMS, {
+    pageSize: 50,
+    filterByFormula: `{Hotel Slug}='${slugEsc}'`,
+  });
+
+  const rows = recs.map(r => {
+    const f = r.fields || {};
+    return {
+      type: 'ROOM',
+      id: r.id,
+      naziv: pickFirstNonEmpty(f['Soba oznaka'], f.Naziv, f.Name),
+      tipSobe: pickFirstNonEmpty(f['Tip sobe'], f.Tip, f.tip),
+      slug: pickFirstNonEmpty(f.Slug, f.slug),
+      opis: pickFirstNonEmpty(f['Opis sobe'], f.Opis, f.opis),
+      aiPrompt: pickFirstNonEmpty(f.AI_PROMPT, f.ai_prompt),
+      aiIntent: asArray(f.AI_INTENT ?? f.ai_intent),
+      aiSource: asArray(f.AI_SOURCE ?? f.ai_source),
+      hotelSlug: pickFirstNonEmpty(f['Hotel Slug'], f.HotelSlug, f.hotel_slug),
+      active: (f.Active ?? true) === true,
+    };
+  });
+
+  const bySourceWeb = rows.filter(r =>
+    r.active &&
+    String(r.hotelSlug) === String(hotelSlug) &&
+    fieldHasAny(r.aiSource, ['WEB'])
+  );
+
+  CACHE.roomsByHotel.set(String(hotelSlug), { ts: Date.now(), rows: bySourceWeb });
+  return bySourceWeb;
+}
+
+function pickFallbackRecords(question, allRecords, limit = 3) {
+  const qTokens = tokenize(question);
+  if (!qTokens.length) return [];
+
+  const scored = allRecords.map(r => {
+    const hay = normalizeText([
+      r.type,
+      r.naziv,
+      r.tipSobe,
+      (Array.isArray(r.kategorija) ? r.kategorija.join(' ') : ''),
+      r.opis,
+      r.radnoVrijeme,
+      (Array.isArray(r.aiIntent) ? r.aiIntent.join(' ') : ''),
+    ].join(' '));
+
+    let score = 0;
+    for (const t of qTokens) {
+      if (t.length < 3) continue;
+      if (hay.includes(t)) score += 1;
+    }
+
+    return { r, score };
+  });
+
   scored.sort((a, b) => b.score - a.score);
   return scored.filter(x => x.score > 0).slice(0, limit).map(x => x.r);
 }
 
-// -------------------------
-// Fetch records for question/intent
-// -------------------------
-async function fetchRows({ hotelSlug, intent, question, patterns }) {
-  const services = await getServicesForHotelWeb(hotelSlug);
-  const rooms = await getRoomsForHotelWeb(hotelSlug);
-  const hotel = await getHotelBySlug(hotelSlug);
+async function fetchKnowledgeRows({ hotelSlug, intent, question }) {
+  const [hotelRec, services, rooms] = await Promise.all([
+    getHotelRecord(hotelSlug),
+    getServicesForHotelWeb(hotelSlug),
+    getRoomsForHotelWeb(hotelSlug),
+  ]);
 
-  // Match by intent in SERVICES + SOBE
-  const matchedServices = intent
-    ? services.filter(r => r.aiIntent.map(String).includes(String(intent)))
+  const all = [
+    ...services,
+    ...rooms,
+  ];
+
+  const matched = intent
+    ? all.filter(r => asArray(r.aiIntent).map(String).includes(String(intent)))
     : [];
-
-  const matchedRooms = intent
-    ? rooms.filter(r => r.aiIntent.map(String).includes(String(intent)))
-    : [];
-
-  // Build candidates for fallback scoring
-  const candidates = [];
-
-  for (const s of services) {
-    const text = [s.naziv, s.kategorija.join(' '), s.opis, s.radnoVrijeme, s.aiIntent.join(' ')].join(' ');
-    candidates.push({ ...s, _table: 'SERVICES', _score: scoreRecord(question, text) });
-  }
-
-  for (const rm of rooms) {
-    const text = [rm.sobaOznaka, rm.tipSobe, rm.slug, rm.opis, rm.aiIntent.join(' ')].join(' ');
-    candidates.push({ ...rm, _table: 'SOBE', _score: scoreRecord(question, text) });
-  }
-
-  if (hotel) {
-    const text = [hotel.naziv, hotel.slug, hotel.opisKratki, hotel.adresa, hotel.grad, hotel.telefon, hotel.email, hotel.mapsUrl, hotel.parking, hotel.checkin, hotel.checkout].join(' ');
-    candidates.push({ ...hotel, _table: 'HOTELI', _score: scoreRecord(question, text) });
-  }
-
-  const matched = [...matchedServices.map(x => ({ ...x, _table: 'SERVICES' })), ...matchedRooms.map(x => ({ ...x, _table: 'SOBE' }))];
 
   const fallback = (!matched.length)
-    ? pickFallbackRecords(question, candidates, 3)
+    ? pickFallbackRecords(question, all, 3)
     : [];
 
-  return {
-    hotel,
-    matched,
-    fallback,
-    counts: {
-      servicesWeb: services.length,
-      roomsWeb: rooms.length,
-      hotelFound: hotel ? 1 : 0,
-      candidates: candidates.length,
-    }
-  };
+  return { hotelRec, matched, fallback, all };
 }
 
 // -------------------------
 // Build answer using records + output rules
 // -------------------------
-function buildContextBlocks(records) {
-  return records.map((r, idx) => {
-    if (r._table === 'HOTELI') {
-      return `# HOTEL RECORD ${idx + 1}
-Naziv: ${r.naziv}
-Slug: ${r.slug}
-Adresa: ${r.adresa || '-'}
-Grad: ${r.grad || '-'}
-Telefon: ${r.telefon || '-'}
-Email: ${r.email || '-'}
-Google Maps: ${r.mapsUrl || '-'}
-Parking: ${r.parking || '-'}
-Check-in: ${r.checkin || '-'}
-Check-out: ${r.checkout || '-'}
-Opis: ${r.opisKratki || '-'}`;
-    }
+async function generateAnswer({ question, hotelSlug, hotelRec, intentPick, recordsToUse, outputRule }) {
+  const styleText = outputRule
+    ? `OUTPUT RULE (Scope=${outputRule.scope}, Format=${outputRule.format}):
+STYLE: ${outputRule.style}
+EXAMPLE: ${outputRule.example}`
+    : 'OUTPUT RULE: none (use clear short paragraphs).';
 
-    if (r._table === 'SOBE') {
-      const aiPromptShort = (r.aiPrompt || '').slice(0, 600);
-      const opisShort = (r.opis || '').slice(0, 1200);
-      return `# ROOM RECORD ${idx + 1}
-Soba: ${r.sobaOznaka || '-'}
-Tip: ${r.tipSobe || '-'}
+  const hotelBlock = hotelRec ? `# HOTEL CORE
+Naziv: ${hotelRec.hotelNaziv || '-'}
+Slug: ${hotelRec.slug || hotelSlug}
+Opis: ${hotelRec.opis || '-'}
+Adresa: ${hotelRec.adresa || '-'}
+Telefon: ${hotelRec.telefon || '-'}
+Email: ${hotelRec.email || '-'}
+Web: ${hotelRec.web || '-'}
+Check-in: ${hotelRec.checkIn || '-'}
+Check-out: ${hotelRec.checkOut || '-'}
+Parking (if defined): ${hotelRec.parking || '-'}` : '# HOTEL CORE\n(no hotel record found)';
+
+  const contextBlocks = recordsToUse.map((r, idx) => {
+    const aiPromptShort = (r.aiPrompt || '').slice(0, 600);
+    const opisShort = (r.opis || '').slice(0, 1400);
+
+    if (r.type === 'ROOM') {
+      return `# RECORD ${idx + 1} (ROOM)
+Naziv: ${r.naziv || '-'}
+Tip sobe: ${r.tipSobe || '-'}
 Slug: ${r.slug || '-'}
 Opis: ${opisShort || '-'}
 AI_PROMPT (internal): ${aiPromptShort || '-'}`;
     }
 
-    // SERVICES
-    const aiPromptShort = (r.aiPrompt || '').slice(0, 600);
-    const opisShort = (r.opis || '').slice(0, 1200);
-    return `# SERVICE RECORD ${idx + 1}
+    return `# RECORD ${idx + 1} (SERVICE)
 Naziv: ${r.naziv || '-'}
-Kategorija: ${(r.kategorija || []).join(', ') || '-'}
+Kategorija: ${(r.kategorija || []).join(', ')}
 Radno vrijeme: ${r.radnoVrijeme || '-'}
 Opis: ${opisShort || '-'}
 AI_PROMPT (internal): ${aiPromptShort || '-'}`;
   });
-}
 
-function hardNoInfoMessage(question) {
-  const q = String(question || '').toLowerCase();
-  const isHr = /[čćđšž]|(^|\s)(gdje|koje|kada|koliko|adresa|telefon|broj|lokacija|parking|sobe|doručak|wifi)(\s|$)/.test(q);
-
-  if (isHr) {
-    return 'Nažalost, za to trenutno nemam potvrđenu informaciju u sustavu. Preporučujem da kontaktirate recepciju hotela za točne detalje.';
-  }
-  return "Sorry — I don't have verified information for that right now. Please contact the hotel's reception for the exact details.";
-}
-
-async function generateAnswer({ question, hotelSlug, intentPick, recordsToUse, outputRule }) {
-  // HARD STOP: no records => no OpenAI call (prevents hallucinations)
-  if (!recordsToUse || !recordsToUse.length) {
-    return hardNoInfoMessage(question);
-  }
-
-  const styleText = outputRule
-    ? `OUTPUT RULE (Scope=${outputRule.scope}, Format=${outputRule.format}):
-STYLE: ${outputRule.style}
-EXAMPLE: ${outputRule.example}` // used as guidance, but we override greeting rule below
-    : 'OUTPUT RULE: none (use clear short paragraphs).';
-
-  const contextBlocks = buildContextBlocks(recordsToUse);
-
-  const sys = `You are a hotel web assistant for website visitors.
+  const sys = `You are "AI Olly" — a hotel web assistant for website visitors.
 
 CRITICAL RULES:
-- This is the WEB widget. Do NOT assume the user is a checked-in guest.
-- HOTEL-SPECIFIC facts MUST come from provided RECORDS. If missing in RECORDS, say you don't have that info and suggest contacting reception.
-- NEVER invent: address, phone, parking policy, prices, schedules, room features, availability.
-- Do NOT start every answer with "Dobrodošli" or repetitive greetings. Use a greeting only if the user greets first (e.g., "hi").
-- Keep answers short, helpful, and specific.
-- If question is ambiguous, ask ONE short clarifying question.
+- This is the WEB widget (website visitors). Do NOT assume the user is a checked-in guest.
+- HOTEL-SPECIFIC facts MUST come from provided HOTEL CORE or RECORDS. If missing, say you don't have that info and suggest contacting reception.
+- Do NOT greet with "Dobrodošli" in every answer. Greet only if the user greets first (hi/hello/bok) or asks who you are.
+- Keep answers short and direct. 1–4 short sentences unless user asks for details.
+- If you have multiple possible interpretations, ask ONE short clarifying question.
 
 ${styleText}
 
@@ -544,6 +499,7 @@ Respond in the user's language (HR/EN) matching the question.`;
     question,
     picked_intent: intentPick?.intent || null,
     confidence: intentPick?.confidence ?? null,
+    hotel_core: hotelBlock,
     records: contextBlocks,
   };
 
@@ -556,7 +512,7 @@ Respond in the user's language (HR/EN) matching the question.`;
     ],
   });
 
-  return resp.choices?.[0]?.message?.content?.trim() || hardNoInfoMessage(question);
+  return resp.choices?.[0]?.message?.content?.trim() || '';
 }
 
 // -------------------------
@@ -580,7 +536,7 @@ app.post('/api/web-ask', async (req, res) => {
     if (!question) return res.status(400).json({ ok: false, error: 'Missing question' });
 
     // 1) Load patterns (WEB)
-    const patterns = await getIntentPatternsForWeb(hotelSlug);
+    const patterns = await getIntentPatternsForWeb();
 
     // 2) Pick intent
     const intentPick = await chooseIntent(question, patterns);
@@ -594,26 +550,26 @@ app.post('/api/web-ask', async (req, res) => {
       scopeWanted = (intentPick.outputScope || 'General');
     }
 
-    // 3) Fetch records from SERVICES + SOBE + HOTELI
-    const { hotel, matched, fallback, counts } = await fetchRows({
+    // 3) Fetch knowledge rows (SERVICES + SOBE) + HOTEL CORE
+    const { hotelRec, matched, fallback, all } = await fetchKnowledgeRows({
       hotelSlug,
       intent: intentPick.intent,
       question,
-      patterns,
     });
 
     const recordsToUse = matched.length ? matched : fallback;
 
     // 4) Output rule (by scopeWanted, source WEB). If missing, fallback to General/WEB
-    let outputRule = await getOutputRule({ scopeWanted, aiSourceWanted: 'WEB', hotelSlug });
+    let outputRule = await getOutputRule({ scopeWanted, aiSourceWanted: 'WEB' });
     if (!outputRule && String(scopeWanted).toLowerCase() !== 'general') {
-      outputRule = await getOutputRule({ scopeWanted: 'General', aiSourceWanted: 'WEB', hotelSlug });
+      outputRule = await getOutputRule({ scopeWanted: 'General', aiSourceWanted: 'WEB' });
     }
 
     // 5) Generate answer
     const answer = await generateAnswer({
       question,
       hotelSlug,
+      hotelRec,
       intentPick,
       recordsToUse,
       outputRule,
@@ -629,13 +585,9 @@ app.post('/api/web-ask', async (req, res) => {
         intent: intentPick.intent,
         confidence: intentPick.confidence ?? null,
         scopeWanted,
-        usedRecords: recordsToUse.map(r => ({
-          table: r._table || null,
-          naziv: r.naziv || r.sobaOznaka || null,
-          id: r.id,
-        })),
+        usedRecords: recordsToUse.map(r => ({ type: r.type, naziv: r.naziv, id: r.id })),
         usedFallback: (!matched.length && fallback.length) ? true : false,
-        counts,
+        totalWebRecordsForHotel: all.length,
         ms,
       },
     });
