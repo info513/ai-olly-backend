@@ -74,23 +74,58 @@ const base = Airtable.base(AIRTABLE_BASE_ID);
 // -------------------------
 const nowIso = () => new Date().toISOString();
 
-function pickFirstNonEmpty(...vals) {
-  for (const v of vals) {
-    if (typeof v === 'string' && v.trim()) return v.trim();
-  }
-  return '';
-}
-
 function asArray(v) {
   if (!v) return [];
   if (Array.isArray(v)) return v;
   return [v];
 }
 
+// Airtable LOOKUP često vraća array; ovo uzme prvi smisleni string
+function pickText(v) {
+  if (Array.isArray(v)) {
+    for (const item of v) {
+      if (typeof item === 'string' && item.trim()) return item.trim();
+    }
+    return '';
+  }
+  if (typeof v === 'string' && v.trim()) return v.trim();
+  return '';
+}
+
+function pickFirstNonEmpty(...vals) {
+  for (const v of vals) {
+    const t = pickText(v);
+    if (t) return t;
+  }
+  return '';
+}
+
+function normalizeUpper(v) {
+  return String(v ?? '').trim().toUpperCase();
+}
+
+// case-insensitive match; radi za multi-select i string
 function fieldHasAny(fieldsValue, allowed) {
-  const arr = asArray(fieldsValue).map(String);
-  const allowedSet = new Set(allowed.map(String));
+  const arr = asArray(fieldsValue).map(normalizeUpper);
+  const allowedSet = new Set(allowed.map(normalizeUpper));
   return arr.some(v => allowedSet.has(v));
+}
+
+// Active checkbox: ako polje ne postoji -> default true (da ne “pobije” stare tablice)
+function isActiveField(fields) {
+  if (!fields) return true;
+  // podrži više varijanti imena (ali standard je Active)
+  const v =
+    fields.Active ??
+    fields['Active'] ??
+    fields['Is Active'] ??
+    fields.IsActive ??
+    fields.is_active;
+
+  // ako je undefined => tretiraj kao aktivno
+  if (typeof v === 'undefined') return true;
+
+  return v === true;
 }
 
 async function airtableSelectAll(tableName, options) {
@@ -120,9 +155,9 @@ function tokenize(s) {
 // -------------------------
 const CACHE_TTL_MS = 60 * 1000; // 60s
 let CACHE = {
-  intents: { ts: 0, data: [] },
-  outputRules: { ts: 0, data: [] },
-  servicesByHotel: new Map(), // key: hotelSlug => { ts, rows }
+  intents: { ts: 0, data: [] },          // cached FULL list (we filter per request by hotel)
+  outputRules: { ts: 0, data: [] },      // cached FULL list (we filter per request by hotel)
+  servicesByHotel: new Map(),            // key: hotelSlug => { ts, rows }
 };
 
 function cacheFresh(ts) {
@@ -130,9 +165,13 @@ function cacheFresh(ts) {
 }
 
 // -------------------------
-// Load AI_INTENT_PATTERNS (WEB/BOTH)
+// Load AI_INTENT_PATTERNS (WEB)
+// Supports optional fields:
+// - Active (checkbox)
+// - Hotel Slug (text or lookup)
+// Uses "Applies to" multi-select with WEB/PWA
 // -------------------------
-async function getIntentPatternsForWeb() {
+async function loadIntentPatterns() {
   if (cacheFresh(CACHE.intents.ts) && CACHE.intents.data.length) return CACHE.intents.data;
 
   const recs = await airtableSelectAll(TABLE_INTENTS, { pageSize: 100 });
@@ -141,57 +180,84 @@ async function getIntentPatternsForWeb() {
     const f = r.fields || {};
     return {
       id: r.id,
+      active: isActiveField(f),
+      hotelSlug: pickFirstNonEmpty(f['Hotel Slug'], f.HotelSlug, f.hotel_slug),
       intent: pickFirstNonEmpty(f.Intent, f.intent),
       phrases: pickFirstNonEmpty(f.Phrases, f.phrases),
       appliesTo: asArray(f['Applies to'] ?? f.AppliesTo ?? f.applies_to),
-      outputScope: pickFirstNonEmpty(f['Output Scope'], f.OutputScope, f.output_scope), // e.g. "General", "Room Guide", "City Guide"
+      outputScope: pickFirstNonEmpty(f['Output Scope'], f.OutputScope, f.output_scope), // "General", "Room Guide", ...
       servicesLink: f['Services link'] ?? f.ServicesLink ?? f.services_link,
       roomsLink: f['Rooms link'] ?? f.RoomsLink ?? f.rooms_link,
     };
   }).filter(p => p.intent);
 
-  // WEB widget: allow patterns with Applies to containing WEB or BOTH
-  const filtered = patterns.filter(p => fieldHasAny(p.appliesTo, ['WEB', 'BOTH']));
+  CACHE.intents = { ts: Date.now(), data: patterns };
+  return patterns;
+}
 
-  CACHE.intents = { ts: Date.now(), data: filtered };
-  return filtered;
+async function getIntentPatternsForWeb(hotelSlug) {
+  const all = await loadIntentPatterns();
+
+  // WEB widget: allow patterns with Applies to containing WEB
+  // (kompatibilnost: ako netko još ima BOTH, pustit ćemo i to)
+  const forWeb = all
+    .filter(p => p.active)
+    .filter(p => fieldHasAny(p.appliesTo, ['WEB', 'BOTH']));
+
+  // Per-hotel filter (ako Hotel Slug polje postoji u recordu)
+  // - ako pattern nema hotelSlug => globalan
+  // - ako ima hotelSlug => mora matchati trenutni hotel
+  const hs = String(hotelSlug || '');
+  const perHotel = forWeb.filter(p => !p.hotelSlug || String(p.hotelSlug) === hs);
+
+  return perHotel;
 }
 
 // -------------------------
 // Load AI_OUTPUT_RULES (cached)
+// Supports optional fields:
+// - Active (checkbox)
+// - Hotel Slug (text or lookup)
+// - AI_SOURCE (multi-select WEB/PWA) or legacy BOTH
 // -------------------------
 async function loadOutputRules() {
-  if (!cacheFresh(CACHE.outputRules.ts) || !CACHE.outputRules.data.length) {
-    const recs = await airtableSelectAll(TABLE_OUTPUT_RULES, { pageSize: 100 });
-
-    const rules = recs.map(r => {
-      const f = r.fields || {};
-      return {
-        id: r.id,
-        refId: pickFirstNonEmpty(f['Ref ID'], f.RefID, f.ref_id),
-        scope: pickFirstNonEmpty(f.Scope, f.scope), // "General", "Room Guide", "City Guide", "Requests"
-        format: pickFirstNonEmpty(f.Format, f.format),
-        style: pickFirstNonEmpty(f.Style, f.style),
-        example: pickFirstNonEmpty(f['Example Output'], f.ExampleOutput, f.example_output),
-        priority: Number(f.Priority ?? f.priority ?? 0),
-        isActive: (f['Is Active'] ?? f.IsActive ?? f.is_active ?? true) === true,
-        aiSource: asArray(f.AI_SOURCE ?? f.ai_source), // WEB/PWA/POI/ROUTES...
-      };
-    });
-
-    CACHE.outputRules = { ts: Date.now(), data: rules };
+  if (cacheFresh(CACHE.outputRules.ts) && CACHE.outputRules.data.length) {
+    return CACHE.outputRules.data;
   }
-  return CACHE.outputRules.data;
+
+  const recs = await airtableSelectAll(TABLE_OUTPUT_RULES, { pageSize: 100 });
+
+  const rules = recs.map(r => {
+    const f = r.fields || {};
+    return {
+      id: r.id,
+      refId: pickFirstNonEmpty(f['Ref ID'], f.RefID, f.ref_id),
+      scope: pickFirstNonEmpty(f.Scope, f.scope), // "General", "Room Guide", ...
+      format: pickFirstNonEmpty(f.Format, f.format),
+      style: pickFirstNonEmpty(f.Style, f.style),
+      example: pickFirstNonEmpty(f['Example Output'], f.ExampleOutput, f.example_output),
+      priority: Number(f.Priority ?? f.priority ?? 0),
+      active: isActiveField(f),
+      hotelSlug: pickFirstNonEmpty(f['Hotel Slug'], f.HotelSlug, f.hotel_slug),
+      aiSource: asArray(f.AI_SOURCE ?? f.ai_source),
+    };
+  });
+
+  CACHE.outputRules = { ts: Date.now(), data: rules };
+  return rules;
 }
 
-async function getOutputRule({ scopeWanted = 'General', aiSourceWanted = 'WEB' }) {
+async function getOutputRule({ scopeWanted = 'General', aiSourceWanted = 'WEB', hotelSlug }) {
   const rulesAll = await loadOutputRules();
 
   const scopeNorm = String(scopeWanted || 'General').toLowerCase();
+  const hs = String(hotelSlug || '');
+
   const filtered = rulesAll
-    .filter(r => r.isActive)
+    .filter(r => r.active)
     .filter(r => String(r.scope || '').toLowerCase() === scopeNorm)
-    .filter(r => fieldHasAny(r.aiSource, [aiSourceWanted]));
+    .filter(r => fieldHasAny(r.aiSource, [aiSourceWanted, 'BOTH'])) // kompatibilnost
+    .filter(r => !r.hotelSlug || String(r.hotelSlug) === hs);        // global ili match
 
   filtered.sort((a, b) => (b.priority || 0) - (a.priority || 0));
   return filtered[0] || null;
@@ -205,7 +271,6 @@ async function chooseIntent(question, patterns) {
 
   const validIntents = new Set(patterns.map(p => String(p.intent)));
 
-  // Keep list concise
   const compact = patterns.map(p => ({
     intent: p.intent,
     phrases: (p.phrases || '').slice(0, 240),
@@ -237,7 +302,6 @@ Return JSON only with keys: intent, confidence (0-1), outputScope, note.`;
     const confidence = Number(parsed.confidence ?? 0);
     const outputScope = (typeof parsed.outputScope === 'string' && parsed.outputScope.trim()) ? parsed.outputScope.trim() : 'General';
 
-    // Safety: if model returns an intent not in list, ignore it
     if (intent && !validIntents.has(intent)) intent = null;
 
     return { intent, confidence, outputScope, note: parsed.note || '' };
@@ -249,9 +313,11 @@ Return JSON only with keys: intent, confidence (0-1), outputScope, note.`;
 
 // -------------------------
 // Load SERVICES rows per hotel (cached) and filter for WEB
+// IMPORTANT: supports Hotel Slug as LOOKUP (array)
 // -------------------------
 async function getServicesForHotelWeb(hotelSlug) {
-  const cached = CACHE.servicesByHotel.get(String(hotelSlug));
+  const key = String(hotelSlug);
+  const cached = CACHE.servicesByHotel.get(key);
   if (cached && cacheFresh(cached.ts) && Array.isArray(cached.rows)) return cached.rows;
 
   const recs = await airtableSelectAll(TABLE_SERVICES, { pageSize: 100 });
@@ -260,6 +326,7 @@ async function getServicesForHotelWeb(hotelSlug) {
     const f = r.fields || {};
     return {
       id: r.id,
+      active: isActiveField(f),
       naziv: pickFirstNonEmpty(f['Naziv usluge'], f.Naziv, f.Name, f.Title, f.naziv),
       kategorija: asArray(f.Kategorija ?? f.kategorija),
       opis: pickFirstNonEmpty(f.Opis, f.opis),
@@ -267,14 +334,18 @@ async function getServicesForHotelWeb(hotelSlug) {
       aiPrompt: pickFirstNonEmpty(f.AI_PROMPT, f.ai_prompt),
       aiIntent: asArray(f.AI_INTENT ?? f.ai_intent),
       aiSource: asArray(f.AI_SOURCE ?? f.ai_source),
+      // Hotel Slug je često LOOKUP => array ["antique-split"] => pickFirstNonEmpty to sada rješava
       hotelSlug: pickFirstNonEmpty(f['Hotel Slug'], f.HotelSlug, f.hotel_slug),
     };
   });
 
-  const byHotel = rows.filter(r => String(r.hotelSlug) === String(hotelSlug));
-  const bySourceWeb = byHotel.filter(r => fieldHasAny(r.aiSource, ['WEB', 'BOTH']));
+  const byHotel = rows.filter(r => String(r.hotelSlug) === key);
+  const activeOnly = byHotel.filter(r => r.active);
 
-  CACHE.servicesByHotel.set(String(hotelSlug), { ts: Date.now(), rows: bySourceWeb });
+  // WEB: mora imati WEB u AI_SOURCE (ili legacy BOTH)
+  const bySourceWeb = activeOnly.filter(r => fieldHasAny(r.aiSource, ['WEB', 'BOTH']));
+
+  CACHE.servicesByHotel.set(key, { ts: Date.now(), rows: bySourceWeb });
   return bySourceWeb;
 }
 
@@ -301,8 +372,7 @@ function pickFallbackRecords(question, allForHotelWeb, limit = 3) {
   });
 
   scored.sort((a, b) => b.score - a.score);
-  const top = scored.filter(x => x.score > 0).slice(0, limit).map(x => x.r);
-  return top;
+  return scored.filter(x => x.score > 0).slice(0, limit).map(x => x.r);
 }
 
 async function fetchServiceRows({ hotelSlug, intent, question }) {
@@ -312,7 +382,6 @@ async function fetchServiceRows({ hotelSlug, intent, question }) {
     ? allForHotelWeb.filter(r => r.aiIntent.map(String).includes(String(intent)))
     : [];
 
-  // Fallback candidates if no match
   const fallback = (!matched.length)
     ? pickFallbackRecords(question, allForHotelWeb, 3)
     : [];
@@ -330,7 +399,6 @@ STYLE: ${outputRule.style}
 EXAMPLE: ${outputRule.example}`
     : 'OUTPUT RULE: none (use clear short paragraphs).';
 
-  // Keep context tight
   const contextBlocks = recordsToUse.map((r, idx) => {
     const aiPromptShort = (r.aiPrompt || '').slice(0, 600);
     const opisShort = (r.opis || '').slice(0, 1200);
@@ -395,8 +463,8 @@ app.post('/api/web-ask', async (req, res) => {
 
     if (!question) return res.status(400).json({ ok: false, error: 'Missing question' });
 
-    // 1) Load patterns (WEB/BOTH)
-    const patterns = await getIntentPatternsForWeb();
+    // 1) Load patterns for THIS hotel (WEB)
+    const patterns = await getIntentPatternsForWeb(hotelSlug);
 
     // 2) Pick intent
     const intentPick = await chooseIntent(question, patterns);
@@ -417,13 +485,12 @@ app.post('/api/web-ask', async (req, res) => {
       question,
     });
 
-    // records to use in prompt:
     const recordsToUse = matched.length ? matched : fallback;
 
-    // 4) Output rule (by scopeWanted, source WEB). If missing, fallback to General/WEB
-    let outputRule = await getOutputRule({ scopeWanted, aiSourceWanted: 'WEB' });
+    // 4) Output rule (scope + WEB + optional hotelSlug)
+    let outputRule = await getOutputRule({ scopeWanted, aiSourceWanted: 'WEB', hotelSlug });
     if (!outputRule && String(scopeWanted).toLowerCase() !== 'general') {
-      outputRule = await getOutputRule({ scopeWanted: 'General', aiSourceWanted: 'WEB' });
+      outputRule = await getOutputRule({ scopeWanted: 'General', aiSourceWanted: 'WEB', hotelSlug });
     }
 
     // 5) Generate answer
