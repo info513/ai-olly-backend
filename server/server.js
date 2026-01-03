@@ -32,7 +32,7 @@ if (!OPENAI_API_KEY || !AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
   process.exit(1);
 }
 
-// Render build marker (da znaš je li deploy stvarno digao zadnji commit)
+// Render build marker
 const BUILD =
   process.env.RENDER_GIT_COMMIT ||
   process.env.GIT_COMMIT ||
@@ -148,36 +148,40 @@ function tokenize(s) {
   return t.split(/\s+/).filter(Boolean);
 }
 
+// ✅ bolja detekcija jezika (HR vs EN)
+function detectLang(question) {
+  const q = String(question || '');
+  const hasCroChars = /[čćžšđ]/i.test(q);
+  const hasHrWords = /\b(je|li|imate|gdje|kada|radno|vrijeme|soba|sobe|doručak|recepcija|parking|adresa|broj|pravila|kućni)\b/i.test(q.toLowerCase());
+  return (hasCroChars || hasHrWords) ? 'HR' : 'EN';
+}
+
 function isRoomTypesQuestion(question) {
   const q = normalizeText(question);
-  // HR
   if (q.includes('vrste soba')) return true;
   if (q.includes('tipovi soba')) return true;
-  if (q.includes('tip sobe')) return true;
-  // EN
-  if (q.includes('types of rooms')) return true;
   if (q.includes('room types')) return true;
+  if (q.includes('types of rooms')) return true;
 
   const hasRooms = q.includes('soba') || q.includes('rooms') || q.includes('room');
   const hasTypes = q.includes('vrste') || q.includes('tip') || q.includes('types') || q.includes('type');
   return hasRooms && hasTypes;
 }
 
-// Ekstrakcija slug-a kad Airtable vrati string ili array (lookup)
-function valuesToStrings(v) {
-  return asArray(v).map(x => String(x).trim()).filter(Boolean);
+// ✅ hotel-specific heuristika (da možemo hard-stop kad nema podataka)
+function isHotelSpecificQuestion(question) {
+  const q = normalizeText(question);
+  const keys = [
+    'recepcija','reception','wifi','wi fi','internet','parking','parkiranje','doručak','breakfast',
+    'mini bar','minibar','check in','check-out','checkout','checkin','policy','pravila','pet','dog',
+    'laundry','dry cleaning','cleaning','housekeeping','room','rooms','soba','sobe','bed','krevet'
+  ];
+  return keys.some(k => q.includes(k));
 }
 
-function matchesHotelSlug(fieldValue, hotelSlug) {
-  const target = String(hotelSlug || '').trim();
-  const vals = valuesToStrings(fieldValue);
-  return vals.some(x => x === target);
-}
-
-// ✅ WEB filter: ako je AI_SOURCE prazan -> prihvati (tretiraj kao "svugdje")
-function allowForWeb(aiSourceArr) {
-  const src = asArray(aiSourceArr);
-  return isEmptyArray(src) || fieldHasAny(src, ['WEB']);
+function isCityQuestion(question) {
+  const q = normalizeText(question);
+  return q.includes('split') || q.includes('dioklecijan') || q.includes('palač') || q.includes('palace') || q.includes('peristil');
 }
 
 // -------------------------
@@ -212,11 +216,14 @@ async function getIntentPatternsForWeb() {
       phrases: pickFirstNonEmpty(f.Phrases, f.phrases),
       appliesTo: asArray(f['Applies to'] ?? f.AppliesTo ?? f.applies_to),
       outputScope: pickFirstNonEmpty(f['Output Scope'], f.OutputScope, f.output_scope),
+      servicesLink: asArray(f['Services link'] ?? f.ServicesLink ?? f.services_link), // record IDs
+      roomsLink: asArray(f['Rooms link'] ?? f.RoomsLink ?? f.rooms_link),             // record IDs
       active: (f.Active ?? true) === true,
     };
   }).filter(p => p.intent && p.active);
 
   const filtered = patterns.filter(p => fieldHasAny(p.appliesTo, ['WEB']));
+
   CACHE.intents = { ts: Date.now(), data: filtered };
   return filtered;
 }
@@ -255,7 +262,6 @@ async function getOutputRule({ scopeWanted = 'General', aiSourceWanted = 'WEB' }
   const filtered = rulesAll
     .filter(r => r.isActive)
     .filter(r => String(r.scope || '').toLowerCase() === scopeNorm)
-    // ako aiSource prazno -> tretiraj kao WEB (da ti ne ruši output)
     .filter(r => isEmptyArray(r.aiSource) || fieldHasAny(r.aiSource, [aiSourceWanted]));
 
   filtered.sort((a, b) => (b.priority || 0) - (a.priority || 0));
@@ -263,7 +269,7 @@ async function getOutputRule({ scopeWanted = 'General', aiSourceWanted = 'WEB' }
 }
 
 // -------------------------
-// Intent router
+// Intent router (samo routing)
 // -------------------------
 async function chooseIntent(question, patterns) {
   if (!patterns.length) return { intent: null, confidence: 0, note: 'no_patterns', outputScope: 'General' };
@@ -311,7 +317,7 @@ Return JSON only with keys: intent, confidence (0-1), outputScope, note.`;
 }
 
 // -------------------------
-// HOTELI + SERVICES + SOBE (robust retrieval)
+// HOTELI + SERVICES + SOBE
 // -------------------------
 async function getHotelRecord(hotelSlug) {
   const cached = CACHE.hotelBySlug.get(String(hotelSlug));
@@ -319,14 +325,12 @@ async function getHotelRecord(hotelSlug) {
 
   const slugEsc = escapeAirtableFormulaString(hotelSlug);
 
-  // 1) pokušaj filterByFormula
   let rec = await airtableSelectFirst(TABLE_HOTELS, {
     pageSize: 1,
     maxRecords: 1,
     filterByFormula: `{Slug}='${slugEsc}'`,
   });
 
-  // 2) fallback: povuci više i filtriraj u kodu
   if (!rec) {
     const all = await airtableSelectAll(TABLE_HOTELS, { pageSize: 100 });
     rec = all.find(r => {
@@ -355,19 +359,33 @@ async function getHotelRecord(hotelSlug) {
   return finalRow;
 }
 
+function valuesToStrings(v) {
+  return asArray(v).map(x => String(x).trim()).filter(Boolean);
+}
+
+function matchesHotelSlug(fieldValue, hotelSlug) {
+  const target = String(hotelSlug || '').trim();
+  const vals = valuesToStrings(fieldValue);
+  return vals.some(x => x === target);
+}
+
+// ✅ WEB filter: ako je AI_SOURCE prazan -> prihvati
+function allowForWeb(aiSourceArr) {
+  const src = asArray(aiSourceArr);
+  return isEmptyArray(src) || fieldHasAny(src, ['WEB']);
+}
+
 async function getServicesForHotelWeb(hotelSlug) {
   const cached = CACHE.servicesByHotel.get(String(hotelSlug));
   if (cached && cacheFresh(cached.ts) && Array.isArray(cached.rows)) return cached.rows;
 
   const slugEsc = escapeAirtableFormulaString(hotelSlug);
 
-  // 1) pokušaj s filterByFormula (brže)
   let recs = await airtableSelectAll(TABLE_SERVICES, {
     pageSize: 100,
     filterByFormula: `{Hotel Slug}='${slugEsc}'`,
   });
 
-  // 2) fallback ako je 0 (lookup/array slučaj)
   if (!recs.length) {
     recs = await airtableSelectAll(TABLE_SERVICES, { pageSize: 100 });
   }
@@ -405,13 +423,11 @@ async function getRoomsForHotelWeb(hotelSlug) {
 
   const slugEsc = escapeAirtableFormulaString(hotelSlug);
 
-  // 1) filterByFormula
   let recs = await airtableSelectAll(TABLE_ROOMS, {
     pageSize: 100,
     filterByFormula: `{Hotel Slug}='${slugEsc}'`,
   });
 
-  // 2) fallback ako je 0
   if (!recs.length) {
     recs = await airtableSelectAll(TABLE_ROOMS, { pageSize: 100 });
   }
@@ -463,7 +479,6 @@ function pickFallbackRecords(question, allRecords, limit = 3) {
       if (t.length < 3) continue;
       if (hay.includes(t)) score += 1;
     }
-
     return { r, score };
   });
 
@@ -488,29 +503,12 @@ async function fetchKnowledgeRows({ hotelSlug, intent, question }) {
     ? pickFallbackRecords(question, all, 3)
     : [];
 
-  return { hotelRec, matched, fallback, all, rooms, services };
+  return { hotelRec, services, rooms, matched, fallback, all };
 }
 
 // -------------------------
-// Deterministic helpers (bez GPT halucinacija)
+// Deterministic answers (no hallucinations)
 // -------------------------
-function isAddressQuestion(q) {
-  const s = normalizeText(q);
-  return s.includes('adresa') || s.includes('address') || s.includes('lokacija') || s.includes('where are you') || s.includes('gdje se nalazite') || s.includes('na kojoj je adresi');
-}
-function isPhoneQuestion(q) {
-  const s = normalizeText(q);
-  return s.includes('telefon') || s.includes('broj') || s.includes('phone');
-}
-function isEmailQuestion(q) {
-  const s = normalizeText(q);
-  return s.includes('email') || s.includes('e-mail') || s.includes('mail');
-}
-function isParkingQuestion(q) {
-  const s = normalizeText(q);
-  return s.includes('parking') || s.includes('parkiranje') || s.includes('park');
-}
-
 function renderRoomTypesAnswer(rooms, lang = 'HR') {
   if (!rooms?.length) {
     return lang === 'EN'
@@ -519,7 +517,7 @@ function renderRoomTypesAnswer(rooms, lang = 'HR') {
   }
 
   const lines = rooms
-    .map(r => `• ${r.naziv || r.tipSobe || r.slug || 'Soba'}`)
+    .map(r => `• ${r.naziv || r.tipSobe || r.slug || 'Room'}`)
     .slice(0, 20);
 
   return lang === 'EN'
@@ -527,10 +525,16 @@ function renderRoomTypesAnswer(rooms, lang = 'HR') {
     : `Imamo sljedeće vrste soba:\n${lines.join('\n')}`;
 }
 
+function renderNoInfo(lang = 'HR') {
+  return lang === 'EN'
+    ? `I don’t have that information in the system. Please contact reception for exact details.`
+    : `Nemam taj podatak u sustavu. Molim kontaktirajte recepciju za točne informacije.`;
+}
+
 // -------------------------
-// Answer generation (GPT formatting)
+// GPT answer generation (STRICT)
 // -------------------------
-async function generateAnswer({ question, hotelSlug, hotelRec, intentPick, recordsToUse, outputRule }) {
+async function generateAnswer({ question, hotelSlug, lang, hotelRec, intentPick, recordsToUse, outputRule }) {
   const styleText = outputRule
     ? `OUTPUT RULE (Scope=${outputRule.scope}, Format=${outputRule.format}):
 STYLE: ${outputRule.style}
@@ -548,8 +552,8 @@ Web: ${hotelRec.web || '-'}
 Parking: ${hotelRec.parking || '-'}` : '# HOTEL CORE\n(no hotel record found)';
 
   const contextBlocks = recordsToUse.map((r, idx) => {
-    const aiPromptShort = (r.aiPrompt || '').slice(0, 600);
-    const opisShort = (r.opis || '').slice(0, 1400);
+    const aiPromptShort = (r.aiPrompt || '').slice(0, 700);
+    const opisShort = (r.opis || '').slice(0, 1600);
 
     if (r.type === 'ROOM') {
       return `# RECORD ${idx + 1} (ROOM)
@@ -570,18 +574,21 @@ AI_PROMPT (internal): ${aiPromptShort || '-'}`;
 
   const sys = `You are "AI Olly" — a hotel web assistant for website visitors.
 
-CRITICAL RULES:
-- WEB widget (website visitors). Do NOT assume the user is checked-in.
-- HOTEL facts MUST come from HOTEL CORE or RECORDS. If missing, say you don't have that info and suggest contacting reception.
-- Do NOT repeat greetings like "Dobrodošli" in every answer. Only greet if the user greets first.
-- Keep answers short and direct (1–4 sentences) unless user asks for details.
-- If there is NO relevant info in HOTEL CORE/RECORDS, do NOT guess. Say you don't have it.
+ABSOLUTE RULES (no exceptions):
+- You MUST answer hotel-specific facts ONLY using HOTEL CORE or RECORDS provided.
+- If a detail is not present there, you MUST say it's not available and suggest contacting reception.
+- You MUST NOT guess prices, policies, times, services, amenities, room features, phone numbers, addresses, or procedures.
+- Do NOT repeat greetings (e.g., "Dobrodošli") unless user greets first.
+- Keep answers short (1–4 sentences).
 
 ${styleText}
 
-Respond in user's language (HR/EN) matching the question.`;
+Language:
+- If lang=HR respond in Croatian.
+- If lang=EN respond in English.`;
 
   const userPayload = {
+    lang,
     hotel_slug: hotelSlug,
     question,
     picked_intent: intentPick?.intent || null,
@@ -592,7 +599,7 @@ Respond in user's language (HR/EN) matching the question.`;
 
   const resp = await openai.chat.completions.create({
     model: OPENAI_MODEL,
-    temperature: 0.2,
+    temperature: 0, // ✅ manje “kreative”
     messages: [
       { role: 'system', content: sys },
       { role: 'user', content: JSON.stringify(userPayload) },
@@ -606,65 +613,30 @@ Respond in user's language (HR/EN) matching the question.`;
 // Routes
 // -------------------------
 app.get('/api/health', (req, res) => {
-  res.json({
-    ok: true,
-    service: 'ai-olly-hub-web',
-    time: nowIso(),
-    build: BUILD,
-    base: AIRTABLE_BASE_ID,
-  });
+  res.json({ ok: true, service: 'ai-olly-hub-web', time: nowIso(), build: BUILD });
 });
 
-// ✅ Debug endpoint: vidi što backend stvarno čita
+// Debug: vidi koliko recorda server vidi za hotel
 app.get('/api/debug', async (req, res) => {
   try {
     const hotelSlug = pickFirstNonEmpty(req.query?.slug, HOTEL_SLUG_DEFAULT);
-
-    const [hotelRec, servicesAll, roomsAll] = await Promise.all([
-      getHotelRecord(hotelSlug),
-      airtableSelectAll(TABLE_SERVICES, { pageSize: 100 }),
-      airtableSelectAll(TABLE_ROOMS, { pageSize: 100 }),
-    ]);
-
-    const servicesForHotel = servicesAll.filter(r => {
-      const f = r.fields || {};
-      return matchesHotelSlug((f['Hotel Slug'] ?? f.HotelSlug ?? f.hotel_slug), hotelSlug);
-    });
-
-    const roomsForHotel = roomsAll.filter(r => {
-      const f = r.fields || {};
-      return matchesHotelSlug((f['Hotel Slug'] ?? f.HotelSlug ?? f.hotel_slug), hotelSlug);
-    });
-
-    const firstService = servicesAll[0]?.fields || {};
-    const firstRoom = roomsAll[0]?.fields || {};
+    const { hotelRec, services, rooms, all } = await fetchKnowledgeRows({ hotelSlug, intent: null, question: '' });
 
     res.json({
       ok: true,
       time: nowIso(),
       build: BUILD,
       hotelSlug,
-      tables: {
-        TABLE_HOTELS,
-        TABLE_SERVICES,
-        TABLE_ROOMS,
-        TABLE_INTENTS,
-        TABLE_OUTPUT_RULES,
-      },
-      hotelRecordFound: Boolean(hotelRec),
       counts: {
-        servicesTotal: servicesAll.length,
-        roomsTotal: roomsAll.length,
-        servicesForHotel: servicesForHotel.length,
-        roomsForHotel: roomsForHotel.length,
+        hotelRecordFound: Boolean(hotelRec),
+        servicesForHotelWeb: services.length,
+        roomsForHotelWeb: rooms.length,
+        totalWebRecordsForHotel: all.length,
       },
-      samples: {
-        hotel: hotelRec || null,
-        firstServiceFieldKeys: Object.keys(firstService),
-        firstRoomFieldKeys: Object.keys(firstRoom),
-        firstServiceHotelSlugRaw: (servicesAll[0]?.fields || {})['Hotel Slug'] ?? null,
-        firstRoomHotelSlugRaw: (roomsAll[0]?.fields || {})['Hotel Slug'] ?? null,
-      },
+      sampleKeys: {
+        services_first: services[0] ? Object.keys(services[0]) : [],
+        rooms_first: rooms[0] ? Object.keys(rooms[0]) : [],
+      }
     });
   } catch (e) {
     console.error('debug error:', e);
@@ -678,29 +650,22 @@ app.post('/api/web-ask', async (req, res) => {
   try {
     const question = pickFirstNonEmpty(req.body?.question, req.body?.q);
     const hotelSlug = pickFirstNonEmpty(req.query?.slug, req.body?.slug, HOTEL_SLUG_DEFAULT);
+    const lang = detectLang(question);
 
     if (!question) return res.status(400).json({ ok: false, error: 'Missing question' });
 
-    const lang = normalizeText(question).match(/[a-z]/) ? 'EN' : 'HR';
-
+    // 1) patterns + intent
     const patterns = await getIntentPatternsForWeb();
     const intentPick = await chooseIntent(question, patterns);
 
-    let scopeWanted = 'General';
-    if (intentPick?.intent) {
-      const p = patterns.find(x => String(x.intent) === String(intentPick.intent));
-      scopeWanted = (p?.outputScope || intentPick.outputScope || 'General');
-    } else {
-      scopeWanted = (intentPick.outputScope || 'General');
-    }
-
-    const { hotelRec, matched, fallback, all, rooms } = await fetchKnowledgeRows({
+    // 2) load knowledge
+    const { hotelRec, services, rooms, matched, fallback, all } = await fetchKnowledgeRows({
       hotelSlug,
       intent: intentPick.intent,
       question,
     });
 
-    // ✅ 1) Vrste soba -> direktno listaj sobe (bez GPT-a)
+    // 3) "vrste soba" -> direktno listaj sobe (bez GPT-a)
     if (isRoomTypesQuestion(question)) {
       const answer = renderRoomTypesAnswer(rooms, lang);
       const ms = Date.now() - started;
@@ -714,42 +679,78 @@ app.post('/api/web-ask', async (req, res) => {
           scopeWanted: 'General',
           usedRecords: rooms.slice(0, 20).map(r => ({ type: r.type, naziv: r.naziv, id: r.id })),
           usedFallback: false,
+          usedLinked: true,
           totalWebRecordsForHotel: all.length,
           ms,
         },
       });
     }
 
-    // ✅ 2) Adresa/telefon/email/parking -> ako postoji u HOTELI, odgovori bez GPT-a
-    if (hotelRec) {
-      if (isAddressQuestion(question) && hotelRec.adresa) {
-        const ms = Date.now() - started;
-        return res.json({ ok: true, answer: `Adresa hotela je ${hotelRec.adresa}.`, meta: { hotelSlug, intent: intentPick.intent, confidence: intentPick.confidence ?? null, scopeWanted, usedRecords: [], usedFallback: false, totalWebRecordsForHotel: all.length, ms } });
-      }
-      if (isPhoneQuestion(question) && hotelRec.telefon) {
-        const ms = Date.now() - started;
-        return res.json({ ok: true, answer: `Telefon hotela: ${hotelRec.telefon}.`, meta: { hotelSlug, intent: intentPick.intent, confidence: intentPick.confidence ?? null, scopeWanted, usedRecords: [], usedFallback: false, totalWebRecordsForHotel: all.length, ms } });
-      }
-      if (isEmailQuestion(question) && hotelRec.email) {
-        const ms = Date.now() - started;
-        return res.json({ ok: true, answer: `E-mail hotela: ${hotelRec.email}.`, meta: { hotelSlug, intent: intentPick.intent, confidence: intentPick.confidence ?? null, scopeWanted, usedRecords: [], usedFallback: false, totalWebRecordsForHotel: all.length, ms } });
-      }
-      if (isParkingQuestion(question) && hotelRec.parking) {
-        const ms = Date.now() - started;
-        return res.json({ ok: true, answer: hotelRec.parking, meta: { hotelSlug, intent: intentPick.intent, confidence: intentPick.confidence ?? null, scopeWanted, usedRecords: [], usedFallback: false, totalWebRecordsForHotel: all.length, ms } });
+    // 4) Ako intent postoji i pattern ima linked recorde -> koristi njih (glavni fix)
+    let recordsToUse = [];
+    let usedLinked = false;
+
+    if (intentPick.intent) {
+      const p = patterns.find(x => String(x.intent) === String(intentPick.intent));
+      const svcIds = asArray(p?.servicesLink);
+      const roomIds = asArray(p?.roomsLink);
+
+      const linkedServices = svcIds.map(id => services.find(s => s.id === id)).filter(Boolean);
+      const linkedRooms = roomIds.map(id => rooms.find(r => r.id === id)).filter(Boolean);
+
+      const linked = [...linkedServices, ...linkedRooms];
+
+      if (linked.length) {
+        recordsToUse = linked;
+        usedLinked = true;
       }
     }
 
-    let recordsToUse = matched.length ? matched : fallback;
+    // 5) fallback na AI_INTENT tagging ako nema linked
+    if (!recordsToUse.length) {
+      recordsToUse = matched.length ? matched : fallback;
+    }
+
+    // 6) HARD STOP: ako je pitanje hotel-specific i nemamo records -> nema GPT-a
+    // (ovo ti ubija halucinacije tipa kids corner, cijene, extra bed i sl.)
+    if (isHotelSpecificQuestion(question) && !recordsToUse.length && !hotelRec) {
+      const ms = Date.now() - started;
+      return res.json({
+        ok: true,
+        answer: renderNoInfo(lang),
+        meta: {
+          hotelSlug,
+          intent: intentPick.intent,
+          confidence: intentPick.confidence ?? null,
+          scopeWanted: 'General',
+          usedRecords: [],
+          usedFallback: false,
+          usedLinked,
+          totalWebRecordsForHotel: all.length,
+          ms,
+        },
+      });
+    }
+
+    // 7) scope + output rule
+    let scopeWanted = 'General';
+    if (intentPick?.intent) {
+      const p = patterns.find(x => String(x.intent) === String(intentPick.intent));
+      scopeWanted = (p?.outputScope || intentPick.outputScope || 'General');
+    }
 
     let outputRule = await getOutputRule({ scopeWanted, aiSourceWanted: 'WEB' });
     if (!outputRule && String(scopeWanted).toLowerCase() !== 'general') {
       outputRule = await getOutputRule({ scopeWanted: 'General', aiSourceWanted: 'WEB' });
     }
 
+    // 8) Generate answer (strict)
+    // Napomena: gradska pitanja (Split/Palace) će i dalje moći odgovoriti općenito,
+    // ali hotelske činjenice samo iz records/core.
     const answer = await generateAnswer({
       question,
       hotelSlug,
+      lang,
       hotelRec,
       intentPick,
       recordsToUse,
@@ -768,6 +769,7 @@ app.post('/api/web-ask', async (req, res) => {
         scopeWanted,
         usedRecords: recordsToUse.map(r => ({ type: r.type, naziv: r.naziv, id: r.id })),
         usedFallback: (!matched.length && fallback.length) ? true : false,
+        usedLinked,
         totalWebRecordsForHotel: all.length,
         ms,
       },
