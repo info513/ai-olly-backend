@@ -144,10 +144,22 @@ async function airtableFindByIds(tableName, ids = [], limit = 30) {
     uniq.map(id => base(tableName).find(id))
   );
 
-  // vrati samo uspješne
   return out
     .filter(x => x.status === 'fulfilled' && x.value)
     .map(x => x.value);
+}
+
+// ✅ “siguran select”: prvo pokušaj s filterByFormula, ako puca ili vrati 0 — uzmi sve
+async function airtableSelectAllSafe(tableName, tryOptions = [], fallbackOptions = {}) {
+  for (const opt of tryOptions) {
+    try {
+      const recs = await airtableSelectAll(tableName, opt);
+      if (Array.isArray(recs) && recs.length) return recs;
+    } catch (e) {
+      // ignore and try next
+    }
+  }
+  return airtableSelectAll(tableName, fallbackOptions);
 }
 
 function normalizeText(s) {
@@ -166,8 +178,9 @@ function tokenize(s) {
 // ✅ bolja detekcija jezika (HR vs EN)
 function detectLang(question) {
   const q = String(question || '');
+  const ql = q.toLowerCase();
   const hasCroChars = /[čćžšđ]/i.test(q);
-  const hasHrWords = /\b(je|li|imate|gdje|kada|radno|vrijeme|soba|sobe|doručak|recepcija|parking|adresa|broj|pravila|kućni)\b/i.test(q.toLowerCase());
+  const hasHrWords = /\b(je|li|imate|gdje|kada|radno|vrijeme|soba|sobe|doručak|recepcija|parking|adresa|broj|pravila|kućni|molim|hvala|trebam)\b/i.test(ql);
   return (hasCroChars || hasHrWords) ? 'HR' : 'EN';
 }
 
@@ -183,6 +196,35 @@ function isRoomTypesQuestion(question) {
   return hasRooms && hasTypes;
 }
 
+function isRoomAmenitiesQuestion(question) {
+  const q = normalizeText(question);
+  const hasAmen = q.includes('amenities') || q.includes('amenity') || q.includes('sadržaj') || q.includes('oprema') || q.includes('what is in the room');
+  const hasRoom = q.includes('room') || q.includes('rooms') || q.includes('soba') || q.includes('sobe');
+  return hasAmen && (hasRoom || q.includes('deluxe') || q.includes('superior') || q.includes('standard') || q.includes('comfort'));
+}
+
+function isBedTypeQuestion(question) {
+  const q = normalizeText(question);
+  return (
+    q.includes('twin') ||
+    q.includes('king') ||
+    q.includes('bed') ||
+    q.includes('beds') ||
+    q.includes('krevet') ||
+    q.includes('kreveti')
+  );
+}
+
+function isRoomDifferenceQuestion(question) {
+  const q = normalizeText(question);
+  return (
+    q.includes('razlika') ||
+    q.includes('difference') ||
+    q.includes('compare') ||
+    q.includes('usporedi')
+  );
+}
+
 // ✅ hotel-specific heuristika (da možemo hard-stop kad nema podataka)
 function isHotelSpecificQuestion(question) {
   const q = normalizeText(question);
@@ -190,7 +232,8 @@ function isHotelSpecificQuestion(question) {
     'recepcija','reception','wifi','wi fi','internet','parking','parkiranje','doručak','breakfast',
     'mini bar','minibar','check in','check-out','checkout','checkin','policy','pravila','pet','dog',
     'laundry','dry cleaning','cleaning','housekeeping','room','rooms','soba','sobe','bed','krevet',
-    'view','pogled','floor','kat','size','kvadratura','capacity','kapacitet'
+    'view','pogled','floor','kat','size','kvadratura','capacity','kapacitet',
+    'amenities','oprema','sadržaj'
   ];
   return keys.some(k => q.includes(k));
 }
@@ -198,6 +241,43 @@ function isHotelSpecificQuestion(question) {
 function isCityQuestion(question) {
   const q = normalizeText(question);
   return q.includes('split') || q.includes('dioklecijan') || q.includes('palač') || q.includes('palace') || q.includes('peristil');
+}
+
+// -------------------------
+// Stability: local rate limit (returns "wait 20 seconds")
+// -------------------------
+const RL_WINDOW_MS = 20_000;
+const RL_MAX = 12;
+const RL = new Map(); // ip -> { tsStart, count }
+
+function shouldRateLimit(ip) {
+  const key = String(ip || 'unknown');
+  const now = Date.now();
+  const cur = RL.get(key);
+  if (!cur) {
+    RL.set(key, { tsStart: now, count: 1 });
+    return false;
+  }
+  if (now - cur.tsStart > RL_WINDOW_MS) {
+    RL.set(key, { tsStart: now, count: 1 });
+    return false;
+  }
+  cur.count += 1;
+  RL.set(key, cur);
+  return cur.count > RL_MAX;
+}
+
+function renderWait20s(lang = 'HR') {
+  return lang === 'EN'
+    ? 'Too many requests in a short time. Please wait 20 seconds and try again.'
+    : 'Previše upita u kratkom vremenu. Pričekajte 20 sekundi i pokušajte ponovno.';
+}
+
+function isOpenAIRateLimitError(e) {
+  const status = e?.status || e?.response?.status;
+  const code = e?.code;
+  const msg = String(e?.message || '');
+  return status === 429 || code === 'rate_limit_exceeded' || msg.toLowerCase().includes('rate limit') || msg.includes('429');
 }
 
 // -------------------------
@@ -233,7 +313,7 @@ async function getIntentPatternsForWeb() {
       appliesTo: asArray(f['Applies to'] ?? f.AppliesTo ?? f.applies_to),
       outputScope: pickFirstNonEmpty(f['Output Scope'], f.OutputScope, f.output_scope),
 
-      // linked record IDs (Airtable već vraća array record ID-jeva)
+      // linked record IDs
       servicesLink: asArray(f['Services link'] ?? f.ServicesLink ?? f.services_link),
       roomsLink: asArray(f['Rooms link'] ?? f.RoomsLink ?? f.rooms_link),
 
@@ -289,7 +369,54 @@ async function getOutputRule({ scopeWanted = 'General', aiSourceWanted = 'WEB' }
 
 // -------------------------
 // Intent router (samo routing)
+// + heuristic fallback ako je confidence nizak ili null intent
 // -------------------------
+function tokensWithSynonyms(question) {
+  const t = tokenize(question);
+  const extra = [];
+  const q = normalizeText(question);
+
+  const add = (...arr) => extra.push(...arr);
+
+  if (q.includes('check in') || q.includes('checkin') || q.includes('prijava')) add('checkin', 'arrival', 'prijava');
+  if (q.includes('check out') || q.includes('checkout') || q.includes('odjava')) add('checkout', 'departure', 'odjava');
+  if (q.includes('wifi') || q.includes('wi fi') || q.includes('internet')) add('wifi', 'internet', 'password', 'lozinka');
+  if (q.includes('parking') || q.includes('parkiranje') || q.includes('rampa') || q.includes('gate')) add('parking', 'rampa', 'gate', 'ramp');
+  if (q.includes('breakfast') || q.includes('doručak') || q.includes('dorucak')) add('breakfast', 'doručak', 'menu', 'vrijeme');
+  if (q.includes('amenities') || q.includes('oprema') || q.includes('sadržaj') || q.includes('sadrzaj')) add('amenities', 'oprema', 'sadržaj');
+  if (q.includes('twin') || q.includes('king') || q.includes('bed') || q.includes('krevet')) add('bed', 'krevet', 'twin', 'king');
+
+  return Array.from(new Set([...t, ...extra].map(String).filter(Boolean)));
+}
+
+function heuristicChooseIntent(question, patterns) {
+  const qTokens = tokensWithSynonyms(question);
+  if (!qTokens.length) return { intent: null, confidence: 0, outputScope: 'General', note: 'heuristic_no_tokens' };
+
+  let best = { intent: null, score: 0, outputScope: 'General' };
+
+  for (const p of patterns) {
+    const phrases = String(p.phrases || '');
+    const hay = normalizeText(`${p.intent} ${phrases}`);
+    let score = 0;
+
+    for (const t of qTokens) {
+      if (t.length < 3) continue;
+      if (hay.includes(t)) score += 1;
+    }
+
+    // mala prednost ako intent “ključna riječ” direktno postoji
+    if (p.intent && normalizeText(p.intent).includes(qTokens[0] || '')) score += 0.25;
+
+    if (score > best.score) best = { intent: p.intent, score, outputScope: p.outputScope || 'General' };
+  }
+
+  if (best.score >= 2) {
+    return { intent: best.intent, confidence: Math.min(0.85, 0.55 + best.score * 0.05), outputScope: best.outputScope, note: 'heuristic_match' };
+  }
+  return { intent: null, confidence: 0, outputScope: 'General', note: 'heuristic_no_match' };
+}
+
 async function chooseIntent(question, patterns) {
   if (!patterns.length) return { intent: null, confidence: 0, note: 'no_patterns', outputScope: 'General' };
 
@@ -328,9 +455,18 @@ Return JSON only with keys: intent, confidence (0-1), outputScope, note.`;
 
     if (intent && !validIntents.has(intent)) intent = null;
 
+    // Heuristic fallback ako je “mlitavo”
+    if (!intent || confidence < 0.35) {
+      const h = heuristicChooseIntent(question, patterns);
+      if (h.intent) return h;
+    }
+
     return { intent, confidence, outputScope, note: parsed.note || '' };
   } catch (e) {
     console.error('chooseIntent error:', e);
+    // fallback heuristic (bez OpenAI)
+    const h = heuristicChooseIntent(question, patterns);
+    if (h.intent) return h;
     return { intent: null, confidence: 0, outputScope: 'General', note: 'intent_router_failed' };
   }
 }
@@ -441,7 +577,7 @@ function mapRoomRecord(r) {
     kvadratura: f.Kvadratura ?? f.kvadratura ?? null,
     kat: f.Kat ?? f.kat ?? null,
     pogled: f.Pogled ?? f.pogled ?? null,
-    kreveti: asArray(f.Kreveti ?? f.kreveti),
+    kreveti: asArray(f["Bed's"] ?? f.Beds ?? f.Kreveti ?? f.kreveti),
     roomAmenities: asArray(f['Room Amenities'] ?? f['Room amenities'] ?? f.room_amenities ?? f['Room Amenities (sadržaj sobe)']),
 
     aiPrompt: pickFirstNonEmpty(f.AI_PROMPT, f.ai_prompt),
@@ -458,15 +594,15 @@ async function getServicesForHotelWeb(hotelSlug) {
 
   const slugEsc = escapeAirtableFormulaString(hotelSlug);
 
-  let recs = await airtableSelectAll(TABLE_SERVICES, {
-    pageSize: 100,
-    filterByFormula: `{Hotel Slug}='${slugEsc}'`,
-  });
-
-  // fallback: ako filter ne radi (lookup/array), uzmi sve pa filtriraj ručno
-  if (!recs.length) {
-    recs = await airtableSelectAll(TABLE_SERVICES, { pageSize: 100 });
-  }
+  // pokušaj prvo s “Hotel Slug (text)”, pa s “Hotel Slug”, pa fallback na all
+  const recs = await airtableSelectAllSafe(
+    TABLE_SERVICES,
+    [
+      { pageSize: 100, filterByFormula: `{Hotel Slug (text)}='${slugEsc}'` },
+      { pageSize: 100, filterByFormula: `{Hotel Slug}='${slugEsc}'` },
+    ],
+    { pageSize: 100 }
+  );
 
   const rows = recs.map(mapServiceRecord);
 
@@ -486,15 +622,14 @@ async function getRoomsForHotelWeb(hotelSlug) {
 
   const slugEsc = escapeAirtableFormulaString(hotelSlug);
 
-  let recs = await airtableSelectAll(TABLE_ROOMS, {
-    pageSize: 100,
-    filterByFormula: `{Hotel Slug}='${slugEsc}'`,
-  });
-
-  // fallback: ako filter ne radi (lookup/array), uzmi sve pa filtriraj ručno
-  if (!recs.length) {
-    recs = await airtableSelectAll(TABLE_ROOMS, { pageSize: 100 });
-  }
+  const recs = await airtableSelectAllSafe(
+    TABLE_ROOMS,
+    [
+      { pageSize: 100, filterByFormula: `{Hotel Slug (text)}='${slugEsc}'` },
+      { pageSize: 100, filterByFormula: `{Hotel Slug}='${slugEsc}'` },
+    ],
+    { pageSize: 100 }
+  );
 
   const rows = recs.map(mapRoomRecord);
 
@@ -508,37 +643,61 @@ async function getRoomsForHotelWeb(hotelSlug) {
   return webRows;
 }
 
+// -------------------------
+// Better fallback scoring (services + rooms)
+// -------------------------
+function buildRecordHaystack(r) {
+  return normalizeText([
+    r.type,
+    r.naziv,
+    r.tipSobe,
+    r.slug,
+    (Array.isArray(r.kategorija) ? r.kategorija.join(' ') : ''),
+    (Array.isArray(r.kreveti) ? r.kreveti.join(' ') : ''),
+    (Array.isArray(r.roomAmenities) ? r.roomAmenities.join(' ') : ''),
+    (r.pogled ? String(r.pogled) : ''),
+    (r.kat ? String(r.kat) : ''),
+    (r.kvadratura ? String(r.kvadratura) : ''),
+    (r.kapacitet ? String(r.kapacitet) : ''),
+    r.opis,
+    r.radnoVrijeme,
+    (Array.isArray(r.aiIntent) ? r.aiIntent.join(' ') : ''),
+  ].join(' '));
+}
+
 function pickFallbackRecords(question, allRecords, limit = 3) {
-  const qTokens = tokenize(question);
+  const qTokens = tokensWithSynonyms(question);
   if (!qTokens.length) return [];
 
+  const qNorm = normalizeText(question);
+
   const scored = allRecords.map(r => {
-    const hay = normalizeText([
-      r.type,
-      r.naziv,
-      r.tipSobe,
-      (Array.isArray(r.kategorija) ? r.kategorija.join(' ') : ''),
-      (Array.isArray(r.kreveti) ? r.kreveti.join(' ') : ''),
-      (Array.isArray(r.roomAmenities) ? r.roomAmenities.join(' ') : ''),
-      (r.pogled ? String(r.pogled) : ''),
-      (r.kat ? String(r.kat) : ''),
-      (r.kvadratura ? String(r.kvadratura) : ''),
-      (r.kapacitet ? String(r.kapacitet) : ''),
-      r.opis,
-      r.radnoVrijeme,
-      (Array.isArray(r.aiIntent) ? r.aiIntent.join(' ') : ''),
-    ].join(' '));
+    const hay = buildRecordHaystack(r);
 
     let score = 0;
+
+    // token overlaps
     for (const t of qTokens) {
       if (t.length < 3) continue;
       if (hay.includes(t)) score += 1;
     }
+
+    // phrase contains boost (kad user upiše baš naziv usluge/sobe)
+    const nameNorm = normalizeText(r.naziv || '');
+    if (nameNorm && qNorm.includes(nameNorm) && nameNorm.length >= 4) score += 3;
+
+    // small type boost
+    if ((qNorm.includes('room') || qNorm.includes('soba')) && r.type === 'ROOM') score += 0.5;
+    if ((qNorm.includes('breakfast') || qNorm.includes('doruč')) && r.type === 'SERVICE') score += 0.5;
+
     return { r, score };
   });
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.filter(x => x.score > 0).slice(0, limit).map(x => x.r);
+
+  // vrati samo stvarno relevantne; ali ako top ima visok score, uzmi ga
+  const top = scored.filter(x => x.score > 0);
+  return top.slice(0, limit).map(x => x.r);
 }
 
 async function fetchKnowledgeRows({ hotelSlug, intent, question }) {
@@ -590,6 +749,144 @@ function renderNoInfo(lang = 'HR') {
   return lang === 'EN'
     ? `I don’t have that information in the system. Please contact reception for exact details.`
     : `Nemam taj podatak u sustavu. Molim kontaktirajte recepciju za točne informacije.`;
+}
+
+// ---- room finders ----
+function roomMatchScore(questionNorm, room) {
+  const name = normalizeText(room.naziv || '');
+  const tip = normalizeText(room.tipSobe || '');
+  const slug = normalizeText(room.slug || '');
+  let s = 0;
+  if (name && questionNorm.includes(name)) s += 5;
+  if (tip && questionNorm.includes(tip)) s += 4;
+  if (slug && questionNorm.includes(slug)) s += 3;
+
+  // partial keywords
+  for (const w of ['deluxe','superior','standard','comfort','ground','floor']) {
+    if (questionNorm.includes(w) && (name.includes(w) || tip.includes(w) || slug.includes(w))) s += 1;
+  }
+  return s;
+}
+
+function findBestRoomMention(question, rooms) {
+  const q = normalizeText(question);
+  let best = null;
+  let bestScore = 0;
+  for (const r of rooms || []) {
+    const s = roomMatchScore(q, r);
+    if (s > bestScore) { bestScore = s; best = r; }
+  }
+  return (bestScore >= 3) ? best : null;
+}
+
+function renderRoomAmenitiesForRoom(room, lang = 'HR') {
+  const am = asArray(room?.roomAmenities).map(String).filter(Boolean);
+  if (!room || !am.length) {
+    return lang === 'EN'
+      ? 'I don’t have a full amenities list for that room in the system. Please contact reception for details.'
+      : 'Nemam kompletan popis sadržaja/opreme za tu sobu u sustavu. Molim kontaktirajte recepciju za detalje.';
+  }
+  const title = room.naziv || room.tipSobe || 'Room';
+  const lines = am.slice(0, 50).map(x => `• ${x}`);
+  return lang === 'EN'
+    ? `Room amenities for ${title}:\n${lines.join('\n')}`
+    : `Sadržaj/oprema sobe (${title}):\n${lines.join('\n')}`;
+}
+
+function renderRoomAmenitiesGeneral(rooms, lang = 'HR') {
+  const all = new Set();
+  for (const r of rooms || []) {
+    for (const a of asArray(r.roomAmenities)) {
+      const s = String(a || '').trim();
+      if (s) all.add(s);
+    }
+  }
+  const list = Array.from(all).slice(0, 50);
+  if (!list.length) {
+    return lang === 'EN'
+      ? 'I don’t have a full amenities list in the system. Please contact reception for details.'
+      : 'Nemam kompletan popis sadržaja/opreme u sustavu. Molim kontaktirajte recepciju za detalje.';
+  }
+  const lines = list.map(x => `• ${x}`);
+  return lang === 'EN'
+    ? `Room amenities (as listed):\n${lines.join('\n')}`
+    : `Sadržaj/oprema soba (kako je navedeno u sustavu):\n${lines.join('\n')}`;
+}
+
+function renderBedTypesAnswer(rooms, lang = 'HR') {
+  const lines = (rooms || [])
+    .map(r => {
+      const beds = asArray(r.kreveti).map(String).filter(Boolean);
+      if (!beds.length) return null;
+      const name = r.naziv || r.tipSobe || r.slug || 'Room';
+      return `• ${name}: ${beds.join(', ')}`;
+    })
+    .filter(Boolean)
+    .slice(0, 20);
+
+  if (!lines.length) {
+    return lang === 'EN'
+      ? 'I don’t have bed-type details in the system. Please contact reception for exact information.'
+      : 'Nemam podatke o tipu kreveta u sustavu. Molim kontaktirajte recepciju za točne informacije.';
+  }
+
+  return lang === 'EN'
+    ? `Bed types (as listed):\n${lines.join('\n')}`
+    : `Tipovi kreveta (kako je navedeno u sustavu):\n${lines.join('\n')}`;
+}
+
+function roomValueToText(v) {
+  if (v == null) return '';
+  if (Array.isArray(v)) return v.map(x => String(x).trim()).filter(Boolean).join(', ');
+  return String(v).trim();
+}
+
+function renderRoomDifference(roomA, roomB, lang = 'HR') {
+  if (!roomA || !roomB) {
+    return lang === 'EN'
+      ? 'I can compare rooms only if both room types are clearly identified. Please specify the two room names.'
+      : 'Mogu usporediti sobe samo ako su obje jasno navedene. Molim napišite točno dvije sobe koje želite usporediti.';
+  }
+
+  const fields = [
+    { key: 'tipSobe', labelHR: 'Tip sobe', labelEN: 'Room type' },
+    { key: 'kvadratura', labelHR: 'Kvadratura', labelEN: 'Size (m²)' },
+    { key: 'kapacitet', labelHR: 'Kapacitet', labelEN: 'Capacity' },
+    { key: 'kat', labelHR: 'Kat', labelEN: 'Floor' },
+    { key: 'pogled', labelHR: 'Pogled', labelEN: 'View' },
+    { key: 'kreveti', labelHR: 'Kreveti', labelEN: 'Beds' },
+    { key: 'roomAmenities', labelHR: 'Sadržaj/oprema', labelEN: 'Amenities' },
+  ];
+
+  const nameA = roomA.naziv || roomA.tipSobe || 'Room A';
+  const nameB = roomB.naziv || roomB.tipSobe || 'Room B';
+
+  const diffs = [];
+  for (const f of fields) {
+    const a = roomValueToText(roomA[f.key]);
+    const b = roomValueToText(roomB[f.key]);
+    if (!a && !b) continue;
+
+    // pokaži i kad je isto (korisno), ali označi ako je “nema podatka”
+    const label = (lang === 'EN') ? f.labelEN : f.labelHR;
+    const left = a || (lang === 'EN' ? 'not listed' : 'nije navedeno');
+    const right = b || (lang === 'EN' ? 'not listed' : 'nije navedeno');
+
+    // istaknuti razliku
+    if (a !== b) {
+      diffs.push(`• ${label}: ${nameA} → ${left} | ${nameB} → ${right}`);
+    }
+  }
+
+  if (!diffs.length) {
+    return lang === 'EN'
+      ? `I don’t have enough structured data to compare "${nameA}" and "${nameB}". Please contact reception for details.`
+      : `Nemam dovoljno strukturiranih podataka za usporedbu "${nameA}" i "${nameB}". Molim kontaktirajte recepciju za detalje.`;
+  }
+
+  return lang === 'EN'
+    ? `Key differences (${nameA} vs ${nameB}):\n${diffs.join('\n')}`
+    : `Ključne razlike (${nameA} vs ${nameB}):\n${diffs.join('\n')}`;
 }
 
 // -------------------------
@@ -646,15 +943,19 @@ ABSOLUTE RULES (no exceptions):
 - If a detail is not present there, you MUST say it's not available and suggest contacting reception.
 - You MUST NOT guess prices, policies, times, services, amenities, room features, phone numbers, addresses, or procedures.
 - This is WEB (website visitor). Do NOT handle in-room complaints or troubleshooting flows; if user reports an in-room issue, direct them to reception.
-- Do NOT repeat greetings (e.g., "Dobrodošli") unless user greets first.
+- Do NOT repeat greetings unless the user greets first.
 - Keep answers short (1–4 sentences) unless user asks for details.
+- If user asks to LIST things (amenities, beds, views, room types), you MUST output a clean bullet list. Do NOT describe in prose.
 - If multiple items match (e.g., multiple rooms with a view), list ALL relevant items you have in RECORDS.
 
 ${styleText}
 
 Language:
 - If lang=HR respond in Croatian.
-- If lang=EN respond in English.`;
+- If lang=EN respond in English.
+
+Data usage:
+- Keep proper nouns/labels exactly as provided in RECORDS (do not invent or translate them).`;
 
   const userPayload = {
     lang,
@@ -666,16 +967,26 @@ Language:
     records: contextBlocks,
   };
 
-  const resp = await openai.chat.completions.create({
-    model: OPENAI_MODEL,
-    temperature: 0, // ✅ manje “kreative”
-    messages: [
-      { role: 'system', content: sys },
-      { role: 'user', content: JSON.stringify(userPayload) },
-    ],
-  });
+  try {
+    const resp = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      temperature: 0,
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user', content: JSON.stringify(userPayload) },
+      ],
+    });
 
-  return resp.choices?.[0]?.message?.content?.trim() || '';
+    return resp.choices?.[0]?.message?.content?.trim() || '';
+  } catch (e) {
+    if (isOpenAIRateLimitError(e)) {
+      // signal upstream
+      const err = new Error('OPENAI_RATE_LIMIT');
+      err._isRate = true;
+      throw err;
+    }
+    throw e;
+  }
 }
 
 // -------------------------
@@ -723,6 +1034,17 @@ app.post('/api/web-ask', async (req, res) => {
 
     if (!question) return res.status(400).json({ ok: false, error: 'Missing question' });
 
+    // 7) STABILNOST: local rate limit -> "pričekaj 20s"
+    const ip = req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
+    if (shouldRateLimit(ip)) {
+      const ms = Date.now() - started;
+      return res.json({
+        ok: true,
+        answer: renderWait20s(lang),
+        meta: { hotelSlug, ms, rate_limited: true }
+      });
+    }
+
     // 1) patterns + intent
     const patterns = await getIntentPatternsForWeb();
     const intentPick = await chooseIntent(question, patterns);
@@ -734,7 +1056,7 @@ app.post('/api/web-ask', async (req, res) => {
       question,
     });
 
-    // 3) "vrste soba" -> deterministički (bez GPT-a)
+    // 4) Deterministički: "vrste soba"
     if (isRoomTypesQuestion(question)) {
       const answer = renderRoomTypesAnswer(rooms, lang);
       const ms = Date.now() - started;
@@ -749,13 +1071,90 @@ app.post('/api/web-ask', async (req, res) => {
           usedRecords: rooms.slice(0, 20).map(r => ({ type: r.type, naziv: r.naziv, id: r.id })),
           usedFallback: false,
           usedLinked: false,
+          deterministic: 'room_types',
           totalWebRecordsForHotel: all.length,
           ms,
         },
       });
     }
 
-    // 4) Ako intent postoji i pattern ima linked recorde -> koristi njih (PRIMARNO)
+    // 4) Deterministički: amenities (general ili za određenu sobu)
+    if (isRoomAmenitiesQuestion(question)) {
+      const room = findBestRoomMention(question, rooms);
+      const answer = room
+        ? renderRoomAmenitiesForRoom(room, lang)
+        : renderRoomAmenitiesGeneral(rooms, lang);
+
+      const ms = Date.now() - started;
+      return res.json({
+        ok: true,
+        answer,
+        meta: {
+          hotelSlug,
+          intent: intentPick.intent,
+          confidence: intentPick.confidence ?? null,
+          scopeWanted: 'General',
+          usedRecords: room ? [{ type: 'ROOM', naziv: room.naziv, id: room.id }] : rooms.slice(0, 10).map(r => ({ type: 'ROOM', naziv: r.naziv, id: r.id })),
+          usedFallback: false,
+          usedLinked: false,
+          deterministic: 'room_amenities',
+          totalWebRecordsForHotel: all.length,
+          ms,
+        },
+      });
+    }
+
+    // 4) Deterministički: bed types / twin vs king
+    if (isBedTypeQuestion(question) && (normalizeText(question).includes('twin') || normalizeText(question).includes('king') || normalizeText(question).includes('krevet'))) {
+      const answer = renderBedTypesAnswer(rooms, lang);
+      const ms = Date.now() - started;
+      return res.json({
+        ok: true,
+        answer,
+        meta: {
+          hotelSlug,
+          intent: intentPick.intent,
+          confidence: intentPick.confidence ?? null,
+          scopeWanted: 'General',
+          usedRecords: rooms.slice(0, 20).map(r => ({ type: 'ROOM', naziv: r.naziv, id: r.id })),
+          usedFallback: false,
+          usedLinked: false,
+          deterministic: 'bed_types',
+          totalWebRecordsForHotel: all.length,
+          ms,
+        },
+      });
+    }
+
+    // 5) Room difference handler
+    if (isRoomDifferenceQuestion(question) && (normalizeText(question).includes('deluxe') || normalizeText(question).includes('superior') || normalizeText(question).includes('standard') || normalizeText(question).includes('comfort'))) {
+      // pokušaj naći 2 sobe: uzmi top2 po match score
+      const qn = normalizeText(question);
+      const scored = (rooms || []).map(r => ({ r, s: roomMatchScore(qn, r) })).sort((a, b) => b.s - a.s);
+      const roomA = scored[0]?.s >= 3 ? scored[0].r : null;
+      const roomB = scored[1]?.s >= 3 ? scored[1].r : null;
+
+      const answer = renderRoomDifference(roomA, roomB, lang);
+      const ms = Date.now() - started;
+      return res.json({
+        ok: true,
+        answer,
+        meta: {
+          hotelSlug,
+          intent: intentPick.intent,
+          confidence: intentPick.confidence ?? null,
+          scopeWanted: 'General',
+          usedRecords: [roomA, roomB].filter(Boolean).map(r => ({ type: 'ROOM', naziv: r.naziv, id: r.id })),
+          usedFallback: false,
+          usedLinked: false,
+          deterministic: 'room_difference',
+          totalWebRecordsForHotel: all.length,
+          ms,
+        },
+      });
+    }
+
+    // 6) Ako intent postoji i pattern ima linked recorde -> koristi njih (PRIMARNO)
     let recordsToUse = [];
     let usedLinked = false;
 
@@ -773,7 +1172,6 @@ app.post('/api/web-ask', async (req, res) => {
       const linkedServices = svcRecs.map(mapServiceRecord).filter(r =>
         r.active &&
         allowForWeb(r.aiSource) &&
-        // ako je hotel slug upisan, neka mora matchati; ako je prazno, pusti (da te ne blokira tijekom sređivanja)
         (!valuesToStrings(r.hotelSlugRaw).length || matchesHotelSlug(r.hotelSlugRaw, hotelSlug))
       );
 
@@ -791,14 +1189,18 @@ app.post('/api/web-ask', async (req, res) => {
       }
     }
 
-    // 5) fallback na AI_INTENT tagging ako nema linked
+    // 3) fallback na AI_INTENT tagging ako nema linked
     if (!recordsToUse.length) {
       recordsToUse = matched.length ? matched : fallback;
     }
 
-    // 6) HARD STOP:
-    // - ako je hotel-specific i nemamo ništa (core + records), NE PUŠTAMO GPT da izmišlja
-    // - ali gradska pitanja (Split/Palace) mogu ići dalje
+    // 6) dodatni micro-fallback: ako i dalje prazno, probaj scoring iz ALL (često spašava “postoji u services ali nije pogođeno”)
+    if (!recordsToUse.length) {
+      const extra = pickFallbackRecords(question, all, 3);
+      if (extra.length) recordsToUse = extra;
+    }
+
+    // 6) HARD STOP: hotel-specific bez podataka -> nema GPT-a (osim city pitanja)
     if (isHotelSpecificQuestion(question) && !recordsToUse.length && !hotelRec && !isCityQuestion(question)) {
       const ms = Date.now() - started;
       return res.json({
@@ -818,7 +1220,7 @@ app.post('/api/web-ask', async (req, res) => {
       });
     }
 
-    // 7) scope + output rule
+    // output scope + output rule
     let scopeWanted = 'General';
     if (intentPick?.intent) {
       const p = patterns.find(x => String(x.intent) === String(intentPick.intent));
@@ -830,16 +1232,29 @@ app.post('/api/web-ask', async (req, res) => {
       outputRule = await getOutputRule({ scopeWanted: 'General', aiSourceWanted: 'WEB' });
     }
 
-    // 8) Generate answer (strict)
-    const answer = await generateAnswer({
-      question,
-      hotelSlug,
-      lang,
-      hotelRec,
-      intentPick,
-      recordsToUse,
-      outputRule,
-    });
+    // 2) Generate answer (strict)
+    let answer = '';
+    try {
+      answer = await generateAnswer({
+        question,
+        hotelSlug,
+        lang,
+        hotelRec,
+        intentPick,
+        recordsToUse,
+        outputRule,
+      });
+    } catch (e) {
+      if (e?._isRate || String(e?.message || '') === 'OPENAI_RATE_LIMIT' || isOpenAIRateLimitError(e)) {
+        const ms = Date.now() - started;
+        return res.json({
+          ok: true,
+          answer: renderWait20s(lang),
+          meta: { hotelSlug, ms, openai_rate_limited: true }
+        });
+      }
+      throw e;
+    }
 
     const ms = Date.now() - started;
 
@@ -860,6 +1275,14 @@ app.post('/api/web-ask', async (req, res) => {
     });
   } catch (e) {
     console.error('web-ask error:', e);
+
+    // 7) ako je OpenAI “zakucao” zbog rate limit / overload -> poruka 20s
+    const question = pickFirstNonEmpty(req.body?.question, req.body?.q);
+    const lang = detectLang(question);
+    if (isOpenAIRateLimitError(e)) {
+      return res.json({ ok: true, answer: renderWait20s(lang), meta: { openai_rate_limited: true } });
+    }
+
     res.status(500).json({ ok: false, error: 'Server error' });
   }
 });
