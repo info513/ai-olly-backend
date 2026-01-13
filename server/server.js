@@ -203,16 +203,22 @@ function isRoomAmenitiesQuestion(question) {
   return hasAmen && (hasRoom || q.includes('deluxe') || q.includes('superior') || q.includes('standard') || q.includes('comfort'));
 }
 
+/**
+ * ✅ FIX: "parking" sadrži substring "king" -> više ne smije okidati bed_types.
+ * Logika: "king/twin/bed/krevet" moraju biti tokeni (riječi) ili jasna fraza "king size".
+ */
 function isBedTypeQuestion(question) {
-  const q = normalizeText(question);
-  return (
-    q.includes('twin') ||
-    q.includes('king') ||
-    q.includes('bed') ||
-    q.includes('beds') ||
-    q.includes('krevet') ||
-    q.includes('kreveti')
-  );
+  const qNorm = normalizeText(question);
+  const toks = tokenize(question);
+
+  const hasKingWord = toks.includes('king');
+  const hasTwinWord = toks.includes('twin');
+  const hasKingSize = qNorm.includes('king size');
+
+  const hasBedWord = toks.includes('bed') || toks.includes('beds');
+  const hasHrBedWord = toks.includes('krevet') || toks.includes('kreveti');
+
+  return hasKingWord || hasTwinWord || hasKingSize || hasBedWord || hasHrBedWord;
 }
 
 function isRoomDifferenceQuestion(question) {
@@ -428,7 +434,12 @@ function tokensWithSynonyms(question) {
   if (q.includes('parking') || q.includes('parkiranje') || q.includes('rampa') || q.includes('gate')) add('parking', 'rampa', 'gate', 'ramp');
   if (q.includes('breakfast') || q.includes('doručak') || q.includes('dorucak')) add('breakfast', 'doručak', 'menu', 'vrijeme');
   if (q.includes('amenities') || q.includes('oprema') || q.includes('sadržaj') || q.includes('sadrzaj')) add('amenities', 'oprema', 'sadržaj');
-  if (q.includes('twin') || q.includes('king') || q.includes('bed') || q.includes('krevet')) add('bed', 'krevet', 'twin', 'king');
+  // ✅ FIX: ovdje je ok da dodamo "king" kao token, ali samo ako user stvarno ima riječ "king" u pitanju.
+  // q.includes('king') je substring; koristimo tokene.
+  const toks = tokenize(question);
+  if (toks.includes('twin') || toks.includes('king') || toks.includes('bed') || toks.includes('krevet') || toks.includes('kreveti') || normalizeText(question).includes('king size')) {
+    add('bed', 'krevet', 'twin', 'king');
+  }
   if (q.includes('minibar') || q.includes('mini bar')) add('minibar', 'mini bar', 'price list');
   if (q.includes('transfer') || q.includes('airport') || q.includes('zračna') || q.includes('zracna')) add('transfer', 'airport', 'pickup', 'shuttle');
   if (q.includes('laundry') || q.includes('washing') || q.includes('dry cleaning') || q.includes('pras')) add('laundry', 'washing', 'dry cleaning');
@@ -931,9 +942,7 @@ function renderHotelCoreAnswer(hotelRec, lang = 'HR') {
 
   if (!parts.length) return renderNoInfo(lang);
 
-  return lang === 'EN'
-    ? parts.join('\n')
-    : parts.join('\n');
+  return parts.join('\n');
 }
 
 // ✅ deterministički: “Which rooms have UNESCO/Palace view?”
@@ -1026,9 +1035,6 @@ function splitIntoTwoRoomQueries(question) {
 
   for (const sep of separators) {
     if (lower.includes(normalizeText(sep))) {
-      const idx = lower.indexOf(normalizeText(sep));
-      // grubo rezanje po original stringu: nađi približno mjesto
-      // (nije savršeno, ali je stabilno za naše potrebe)
       const parts = q.split(new RegExp(sep, 'i'));
       if (parts.length >= 2) {
         return [parts[0].trim(), parts[1].trim()];
@@ -1447,8 +1453,8 @@ app.post('/api/web-ask', async (req, res) => {
       });
     }
 
-    // 4) Deterministički: bed types / twin vs king
-    if (isBedTypeQuestion(question) && (normalizeText(question).includes('twin') || normalizeText(question).includes('king') || normalizeText(question).includes('krevet'))) {
+    // 4) Deterministički: bed types / twin vs king  ✅ FIX: više nema substring provjere "king"
+    if (isBedTypeQuestion(question)) {
       const answer = renderBedTypesAnswer(rooms, lang);
       const ms = Date.now() - started;
       return res.json({
