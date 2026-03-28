@@ -4,7 +4,8 @@
   "description": "AI Olly backend i sinkronizacija s Airtableom",
   "type": "module",
   "scripts": {
-    "start": "node server/server.js"
+    "start": "node server/server.js",
+    "test": "node --test tests/fix-01-02.test.js"
   },
   "keywords": [],
   "author": "",

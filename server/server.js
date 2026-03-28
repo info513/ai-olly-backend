@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import Airtable from 'airtable';
 import OpenAI from 'openai';
+import { normalizeText, detectLang, isContactCoreQuestion, isHotelSpecificQuestion, isCityQuestion } from './classify.js';
 
 const {
   PORT = 8080,
@@ -162,26 +163,10 @@ async function airtableSelectAllSafe(tableName, tryOptions = [], fallbackOptions
   return airtableSelectAll(tableName, fallbackOptions);
 }
 
-function normalizeText(s) {
-  return String(s || '')
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim();
-}
-
 function tokenize(s) {
   const t = normalizeText(s);
   if (!t) return [];
   return t.split(/\s+/).filter(Boolean);
-}
-
-// ✅ bolja detekcija jezika (HR vs EN)
-function detectLang(question) {
-  const q = String(question || '');
-  const ql = q.toLowerCase();
-  const hasCroChars = /[čćžšđ]/i.test(q);
-  const hasHrWords = /\b(je|li|imate|gdje|kada|radno|vrijeme|soba|sobe|doručak|recepcija|parking|adresa|broj|pravila|kućni|molim|hvala|trebam)\b/i.test(ql);
-  return (hasCroChars || hasHrWords) ? 'HR' : 'EN';
 }
 
 function isRoomTypesQuestion(question) {
@@ -240,56 +225,6 @@ function isRoomViewListQuestion(question) {
   const hasWhichRooms = q.includes('which rooms') || q.includes('koje sobe') || q.includes('which room') || q.includes('koja soba');
   const hasUnesco = q.includes('unesco') || q.includes('palace') || q.includes('palač') || q.includes('peristil') || q.includes('cathedral') || q.includes('katedr');
   return (hasView && (hasWhichRooms || hasUnesco)) || (hasWhichRooms && hasUnesco);
-}
-
-// ✅ kontakt / telefon / email / maps / check-in-out (deterministički)
-function isContactCoreQuestion(question) {
-  const q = normalizeText(question);
-  return (
-    q.includes('contact') ||
-    q.includes('kontakt') ||
-    q.includes('phone') ||
-    q.includes('telefon') ||
-    q.includes('tel') ||
-    q.includes('call') ||
-    q.includes('email') ||
-    q.includes('e mail') ||
-    q.includes('reach') ||
-    q.includes('reception') ||
-    q.includes('recepc') ||
-    q.includes('address') ||
-    q.includes('adresa') ||
-    q.includes('google maps') ||
-    q.includes('maps') ||
-    q.includes('instagram') ||
-    q.includes('review') ||
-    q.includes('check in') ||
-    q.includes('checkin') ||
-    q.includes('check out') ||
-    q.includes('checkout') ||
-    q.includes('arrival time') ||
-    q.includes('departure time')
-  );
-}
-
-// ✅ hotel-specific heuristika (da možemo hard-stop kad nema podataka)
-function isHotelSpecificQuestion(question) {
-  const q = normalizeText(question);
-  const keys = [
-    'recepcija','reception','wifi','wi fi','internet','parking','parkiranje','doručak','breakfast',
-    'mini bar','minibar','check in','check-out','checkout','checkin','policy','pravila','pet','dog',
-    'laundry','dry cleaning','cleaning','housekeeping','room','rooms','soba','sobe','bed','krevet',
-    'view','pogled','floor','kat','size','kvadratura','capacity','kapacitet',
-    'amenities','oprema','sadržaj',
-    'transfer','airport','zračna luka','zracna luka','taxi','uber','directions','how to get','dolazak',
-    'invoice','račun','r1','city tax','tourist tax','boravišna','boravisna'
-  ];
-  return keys.some(k => q.includes(k));
-}
-
-function isCityQuestion(question) {
-  const q = normalizeText(question);
-  return q.includes('split') || q.includes('dioklecijan') || q.includes('palač') || q.includes('palace') || q.includes('peristil');
 }
 
 // -------------------------
@@ -1560,7 +1495,7 @@ app.post('/api/web-ask', async (req, res) => {
     }
 
     // 6) HARD STOP: hotel-specific bez podataka -> nema GPT-a (osim city pitanja)
-    if (isHotelSpecificQuestion(question) && !recordsToUse.length && !hotelRec && !isCityQuestion(question)) {
+    if (isHotelSpecificQuestion(question) && !recordsToUse.length && !isCityQuestion(question)) {
       const ms = Date.now() - started;
       return res.json({
         ok: true,
