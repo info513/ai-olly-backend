@@ -5,7 +5,9 @@ import express from 'express';
 import cors from 'cors';
 import Airtable from 'airtable';
 import OpenAI from 'openai';
-import { normalizeText, detectLang, isContactCoreQuestion, isHotelSpecificQuestion, isCityQuestion } from './classify.js';
+import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion } from './classify.js';
+import { timingSafeEqual } from 'node:crypto';
+import { asArray, isEmptyArray, fieldHasAny, valuesToStrings, matchesHotelSlug, allowForWeb, allowForPWA } from './filters.js';
 
 const {
   PORT = 8080,
@@ -23,6 +25,8 @@ const {
   TABLE_HOTELS = 'HOTELI',
   TABLE_INTENTS = 'AI_INTENT_PATTERNS',
   TABLE_OUTPUT_RULES = 'AI_OUTPUT_RULES',
+  TABLE_ROOM_GUIDE = 'ROOM GUIDE',
+  TABLE_REQUESTS   = 'REQUESTS',
 
   // CORS
   CORS_ORIGINS = '',
@@ -68,6 +72,7 @@ app.use((err, req, res, next) => {
 });
 
 app.use(express.json({ limit: '1mb' }));
+app.use('/pwa', express.static('pwa'));
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
@@ -84,22 +89,6 @@ function pickFirstNonEmpty(...vals) {
     if (typeof v === 'string' && v.trim()) return v.trim();
   }
   return '';
-}
-
-function asArray(v) {
-  if (!v) return [];
-  if (Array.isArray(v)) return v;
-  return [v];
-}
-
-function isEmptyArray(v) {
-  return Array.isArray(v) && v.length === 0;
-}
-
-function fieldHasAny(fieldsValue, allowed) {
-  const arr = asArray(fieldsValue).map(String);
-  const allowedSet = new Set(allowed.map(String));
-  return arr.some(v => allowedSet.has(v));
 }
 
 function clampPageSize(n) {
@@ -150,8 +139,9 @@ async function airtableFindByIds(tableName, ids = [], limit = 30) {
     .map(x => x.value);
 }
 
-// ✅ “siguran select”: prvo pokušaj s filterByFormula, ako puca ili vrati 0 — uzmi sve
-async function airtableSelectAllSafe(tableName, tryOptions = [], fallbackOptions = {}) {
+// “siguran select”: pokušaj svaki filter redom; ako svi failaju, vrati [] (fail-closed).
+// Ako je fallbackOptions eksplicitno proslijeđen (ne null), koristi ga kao zadnji resort.
+async function airtableSelectAllSafe(tableName, tryOptions = [], fallbackOptions = null) {
   for (const opt of tryOptions) {
     try {
       const recs = await airtableSelectAll(tableName, opt);
@@ -160,6 +150,7 @@ async function airtableSelectAllSafe(tableName, tryOptions = [], fallbackOptions
       // ignore and try next
     }
   }
+  if (fallbackOptions === null) return []; // fail-closed: ne vraćaj sve zapise
   return airtableSelectAll(tableName, fallbackOptions);
 }
 
@@ -274,6 +265,9 @@ let CACHE = {
   servicesByHotel: new Map(),
   roomsByHotel: new Map(),
   hotelBySlug: new Map(),
+  pwaServicesByHotel: new Map(), // PWA: AI_SOURCE=PWA|BOTH, keyed by hotelSlug
+  roomGuideByHotel: new Map(),   // PWA: ROOM GUIDE records, keyed by hotelSlug
+  intentsPwa: { ts: 0, data: [] }, // PWA intent patterns — separate bucket from intents (WEB)
 };
 
 function cacheFresh(ts) {
@@ -308,6 +302,36 @@ async function getIntentPatternsForWeb() {
   const filtered = patterns.filter(p => fieldHasAny(p.appliesTo, ['WEB']));
 
   CACHE.intents = { ts: Date.now(), data: filtered };
+  return filtered;
+}
+
+// -------------------------
+// AI_INTENT_PATTERNS (PWA only)
+// Separate cache bucket from WEB — never share; filter differs.
+// Patterns tagged Applies to=PWA (may overlap with WEB where both values present).
+// -------------------------
+async function getIntentPatternsForPwa() {
+  if (cacheFresh(CACHE.intentsPwa.ts) && CACHE.intentsPwa.data.length) return CACHE.intentsPwa.data;
+
+  const recs = await airtableSelectAll(TABLE_INTENTS, { pageSize: 100 });
+
+  const patterns = recs.map(r => {
+    const f = r.fields || {};
+    return {
+      id: r.id,
+      intent: pickFirstNonEmpty(f.Intent, f.intent),
+      phrases: pickFirstNonEmpty(f.Phrases, f.phrases),
+      appliesTo: asArray(f['Applies to'] ?? f.AppliesTo ?? f.applies_to),
+      outputScope: pickFirstNonEmpty(f['Output Scope'], f.OutputScope, f.output_scope),
+      servicesLink: asArray(f['Services link'] ?? f.ServicesLink ?? f.services_link),
+      roomsLink: asArray(f['Rooms link'] ?? f.RoomsLink ?? f.rooms_link),
+      active: (f.Active ?? true) === true,
+    };
+  }).filter(p => p.intent && p.active);
+
+  const filtered = patterns.filter(p => fieldHasAny(p.appliesTo, ['PWA']));
+
+  CACHE.intentsPwa = { ts: Date.now(), data: filtered };
   return filtered;
 }
 
@@ -585,6 +609,11 @@ async function getHotelRecord(hotelSlug) {
     // parking (ako ga ima u hotel tablici)
     parking: pickFirstNonEmpty(f.Parking, f.parking),
 
+    // Persona voice — hotel-specific tone injected into every GPT call.
+    // Field must be created manually in Airtable (REST API cannot create fields).
+    // Returns '' if field not yet populated; generateAnswer gracefully skips it.
+    personaVoice: pickFirstNonEmpty(f['Persona Voice'], f.personaVoice, ''),
+
     active: (f.Active ?? true) === true,
   } : null;
 
@@ -592,22 +621,6 @@ async function getHotelRecord(hotelSlug) {
 
   CACHE.hotelBySlug.set(String(hotelSlug), { ts: Date.now(), row: finalRow });
   return finalRow;
-}
-
-function valuesToStrings(v) {
-  return asArray(v).map(x => String(x).trim()).filter(Boolean);
-}
-
-function matchesHotelSlug(fieldValue, hotelSlug) {
-  const target = String(hotelSlug || '').trim();
-  const vals = valuesToStrings(fieldValue);
-  return vals.some(x => x === target);
-}
-
-// ✅ WEB filter: ako je AI_SOURCE prazan -> prihvati
-function allowForWeb(aiSourceArr) {
-  const src = asArray(aiSourceArr);
-  return isEmptyArray(src) || fieldHasAny(src, ['WEB']);
 }
 
 // ✅ izvuci hotel slug iz različitih naziva polja (sigurnije)
@@ -634,7 +647,7 @@ function mapServiceRecord(r) {
     kategorija: asArray(f.Kategorija ?? f.kategorija),
     opis: pickFirstNonEmpty(f.Opis, f.opis),
     radnoVrijeme: pickFirstNonEmpty(f['Radno vrijeme'], f.Radno, f.radno_vrijeme),
-    aiPrompt: pickFirstNonEmpty(f.AI_PROMPT, f.ai_prompt),
+    aiPrompt: pickFirstNonEmpty(f['AI_PROMPT  '], f.AI_PROMPT, f.ai_prompt), // Fix #4c: field has two trailing spaces in Airtable
     aiIntent: asArray(f.AI_INTENT ?? f.ai_intent),
     aiSource: asArray(f.AI_SOURCE ?? f.ai_source),
     hotelSlugRaw: getHotelSlugRaw(f),
@@ -683,8 +696,8 @@ async function getServicesForHotelWeb(hotelSlug) {
     [
       { pageSize: 100, filterByFormula: `{Hotel Slug (text)}='${slugEsc}'` },
       { pageSize: 100, filterByFormula: `{Hotel Slug}='${slugEsc}'` },
-    ],
-    { pageSize: 100 }
+    ]
+    // bez fallbacka — ako oba filtera promašuju, vraćamo [], ne sve zapise
   );
 
   const rows = recs.map(mapServiceRecord);
@@ -710,8 +723,8 @@ async function getRoomsForHotelWeb(hotelSlug) {
     [
       { pageSize: 100, filterByFormula: `{Hotel Slug (text)}='${slugEsc}'` },
       { pageSize: 100, filterByFormula: `{Hotel Slug}='${slugEsc}'` },
-    ],
-    { pageSize: 100 }
+    ]
+    // bez fallbacka — ako oba filtera promašuju, vraćamo [], ne sve zapise
   );
 
   const rows = recs.map(mapRoomRecord);
@@ -724,6 +737,91 @@ async function getRoomsForHotelWeb(hotelSlug) {
 
   CACHE.roomsByHotel.set(String(hotelSlug), { ts: Date.now(), rows: webRows });
   return webRows;
+}
+
+// -------------------------
+// PWA: SERVICES loader — AI_SOURCE=PWA or BOTH
+// -------------------------
+async function getServicesForHotelPwa(hotelSlug) {
+  const cached = CACHE.pwaServicesByHotel.get(String(hotelSlug));
+  if (cached && cacheFresh(cached.ts) && Array.isArray(cached.rows)) return cached.rows;
+
+  const slugEsc = escapeAirtableFormulaString(hotelSlug);
+
+  const recs = await airtableSelectAllSafe(
+    TABLE_SERVICES,
+    [
+      { pageSize: 100, filterByFormula: `{Hotel Slug (text)}='${slugEsc}'` },
+      { pageSize: 100, filterByFormula: `{Hotel Slug}='${slugEsc}'` },
+    ]
+  );
+
+  const rows = recs.map(mapServiceRecord).filter(r =>
+    r.active &&
+    matchesHotelSlug(r.hotelSlugRaw, hotelSlug) &&
+    allowForPWA(r.aiSource)
+  );
+
+  CACHE.pwaServicesByHotel.set(String(hotelSlug), { ts: Date.now(), rows });
+  return rows;
+}
+
+// -------------------------
+// PWA: ROOM GUIDE loader
+// Maps one ROOM GUIDE record to a usable object.
+// -------------------------
+function mapRoomGuideRecord(rec) {
+  const f = rec.fields || {};
+  return {
+    id: rec.id,
+    type: 'ROOM_GUIDE',
+    naziv: pickFirstNonEmpty(f['Naziv sobe'], ''),
+    wifi: pickFirstNonEmpty(f.WiFi, ''),
+    klimaUpute: pickFirstNonEmpty(f['Upute Klima'], ''),
+    tvUpute: pickFirstNonEmpty(f['Upute TV'], ''),
+    sefUpute: pickFirstNonEmpty(f['Upute Sef'], ''),
+    napomene: pickFirstNonEmpty(f.Napomene, ''),
+    aiWelcome: pickFirstNonEmpty(f['AI WELCOME'], ''),
+    roomFeatures: pickFirstNonEmpty(f['Room features/Communication'], ''),
+    aiMasterPrompt: pickFirstNonEmpty(f['AI Master prompt'], ''),
+    qrLink: pickFirstNonEmpty(f['QR LINK'], ''),
+    // Access token — set per check-in, cleared at check-out.
+    // Field 'Access Token' must be created manually in Airtable (singleLineText).
+    accessToken: pickFirstNonEmpty(f['Access Token'], f.accessToken, ''),
+    hotelSlugRaw: asArray(f['Hotel Slug'] ?? []),
+    active: (f.Active ?? true) === true,
+  };
+}
+
+// Loads all ROOM GUIDE records for a hotel (cached by hotelSlug).
+// Filters via FIND on the Hotel Slug lookup field.
+// Returns [] if hotel has no room guide records — never returns all hotels' records.
+async function getRoomGuideByHotel(hotelSlug) {
+  const cached = CACHE.roomGuideByHotel.get(String(hotelSlug));
+  if (cached && cacheFresh(cached.ts) && Array.isArray(cached.rows)) return cached.rows;
+
+  const slugEsc = escapeAirtableFormulaString(hotelSlug);
+
+  const recs = await airtableSelectAllSafe(
+    TABLE_ROOM_GUIDE,
+    [
+      { pageSize: 100, filterByFormula: `FIND("${slugEsc}", ARRAYJOIN({Hotel Slug}))` },
+    ]
+    // no fallback — if filter misses, return [], never load all hotels' rooms
+  );
+
+  const rows = recs.map(mapRoomGuideRecord).filter(r => r.active);
+
+  CACHE.roomGuideByHotel.set(String(hotelSlug), { ts: Date.now(), rows });
+  return rows;
+}
+
+// Returns the ROOM GUIDE record for a specific room number string (e.g. "201"), or null.
+async function getRoomGuideRecord(hotelSlug, roomNumber) {
+  if (!roomNumber) return null;
+  const all = await getRoomGuideByHotel(hotelSlug);
+  const target = String(roomNumber).trim();
+  return all.find(r => String(r.naziv).trim() === target) ?? null;
 }
 
 // -------------------------
@@ -849,6 +947,93 @@ function renderNoInfo(lang = 'HR') {
   return lang === 'EN'
     ? `I don’t have that information in the system. Please contact reception for exact details.`
     : `Nemam taj podatak u sustavu. Molim kontaktirajte recepciju za točne informacije.`;
+}
+
+/// ✅ deterministički: radno vrijeme doručka
+// Fix #7: extracts the Radno vrijeme field from the Breakfast (Hours & Policy)
+// service record. Normalises "7:30 AM to 10:30 AM" → language-appropriate format.
+// Returns null if no breakfast record with a radnoVrijeme value is found —
+// caller falls through to GPT (graceful degradation, no hard stop).
+function parseTimeRange(raw) {
+  // Parse "H:MM [AM|PM] to H:MM [AM|PM]" into a [from, to] pair in 24-hour format.
+  // AM hours are returned unchanged.  PM hours (except 12:xx PM) are shifted +12.
+  // Examples:
+  //   "7:30 AM to 10:30 AM" → ["7:30",  "10:30"]  (breakfast — all AM, unchanged)
+  //   "8:00 AM to 2:00 PM"  → ["8:00",  "14:00"]  (housekeeping — PM end converted)
+  const parts = String(raw || '').split(/\s+to\s+/i);
+  if (parts.length !== 2) return null;
+
+  function to24h(segment) {
+    const seg = segment.trim();
+    const isPM = /PM/i.test(seg);
+    const time = seg.replace(/\s*[AP]M/gi, '').trim();
+    if (!isPM) return time;
+    const [h, m] = time.split(':').map(Number);
+    const hour24 = h === 12 ? 12 : h + 12;
+    return `${hour24}:${String(m || 0).padStart(2, '0')}`;
+  }
+
+  return [to24h(parts[0]), to24h(parts[1])];
+}
+
+function renderBreakfastHoursAnswer(services, lang = 'HR') {
+  const rec = (services || []).find(r =>
+    normalizeText(r.naziv || '').includes('breakfast') && r.radnoVrijeme
+  );
+  if (!rec?.radnoVrijeme) return null;
+
+  const parsed = parseTimeRange(rec.radnoVrijeme);
+  if (!parsed) return null;
+  const [from, to] = parsed;
+
+  return lang === 'EN'
+    ? `Breakfast is served from ${from} to ${to}.`
+    : `Doručak se poslužuje od ${from} do ${to}.`;
+}
+
+// ✅ deterministički: radno vrijeme domaćinstva (housekeeping)
+// Fix #8: same pattern as breakfast hours. parseTimeRange converts
+// "8:00 AM to 2:00 PM" → ["8:00", "14:00"] via PM→24h shift.
+// Returns null if no housekeeping record with radnoVrijeme is found —
+// caller falls through to GPT (graceful degradation, no hard stop).
+function renderHousekeepingHoursAnswer(services, lang = 'HR') {
+  const rec = (services || []).find(r =>
+    normalizeText(r.naziv || '').includes('housekeeping') && r.radnoVrijeme
+  );
+  if (!rec?.radnoVrijeme) return null;
+
+  const parsed = parseTimeRange(rec.radnoVrijeme);
+  if (!parsed) return null;
+  const [from, to] = parsed;
+
+  return lang === 'EN'
+    ? `Housekeeping is available from ${from} to ${to}.`
+    : `Čišćenje sobe dostupno je od ${from} do ${to}.`;
+}
+
+// ✅ deterministički: WiFi pristup i lozinka (Fix #9)
+// The Complimentary WiFi Opis is already guest-ready (availability + network +
+// password). Returned verbatim — no language-specific template needed since
+// the network name and password are proper nouns identical in all languages.
+// Returns null if no WiFi record found — caller falls through to GPT.
+function renderWifiAnswer(services) {
+  const rec = (services || []).find(r =>
+    normalizeText(r.naziv || '').includes('wifi')
+  );
+  if (!rec?.opis) return null;
+  return rec.opis.trim();
+}
+
+// ✅ deterministički: politika kućnih ljubimaca (Fix #10)
+// The Pet Policy (No Pets) Opis is a single definitive sentence. Returned
+// verbatim — the English text is appropriate for both EN and HR contexts since
+// it is a formal policy statement. Returns null if record not found or inactive.
+function renderPetPolicyAnswer(services) {
+  const rec = (services || []).find(r =>
+    normalizeText(r.naziv || '').includes('pet')
+  );
+  if (!rec?.opis) return null;
+  return rec.opis.trim();
 }
 
 // ✅ deterministički: kontakt / maps / check-in-out
@@ -1135,10 +1320,45 @@ function applyPriceGuard(answer, { lang, hotelRec, recordsToUse }) {
   return answer;
 }
 
+// PWA WiFi renderer — reads the WiFi block from a ROOM GUIDE record.
+// ROOM GUIDE.WiFi already contains the full formatted block (network + password).
+// Returns null if room guide missing or WiFi field empty; caller falls back to SERVICES.
+function renderWifiAnswerPwa(roomGuide) {
+  if (!roomGuide?.wifi) return null;
+  return roomGuide.wifi.trim();
+}
+
+// PWA AC renderer — reads Upute Klima from ROOM GUIDE.
+// Returns null if room guide missing or field empty → GPT stub fallthrough.
+function renderAcAnswer(roomGuide) {
+  if (!roomGuide?.klimaUpute) return null;
+  return roomGuide.klimaUpute.trim();
+}
+
+// PWA TV renderer — reads Upute TV from ROOM GUIDE.
+// Returns null if room guide missing or field empty → GPT stub fallthrough.
+function renderTvAnswer(roomGuide) {
+  if (!roomGuide?.tvUpute) return null;
+  return roomGuide.tvUpute.trim();
+}
+
+// PWA safe renderer — reads Upute Sef from ROOM GUIDE.
+// Returns null if room guide missing or field empty → GPT stub fallthrough.
+function renderSafeAnswer(roomGuide) {
+  if (!roomGuide?.sefUpute) return null;
+  return roomGuide.sefUpute.trim();
+}
+
 // -------------------------
 // GPT answer generation (STRICT)
 // -------------------------
 async function generateAnswer({ question, hotelSlug, lang, hotelRec, intentPick, recordsToUse, outputRule }) {
+  // Persona voice: hotel-specific character injected before output rules.
+  // Empty string when field is not yet populated — no effect on prompt.
+  const personaBlock = hotelRec?.personaVoice
+    ? `PERSONA:\n${hotelRec.personaVoice}\n\n`
+    : '';
+
   const styleText = outputRule
     ? `OUTPUT RULE (Scope=${outputRule.scope}, Format=${outputRule.format}):
 STYLE: ${outputRule.style}
@@ -1200,7 +1420,7 @@ ABSOLUTE RULES (no exceptions):
 - If multiple items match (e.g., multiple rooms with a view), list ALL relevant items you have in RECORDS.
 - Never output a price unless it exists verbatim in HOTEL CORE or RECORDS.
 
-${styleText}
+${personaBlock}${styleText}
 
 Language:
 - If lang=HR respond in Croatian.
@@ -1321,6 +1541,78 @@ app.post('/api/web-ask', async (req, res) => {
           ms,
         },
       });
+    }
+
+    // ✅ 0.5) Deterministički: radno vrijeme doručka (Fix #7)
+    if (isBreakfastHoursQuestion(question)) {
+      const answer = renderBreakfastHoursAnswer(services, lang);
+      if (answer) {
+        const ms = Date.now() - started;
+        return res.json({
+          ok: true,
+          answer,
+          meta: {
+            hotelSlug,
+            deterministic: 'breakfast_hours',
+            ms,
+          },
+        });
+      }
+      // answer is null (no breakfast record or missing radnoVrijeme) — fall through to GPT
+    }
+
+    // ✅ 0.6) Deterministički: radno vrijeme domaćinstva (Fix #8)
+    if (isHousekeepingHoursQuestion(question)) {
+      const answer = renderHousekeepingHoursAnswer(services, lang);
+      if (answer) {
+        const ms = Date.now() - started;
+        return res.json({
+          ok: true,
+          answer,
+          meta: {
+            hotelSlug,
+            deterministic: 'housekeeping_hours',
+            ms,
+          },
+        });
+      }
+      // answer is null (no housekeeping record or missing radnoVrijeme) — fall through to GPT
+    }
+
+    // ✅ 0.7) Deterministički: WiFi pristup i lozinka (Fix #9)
+    if (isWifiQuestion(question)) {
+      const answer = renderWifiAnswer(services);
+      if (answer) {
+        const ms = Date.now() - started;
+        return res.json({
+          ok: true,
+          answer,
+          meta: {
+            hotelSlug,
+            deterministic: 'wifi',
+            ms,
+          },
+        });
+      }
+      // answer is null (no WiFi record found) — fall through to GPT
+    }
+
+    // ✅ 0.8) Deterministički: politika kućnih ljubimaca (Fix #10)
+    if (isPetPolicyQuestion(question)) {
+      const answer = renderPetPolicyAnswer(services);
+      if (answer) {
+        const ms = Date.now() - started;
+        return res.json({
+          ok: true,
+          answer,
+          meta: {
+            hotelSlug,
+            deterministic: 'pet_policy',
+            ms,
+          },
+        });
+      }
+      // answer is null (no pet policy record found) — fall through to GPT
     }
 
     // 4) Deterministički: “vrste soba”
@@ -1466,13 +1758,13 @@ app.post('/api/web-ask', async (req, res) => {
       const linkedServices = svcRecs.map(mapServiceRecord).filter(r =>
         r.active &&
         allowForWeb(r.aiSource) &&
-        (!valuesToStrings(r.hotelSlugRaw).length || matchesHotelSlug(r.hotelSlugRaw, hotelSlug))
+        matchesHotelSlug(r.hotelSlugRaw, hotelSlug)
       );
 
       const linkedRooms = roomRecs.map(mapRoomRecord).filter(r =>
         r.active &&
         allowForWeb(r.aiSource) &&
-        (!valuesToStrings(r.hotelSlugRaw).length || matchesHotelSlug(r.hotelSlugRaw, hotelSlug))
+        matchesHotelSlug(r.hotelSlugRaw, hotelSlug)
       );
 
       const linked = [...linkedServices, ...linkedRooms];
@@ -1580,6 +1872,296 @@ app.post('/api/web-ask', async (req, res) => {
       return res.json({ ok: true, answer: renderWait20s(lang), meta: { openai_rate_limited: true } });
     }
 
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// -------------------------
+// /api/pwa-ask — guest-side PWA endpoint
+//
+// Input:  { question, slug, room, token }
+// Sources: HOTELI + SERVICES(PWA) + ROOM GUIDE(room-specific)
+// Auth:   QR token validated against ROOM GUIDE.Access Token (timing-safe)
+// GPT path: stubbed — returns 501 until implemented
+// -------------------------
+app.post('/api/pwa-ask', async (req, res) => {
+  const started = Date.now();
+
+  try {
+    const question   = pickFirstNonEmpty(req.body?.question, req.body?.q);
+    const hotelSlug  = pickFirstNonEmpty(req.query?.slug, req.body?.slug, HOTEL_SLUG_DEFAULT);
+    const roomNumber = pickFirstNonEmpty(req.body?.room, req.query?.room, '');
+    const token      = pickFirstNonEmpty(req.body?.token, req.query?.token, '');
+    const lang       = detectLang(question);
+
+    if (!question)   return res.status(400).json({ ok: false, error: 'Missing question' });
+    if (!roomNumber) return res.status(400).json({ ok: false, error: 'Missing room number' });
+
+    // Rate limiting — reuse same gate as web-ask
+    const ip = req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim()
+      || req.socket?.remoteAddress
+      || 'unknown';
+    if (shouldRateLimit(ip)) {
+      return res.json({
+        ok: true,
+        answer: renderWait20s(lang),
+        meta: { hotelSlug, roomNumber, ms: Date.now() - started, rate_limited: true },
+      });
+    }
+
+    // Load all PWA data sources in parallel
+    const [hotelRec, pwaServices, roomGuide] = await Promise.all([
+      getHotelRecord(hotelSlug),
+      getServicesForHotelPwa(hotelSlug),
+      getRoomGuideRecord(hotelSlug, roomNumber),
+    ]);
+
+    // ── Token validation ────────────────────────────────────────────────────────
+    // roomGuide null → room not found → 403 (same response, don't reveal room existence)
+    // token missing or mismatch → 403
+    // timing-safe comparison prevents length-based timing attacks.
+    // When Access Token field is not yet created in Airtable, accessToken will be ''
+    // and validation will always fail — intentional fail-closed behaviour.
+    const storedToken = roomGuide?.accessToken ?? '';
+    const tokenValid = (
+      token.length > 0 &&
+      storedToken.length > 0 &&
+      token.length === storedToken.length &&
+      timingSafeEqual(Buffer.from(token), Buffer.from(storedToken))
+    );
+    if (!tokenValid) {
+      return res.status(403).json({ ok: false, error: 'Access denied' });
+    }
+    // ───────────────────────────────────────────────────────────────────────────
+
+    // ✅ 0) Deterministic: hotel core (contact / address / check-in-out)
+    if (isContactCoreQuestion(question)) {
+      return res.json({
+        ok: true,
+        answer: renderHotelCoreAnswer(hotelRec, lang),
+        meta: { hotelSlug, roomNumber, deterministic: 'hotel_core', ms: Date.now() - started },
+      });
+    }
+
+    // ✅ 0.5) Deterministic: breakfast hours
+    if (isBreakfastHoursQuestion(question)) {
+      const answer = renderBreakfastHoursAnswer(pwaServices, lang);
+      if (answer) {
+        return res.json({
+          ok: true,
+          answer,
+          meta: { hotelSlug, roomNumber, deterministic: 'breakfast_hours', ms: Date.now() - started },
+        });
+      }
+    }
+
+    // ✅ 0.6) Deterministic: housekeeping hours
+    if (isHousekeepingHoursQuestion(question)) {
+      const answer = renderHousekeepingHoursAnswer(pwaServices, lang);
+      if (answer) {
+        return res.json({
+          ok: true,
+          answer,
+          meta: { hotelSlug, roomNumber, deterministic: 'housekeeping_hours', ms: Date.now() - started },
+        });
+      }
+    }
+
+    // ✅ 0.7) Deterministic: WiFi — ROOM GUIDE takes priority over SERVICES in PWA
+    // ROOM GUIDE.WiFi is room-specific and already formatted (network + password).
+    if (isWifiQuestion(question)) {
+      const answer = renderWifiAnswerPwa(roomGuide) ?? renderWifiAnswer(pwaServices);
+      if (answer) {
+        return res.json({
+          ok: true,
+          answer,
+          meta: {
+            hotelSlug,
+            roomNumber,
+            deterministic: 'wifi',
+            wifiSource: roomGuide?.wifi ? 'room_guide' : 'services',
+            ms: Date.now() - started,
+          },
+        });
+      }
+    }
+
+    // ✅ 0.8) Deterministic: pet policy
+    if (isPetPolicyQuestion(question)) {
+      const answer = renderPetPolicyAnswer(pwaServices);
+      if (answer) {
+        return res.json({
+          ok: true,
+          answer,
+          meta: { hotelSlug, roomNumber, deterministic: 'pet_policy', ms: Date.now() - started },
+        });
+      }
+    }
+
+    // ✅ 1.0) Deterministic (PWA only): AC / climate control
+    if (isAcQuestion(question)) {
+      const answer = renderAcAnswer(roomGuide);
+      if (answer) {
+        return res.json({
+          ok: true,
+          answer,
+          meta: { hotelSlug, roomNumber, deterministic: 'ac_instructions', ms: Date.now() - started },
+        });
+      }
+    }
+
+    // ✅ 1.1) Deterministic (PWA only): TV / remote control
+    if (isTvQuestion(question)) {
+      const answer = renderTvAnswer(roomGuide);
+      if (answer) {
+        return res.json({
+          ok: true,
+          answer,
+          meta: { hotelSlug, roomNumber, deterministic: 'tv_instructions', ms: Date.now() - started },
+        });
+      }
+    }
+
+    // ✅ 1.2) Deterministic (PWA only): safe / valuables
+    if (isSafeQuestion(question)) {
+      const answer = renderSafeAnswer(roomGuide);
+      if (answer) {
+        return res.json({
+          ok: true,
+          answer,
+          meta: { hotelSlug, roomNumber, deterministic: 'safe_instructions', ms: Date.now() - started },
+        });
+      }
+    }
+
+    // ── GPT path: not yet implemented ──────────────────────────────────────────
+    // TODO: call getIntentPatternsForPwa(), run chooseIntent(), build context from
+    //       pwaServices + roomGuide (room features + AI master prompt),
+    //       call generateAnswer() with room context injected.
+    // ──────────────────────────────────────────────────────────────────────────
+    return res.status(501).json({
+      ok: false,
+      error: 'GPT path not yet implemented for PWA',
+      meta: {
+        hotelSlug,
+        roomNumber,
+        pwaServicesLoaded: pwaServices.length,
+        roomGuideFound: !!roomGuide,
+        ms: Date.now() - started,
+      },
+    });
+
+  } catch (e) {
+    console.error('pwa-ask error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// -------------------------
+// /api/pwa-request — guest submits a service request from the PWA
+//
+// Input:  { slug, room, token, category, message, guestName?, priority? }
+// Auth:   Same ROOM GUIDE access-token validation as /api/pwa-ask (timing-safe)
+// Write:  Creates one record in the REQUESTS table — no GPT involved
+// -------------------------
+app.post('/api/pwa-request', async (req, res) => {
+  const started = Date.now();
+
+  try {
+    const hotelSlug  = pickFirstNonEmpty(req.body?.slug,  req.query?.slug, HOTEL_SLUG_DEFAULT);
+    const roomNumber = pickFirstNonEmpty(req.body?.room,  req.query?.room, '');
+    const token      = pickFirstNonEmpty(req.body?.token, req.query?.token, '');
+    const category   = pickFirstNonEmpty(req.body?.category, '');
+    const message    = pickFirstNonEmpty(req.body?.message, '');
+    const guestName  = pickFirstNonEmpty(req.body?.guestName, req.body?.guest_name, '');
+    const priority   = pickFirstNonEmpty(req.body?.priority, 'Normal');
+
+    // ── Input validation ────────────────────────────────────────────────────────
+    if (!roomNumber) return res.status(400).json({ ok: false, error: 'Missing room' });
+    if (!category)   return res.status(400).json({ ok: false, error: 'Missing category' });
+    if (!message)    return res.status(400).json({ ok: false, error: 'Missing message' });
+
+    // ── Load ROOM GUIDE for token validation ────────────────────────────────────
+    const roomGuide = await getRoomGuideRecord(hotelSlug, roomNumber);
+
+    // ── Token validation — identical logic to /api/pwa-ask ───────────────────
+    const storedToken = roomGuide?.accessToken ?? '';
+    const tokenValid = (
+      token.length > 0 &&
+      storedToken.length > 0 &&
+      token.length === storedToken.length &&
+      timingSafeEqual(Buffer.from(token), Buffer.from(storedToken))
+    );
+    if (!tokenValid) return res.status(403).json({ ok: false, error: 'Access denied' });
+
+    // ── Write to REQUESTS table ──────────────────────────────────────────────
+    const fields = {
+      'Hotel Slug':  hotelSlug,
+      'Naziv sobe':  roomNumber,
+      'Kategorija':  category,
+      'Poruka':      message,
+      'Status':      'New',
+    };
+    if (guestName) fields['Gost - ime'] = guestName;
+    if (priority)  fields['Prioritet']  = priority;
+
+    const created = await base(TABLE_REQUESTS).create(fields);
+
+    return res.status(201).json({
+      ok:        true,
+      requestId: created.id,
+      meta: {
+        hotelSlug,
+        roomNumber,
+        category,
+        priority: fields['Prioritet'] ?? 'Normal',
+        ms: Date.now() - started,
+      },
+    });
+
+  } catch (e) {
+    console.error('pwa-request error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// -------------------------
+// /api/pwa-welcome — load room-specific welcome text for the PWA landing screen
+//
+// Input:  { slug, room, token }
+// Auth:   Same ROOM GUIDE token validation as /api/pwa-ask (timing-safe)
+// Output: { ok, hotelName, aiWelcome }
+// -------------------------
+app.post('/api/pwa-welcome', async (req, res) => {
+  try {
+    const hotelSlug  = pickFirstNonEmpty(req.body?.slug, req.query?.slug, HOTEL_SLUG_DEFAULT);
+    const roomNumber = pickFirstNonEmpty(req.body?.room, req.query?.room, '');
+    const token      = pickFirstNonEmpty(req.body?.token, req.query?.token, '');
+
+    if (!roomNumber) return res.status(400).json({ ok: false, error: 'Missing room' });
+
+    const [hotelRec, roomGuide] = await Promise.all([
+      getHotelRecord(hotelSlug),
+      getRoomGuideRecord(hotelSlug, roomNumber),
+    ]);
+
+    const storedToken = roomGuide?.accessToken ?? '';
+    const tokenValid = (
+      token.length > 0 &&
+      storedToken.length > 0 &&
+      token.length === storedToken.length &&
+      timingSafeEqual(Buffer.from(token), Buffer.from(storedToken))
+    );
+    if (!tokenValid) return res.status(403).json({ ok: false, error: 'Access denied' });
+
+    return res.json({
+      ok:        true,
+      hotelName: hotelRec?.hotelNaziv ?? '',
+      aiWelcome: roomGuide?.aiWelcome ?? '',
+    });
+
+  } catch (e) {
+    console.error('pwa-welcome error:', e);
     res.status(500).json({ ok: false, error: 'Server error' });
   }
 });

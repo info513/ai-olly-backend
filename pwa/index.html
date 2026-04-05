@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#2c1f14">
+  <title>Hotel Antique Split</title>
+  <link rel="manifest" href="/pwa/manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── Screen: Welcome ─────────────────────────────────────────────── -->
+  <div id="screen-welcome" class="screen">
+
+    <div class="welcome-header">
+      <div class="hotel-name" id="hotel-name">Hotel Antique Split</div>
+      <div class="room-badge">Room <span id="room-number">—</span></div>
+    </div>
+
+    <div id="param-warning" class="param-warning" hidden>
+      This link appears to be incomplete. Please scan the QR code in your room again.
+    </div>
+
+    <div class="screen-body">
+
+      <p id="welcome-text" class="welcome-text" hidden></p>
+
+      <div class="action-list">
+
+        <button class="action-btn" onclick="showScreen('ask')">
+          <span class="action-label">Ask the Assistant</span>
+        </button>
+
+        <button class="action-btn" onclick="showScreen('request')">
+          <span class="action-label">Send a Request</span>
+        </button>
+
+        <button class="action-btn" onclick="showIssueScreen()">
+          <span class="action-label">Report an Issue</span>
+        </button>
+
+        <button class="action-btn action-btn--primary" onclick="showScreen('contact')">
+          <span class="action-label">Contact Reception</span>
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Send a Request ──────────────────────────────────────── -->
+  <div id="screen-request" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="showScreen('welcome')">&larr; Back</button>
+      <div class="screen-title" id="req-screen-title">Send a Request</div>
+    </div>
+
+    <!-- Form view -->
+    <div id="req-form" class="screen-body req-scrollable">
+
+      <div class="form-group">
+        <div class="form-label" id="req-cat-label">What do you need?</div>
+        <div class="cat-grid" id="cat-grid">
+          <button class="cat-btn" onclick="selectCategory('Housekeeping')">Housekeeping</button>
+          <button class="cat-btn" onclick="selectCategory('Maintenance')">Maintenance</button>
+          <button class="cat-btn" onclick="selectCategory('Food &amp; Beverage')">Food &amp; Beverage</button>
+          <button class="cat-btn" onclick="selectCategory('Concierge')">Concierge</button>
+          <button class="cat-btn" onclick="selectCategory('Issue / Complaint')">Issue / Complaint</button>
+          <button class="cat-btn" onclick="selectCategory('Other')">Other</button>
+        </div>
+        <div class="field-error" id="cat-error" hidden>Please select a category.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" id="req-msg-label" for="req-message">Describe your request</label>
+        <textarea
+          id="req-message"
+          class="form-textarea"
+          rows="4"
+          placeholder="Tell us what you need..."
+          oninput="clearFieldError('msg-error')"
+        ></textarea>
+        <div class="field-error" id="msg-error" hidden>Please describe your request.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label form-label--optional" for="req-name">
+          Your name <span class="optional-tag">(optional)</span>
+        </label>
+        <input
+          id="req-name"
+          class="form-input"
+          type="text"
+          placeholder="e.g. Ana"
+          autocomplete="given-name"
+        >
+      </div>
+
+      <div class="form-group">
+        <div class="form-label">Priority</div>
+        <div class="prio-toggle">
+          <button id="prio-normal" class="prio-btn prio-btn--selected" onclick="selectPriority('Normal')">Normal</button>
+          <button id="prio-urgent" class="prio-btn" onclick="selectPriority('Urgent')">Urgent</button>
+        </div>
+        <div class="prio-hint" id="prio-hint">Urgent means something is preventing normal use of your room.</div>
+      </div>
+
+      <div class="field-error field-error--global" id="submit-error" hidden></div>
+
+      <button id="req-submit-btn" class="action-btn action-btn--primary submit-btn" onclick="submitRequest()">
+        Send Request
+      </button>
+
+    </div>
+
+    <!-- Loading view -->
+    <div id="req-loading" class="screen-body screen-body--centered" hidden>
+      <div class="spinner"></div>
+      <p class="loading-text">Sending your request...</p>
+    </div>
+
+    <!-- Success view -->
+    <div id="req-success" class="screen-body screen-body--centered" hidden>
+      <div class="success-icon">&#10003;</div>
+      <div class="success-heading" id="req-success-heading">Request sent</div>
+      <p class="success-text" id="req-success-text">Reception has been notified and will take care of it shortly.</p>
+      <p class="success-ref" id="success-ref"></p>
+      <button class="action-btn action-btn--primary" onclick="showScreen('welcome')">Back to menu</button>
+    </div>
+
+  </div>
+
+  <!-- ── Screen: Ask Assistant ──────────────────────────────────────── -->
+  <div id="screen-ask" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="showScreen('welcome')">&larr; Back</button>
+      <div class="screen-title">Assistant</div>
+    </div>
+
+    <div class="screen-body ask-body">
+
+      <p class="ask-hint">Ask about WiFi, AC, TV, the safe, or anything about your stay.</p>
+
+      <div class="ask-input-row">
+        <input
+          id="ask-input"
+          class="ask-input"
+          type="text"
+          placeholder="Your question..."
+          autocomplete="off"
+          autocorrect="off"
+          oninput="onAskInput()"
+          onkeydown="onAskKeydown(event)"
+        >
+        <button id="ask-btn" class="ask-btn" onclick="submitAsk()" disabled>Ask</button>
+      </div>
+
+      <div id="ask-loading" class="ask-loading" hidden>
+        <div class="spinner"></div>
+        <span class="loading-text">Looking that up&hellip;</span>
+      </div>
+
+      <div id="ask-answer-card" class="ask-answer-card" hidden>
+        <div id="ask-answer-text" class="ask-answer-text"></div>
+      </div>
+
+      <div id="ask-error" class="ask-error-box" hidden></div>
+
+      <div id="ask-contact-hint" class="ask-contact-hint" hidden>
+        <button class="action-btn" onclick="showScreen('contact')">Contact Reception</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Screen: Contact Reception ──────────────────────────────────── -->
+  <div id="screen-contact" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="showScreen('welcome')">&larr; Back</button>
+      <div class="screen-title">Reception</div>
+    </div>
+
+    <div class="screen-body">
+      <div class="contact-card">
+
+        <p class="contact-note" id="reception-note">Reception is available 24 hours a day.</p>
+
+        <a id="contact-phone" class="contact-link contact-link--phone" href="tel:+38521785208">
+          <div class="action-label">
+            <div>Call Reception</div>
+            <div class="contact-link-sub" id="phone-display">+38521785208</div>
+          </div>
+        </a>
+
+        <a id="contact-whatsapp" class="contact-link contact-link--whatsapp" href="https://wa.me/38521785208" target="_blank" rel="noopener">
+          <div class="action-label">
+            <div>WhatsApp</div>
+            <div class="contact-link-sub">Open in WhatsApp</div>
+          </div>
+        </a>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
