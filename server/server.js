@@ -812,7 +812,11 @@ async function getRoomGuideByHotel(hotelSlug) {
 
   const rows = recs.map(mapRoomGuideRecord).filter(r => r.active);
 
-  CACHE.roomGuideByHotel.set(String(hotelSlug), { ts: Date.now(), rows });
+  // Only cache non-empty results — an empty result may mean a transient Airtable
+  // failure; caching it would poison every subsequent call for 60 s (→ 403).
+  if (rows.length > 0) {
+    CACHE.roomGuideByHotel.set(String(hotelSlug), { ts: Date.now(), rows });
+  }
   return rows;
 }
 
@@ -1930,6 +1934,7 @@ app.post('/api/pwa-ask', async (req, res) => {
       timingSafeEqual(Buffer.from(token), Buffer.from(storedToken))
     );
     if (!tokenValid) {
+      console.warn(`[pwa-ask] 403: slug=${hotelSlug} room=${roomNumber} token_len=${token.length} stored_len=${storedToken.length} room_found=${roomGuide !== null}`);
       return res.status(403).json({ ok: false, error: 'Access denied' });
     }
     // ───────────────────────────────────────────────────────────────────────────

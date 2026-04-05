@@ -124,6 +124,15 @@ function showReqView(view) {
 
 // ── Submit request ────────────────────────────────────────────────────────
 async function submitRequest() {
+  if (!TOKEN) {
+    const errEl = document.getElementById('submit-error');
+    if (errEl) {
+      errEl.textContent = 'Your room link is incomplete. Please scan the QR code in your room again.';
+      show('submit-error');
+    }
+    return;
+  }
+
   // Client-side validation
   let valid = true;
 
@@ -223,6 +232,12 @@ async function submitAsk() {
   const input    = document.getElementById('ask-input');
   const question = input ? input.value.trim() : '';
   if (!question) return;
+
+  if (!TOKEN) {
+    setText('ask-error', 'Your room link is incomplete. Please scan the QR code in your room again.');
+    show('ask-error');
+    return;
+  }
 
   const btn = document.getElementById('ask-btn');
   if (input) input.disabled = true;
