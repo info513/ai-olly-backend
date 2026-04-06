@@ -26,7 +26,7 @@
       This link appears to be incomplete. Please scan the QR code in your room again.
     </div>
 
-    <p id="welcome-text" class="welcome-text" style="padding:0 20px;" hidden></p>
+    <p id="welcome-text" class="welcome-text" hidden></p>
 
     <div class="screen-body">
       <div class="guide-grid">
@@ -160,14 +160,15 @@
     </div>
 
     <div class="screen-body">
-      <div id="services-loading" class="screen-body--centered" hidden>
-        <div class="spinner"></div>
-        <p class="loading-text">Loading services&hellip;</p>
-      </div>
-      <div id="services-empty" hidden>
-        <p style="color:var(--text-muted);font-size:15px;">No services available at this time.</p>
+        <div id="services-empty" class="screen-body--empty" hidden>
+        <p class="screen-subtitle">No services available at this time.</p>
       </div>
       <div id="services-list"></div>
+    </div>
+
+    <div id="services-loading" class="screen-body screen-body--centered" hidden>
+      <div class="spinner"></div>
+      <p class="loading-text">Loading services&hellip;</p>
     </div>
   </div>
 
@@ -183,8 +184,8 @@
       <div id="svc-category" class="detail-category"></div>
       <h2 id="svc-title" class="detail-title"></h2>
       <div id="svc-hours" class="detail-meta"></div>
-      <div id="svc-desc" class="detail-section-text" style="margin-bottom:20px;"></div>
-      <div style="display:flex;flex-direction:column;gap:10px;">
+      <div id="svc-desc" class="detail-section-text"></div>
+      <div class="detail-actions">
         <button class="action-btn" onclick="gotoRoot('ask')">Ask Olly</button>
         <button class="action-btn" onclick="pushScreen('contact')">Contact Reception</button>
         <button class="action-btn action-btn--primary" onclick="pushScreen('request')">Send a Request</button>
@@ -196,7 +197,7 @@
   <div id="screen-city-map" class="screen screen--root">
 
     <div class="screen-header">
-      <div class="screen-title" style="margin-left:0;">City Map</div>
+      <div class="screen-title">City Map</div>
     </div>
 
     <div class="map-screen-body">
@@ -214,9 +215,8 @@
       </div>
     </div>
 
-    <!-- POI list below map -->
-    <div class="screen-body" style="flex:none;padding-top:12px;">
-      <p class="screen-subtitle">Tap a marker to explore. All distances from the hotel.</p>
+    <div class="map-footer">
+      <p class="screen-subtitle">Tap a marker to explore. Distances from the hotel.</p>
     </div>
 
   </div>
@@ -226,18 +226,17 @@
 
     <div class="screen-header">
       <button class="back-btn" onclick="popScreen()">&larr; Back</button>
-      <button class="back-btn" id="poi-back-to-map-btn" onclick="popToMap()" style="margin-left:auto;">Map</button>
     </div>
 
     <div class="screen-body">
       <div id="poi-category" class="detail-category"></div>
       <h2 id="poi-name" class="detail-title"></h2>
       <div id="poi-meta" class="detail-meta"></div>
-      <div id="poi-short-desc" class="detail-section-text" style="margin-bottom:12px;"></div>
+      <div id="poi-short-desc" class="detail-section-text detail-text--lead"></div>
       <div id="poi-long-desc" class="detail-section-text"></div>
-      <div style="margin-top:24px;">
-        <a id="poi-nav-btn" href="#" target="_blank" rel="noopener" class="action-btn action-btn--primary" style="display:flex;justify-content:center;text-decoration:none;">
-          Navigate
+      <div class="detail-actions">
+        <a id="poi-nav-btn" href="#" target="_blank" rel="noopener" class="action-btn action-btn--primary action-btn--block">
+          Open in Maps
         </a>
       </div>
     </div>
@@ -266,11 +265,11 @@
     </div>
 
     <div class="screen-body">
-      <div style="display:flex;gap:10px;margin-bottom:4px;">
+      <div class="detail-badges">
         <div id="route-type" class="detail-category"></div>
         <div id="route-duration" class="detail-category"></div>
       </div>
-      <div id="route-desc" class="detail-section-text" style="margin-bottom:16px;"></div>
+      <div id="route-desc" class="detail-section-text detail-text--lead"></div>
       <div id="route-start" class="detail-meta"></div>
 
       <div class="detail-section">
@@ -280,9 +279,9 @@
 
       <div id="route-profile" class="rg-content-block" style="margin-top:16px;" hidden></div>
 
-      <div style="display:flex;gap:10px;margin-top:20px;">
-        <button class="action-btn" style="flex:1;" onclick="openRouteMap()">Open on Map</button>
-        <button class="action-btn action-btn--primary" style="flex:1;" onclick="navigateToRouteStart()">Navigate to Start</button>
+      <div class="detail-actions detail-actions--row">
+        <button class="action-btn" onclick="openRouteMap()">View on Map</button>
+        <button class="action-btn action-btn--primary" onclick="navigateToRouteStart()">Navigate to Start</button>
       </div>
     </div>
   </div>
@@ -299,7 +298,7 @@
       <div id="route-map-leaflet" style="height:60vh;width:100%;"></div>
     </div>
 
-    <div class="screen-body" style="flex:none;padding-top:12px;">
+    <div class="map-footer">
       <div id="route-map-legend"></div>
     </div>
   </div>
@@ -355,11 +354,10 @@
 
     <div class="screen-header">
       <button class="back-btn" onclick="popScreen()">&larr; Back</button>
-      <h2 id="nm-category-title" class="screen-title"></h2>
+      <div id="nm-category-title" class="screen-title"></div>
     </div>
 
     <div class="screen-body">
-      <p class="screen-subtitle">Results near Hotel Antique Split</p>
       <div id="nm-results-list"></div>
     </div>
   </div>
@@ -512,7 +510,7 @@
   <div id="screen-ask" class="screen screen--root">
 
     <div class="screen-header">
-      <div class="screen-title" style="margin-left:0;">Ask Olly</div>
+      <div class="screen-title">Ask Olly</div>
     </div>
 
     <div class="screen-body ask-body">
@@ -566,7 +564,7 @@
   <div id="screen-info" class="screen screen--root">
 
     <div class="screen-header">
-      <div class="screen-title" style="margin-left:0;">Info</div>
+      <div class="screen-title">Hotel Info</div>
     </div>
 
     <div class="screen-body">
@@ -599,9 +597,9 @@
 
       <div class="info-section">
         <div class="info-row">
-          <span class="info-label">How to use this guide</span>
-          <span class="info-value" style="color:var(--text-muted);font-size:14px;line-height:1.65;">
-            Use the home screen to navigate all sections of the guide. Room Guide shows your room's WiFi, AC, TV and safe instructions. Hotel Services lists dining and amenities. City Map displays points of interest. Routes offers curated walks. Ask Olly answers questions about your stay.
+          <span class="info-label">About this guide</span>
+          <span class="info-value info-value--muted">
+            Your digital room guide. Use Room Guide for in-room instructions, Ask Olly for quick answers, and City Map &amp; Routes to explore Split.
           </span>
         </div>
       </div>

@@ -266,7 +266,8 @@ function showPoiMiniCard(idx) {
   currentPoi = poi;
   setText('poi-mini-category', poi.category);
   setText('poi-mini-name', poi.name);
-  setText('poi-mini-info', poi.dist + ' \u00b7 ' + poi.visit);
+  const meta = [poi.dist, poi.visit].filter(Boolean).join(' \u00b7 ');
+  setText('poi-mini-info', meta);
   show('poi-mini-card');
 }
 
@@ -284,11 +285,12 @@ function openPoiDetail() {
 function _populatePoiDetail(poi) {
   setText('poi-category', poi.category);
   setText('poi-name', poi.name);
-  setText('poi-meta', poi.dist + '  \u00b7  ' + poi.visit);
+  const meta = [poi.dist, poi.visit].filter(Boolean).join('  \u00b7  ');
+  setText('poi-meta', meta);
   setText('poi-short-desc', poi.shortDesc);
   setText('poi-long-desc', poi.longDesc);
   const navBtn = document.getElementById('poi-nav-btn');
-  if (navBtn) navBtn.href = poi.nav;
+  if (navBtn) navBtn.href = poi.nav || '#';
 }
 
 function navigateToPoi() {
@@ -411,6 +413,7 @@ function initRouteMap() {
     .filter(Boolean);
 
   routePois.forEach((poi, i) => {
+    if (!poi.coords) return;
     const poiIcon = L.divIcon({
       className: '',
       html: `<div style="width:22px;height:22px;background:#8b6914;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.2);">${i + 1}</div>`,
@@ -437,9 +440,8 @@ function initRouteMap() {
 }
 
 function navigateToRouteStart() {
-  if (!currentRoute?.startPoint?.coords) return;
-  const { lat, lng } = currentRoute.startPoint.coords;
-  window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+  const coords = currentRoute?.startPointCoords || CONFIG.hotelCoords;
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`, '_blank');
 }
 
 // ── Near Me ───────────────────────────────────────────────────────────────
@@ -467,11 +469,9 @@ function renderNearMeResults(cat) {
   const { lat, lng } = CONFIG.hotelCoords;
   const mapsUrl = `https://www.google.com/maps/search/${cat.query}/@${lat},${lng},16z`;
   container.innerHTML = `
-    <div style="padding:8px 0;">
-      <p style="font-size:15px;color:var(--text-muted);line-height:1.65;margin-bottom:16px;">
-        View ${escHtml(cat.label.toLowerCase())} near Hotel Antique Split on the map.
-      </p>
-      <a href="${mapsUrl}" target="_blank" rel="noopener" class="action-btn action-btn--primary" style="display:flex;text-align:center;justify-content:center;text-decoration:none;">
+    <div class="nm-maps-result">
+      <p class="screen-subtitle">Nearest ${escHtml(cat.label.toLowerCase())} near the hotel.</p>
+      <a href="${mapsUrl}" target="_blank" rel="noopener" class="action-btn action-btn--primary action-btn--block">
         Open in Google Maps
       </a>
     </div>

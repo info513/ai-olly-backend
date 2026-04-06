@@ -522,7 +522,7 @@ html, body {
   line-height: 1.65;
   color: var(--text-muted);
   white-space: pre-line;
-  padding: 4px 0 4px;
+  padding: 0 20px;
 }
 
 /* ── Bottom navigation ──────────────────────────────────────────────────── */
@@ -928,6 +928,12 @@ html, body {
   color: var(--text);
 }
 
+.info-value--muted {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 /* ── Detail screens ─────────────────────────────────────────────────────── */
 
 .detail-category {
@@ -976,5 +982,53 @@ html, body {
 .screen-subtitle {
   font-size: 14px;
   color: var(--text-muted);
-  margin: -4px 0 4px;
+  line-height: 1.5;
+  margin: -4px 0 8px;
+}
+
+/* ── Detail actions block ───────────────────────────────────────────────── */
+
+.detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.detail-actions--row {
+  flex-direction: row;
+}
+
+.detail-actions--row > * { flex: 1; }
+
+/* ── Detail badges (type/duration row) ─────────────────────────────────── */
+
+.detail-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+/* ── Detail text lead (short desc above long desc) ─────────────────────── */
+
+.detail-text--lead { margin-bottom: 12px; }
+
+/* ── Block action button (full-width link buttons) ─────────────────────── */
+
+.action-btn--block { justify-content: center; }
+
+/* ── Map footer (info strip below map) ─────────────────────────────────── */
+
+.map-footer {
+  flex: none;
+  padding: 12px 20px 0;
+}
+
+/* ── Near Me Maps result ────────────────────────────────────────────────── */
+
+.nm-maps-result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
