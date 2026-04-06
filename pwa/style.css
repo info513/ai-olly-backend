@@ -60,9 +60,18 @@ html, body {
 }
 
 .screen-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 17px;
   font-weight: 600;
   color: var(--text);
+}
+
+.action-icon {
+  font-size: 20px;
 }
 
 /* ── Welcome header ─────────────────────────────────────────────────────── */
@@ -723,7 +732,11 @@ html, body {
 #city-map-leaflet,
 #route-map-leaflet {
   z-index: 1;
+  width: 100%;
 }
+
+#city-map-leaflet  { height: 55vh; }
+#route-map-leaflet { height: 60vh; }
 
 .leaflet-container { font-family: inherit; }
 

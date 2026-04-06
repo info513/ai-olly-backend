@@ -45,7 +45,11 @@ function _activateScreen(name) {
   }
 
   // Screen-specific init / render
-  if (name === 'city-map'   && !cityMapInited) initCityMap();
+  if (name === 'city-map') {
+    hide('poi-mini-card');
+    setHidden('poi-loading-hint', !!poisData);
+    if (!cityMapInited) initCityMap();
+  }
   if (name === 'room-guide') renderRoomGuideSections();
   if (name === 'services')   renderServicesList();
   if (name === 'routes')     renderRoutesList();
@@ -87,6 +91,8 @@ function renderRoomGuideSections() {
   // Static sections in HTML — just manage loading indicator
   if (roomGuideData) {
     hide('rg-loading');
+  } else {
+    show('rg-loading');
   }
 }
 
@@ -163,9 +169,9 @@ function renderRoomSection(section) {
       : `<div class="rg-content-block"><p class="rg-content-text">No additional notes for this room.</p></div>`;
   }
 
-  html += `<div style="display:flex;gap:10px;">
-    <button class="action-btn" style="flex:1;" onclick="gotoRoot('ask')">Ask Olly</button>
-    <button class="action-btn action-btn--primary" style="flex:1;" onclick="pushScreen('contact')">Reception</button>
+  html += `<div class="detail-actions detail-actions--row">
+    <button class="action-btn" onclick="gotoRoot('ask')">Ask Olly</button>
+    <button class="action-btn action-btn--primary" onclick="pushScreen('contact')">Reception</button>
   </div>`;
 
   html += '</div>';
@@ -246,6 +252,7 @@ function initCityMap() {
 
 function addPoiMarkersToMap() {
   if (!cityMapObj || !poisData) return;
+  hide('poi-loading-hint');
   const poiIcon = L.divIcon({
     className: '',
     html: '<div style="width:10px;height:10px;background:#8b6914;border:1.5px solid #fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>',
@@ -796,6 +803,7 @@ async function loadRoomGuide() {
     const data = await res.json();
     if (data.ok) {
       roomGuideData = data;
+      if (currentScreen === 'room-guide') renderRoomGuideSections();
     }
   } catch (_) {
     // Silent fallback
@@ -812,7 +820,10 @@ async function loadServices() {
     });
     if (!res.ok) return;
     const data = await res.json();
-    if (data.ok) servicesData = data.services || [];
+    if (data.ok) {
+      servicesData = data.services || [];
+      if (currentScreen === 'services') renderServicesList();
+    }
   } catch (_) {
     // Silent fallback
   }

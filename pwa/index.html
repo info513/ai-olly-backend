@@ -201,7 +201,7 @@
     </div>
 
     <div class="map-screen-body">
-      <div id="city-map-leaflet" style="height:55vh;width:100%;"></div>
+      <div id="city-map-leaflet"></div>
 
       <div id="poi-mini-card" class="poi-mini-card" hidden>
         <button class="poi-mini-close" onclick="closePoisMiniCard()">&#x2715;</button>
@@ -216,6 +216,7 @@
     </div>
 
     <div class="map-footer">
+      <p id="poi-loading-hint" class="screen-subtitle" hidden>Loading points of interest&hellip;</p>
       <p class="screen-subtitle">Tap a marker to explore. Distances from the hotel.</p>
     </div>
 
@@ -295,7 +296,7 @@
     </div>
 
     <div style="flex:1;">
-      <div id="route-map-leaflet" style="height:60vh;width:100%;"></div>
+      <div id="route-map-leaflet"></div>
     </div>
 
     <div class="map-footer">
@@ -374,17 +375,17 @@
       <div class="help-list">
 
         <button class="action-btn" onclick="showRequestScreen()">
-          <span style="font-size:20px;">📋</span>
+          <span class="action-icon">📋</span>
           <span class="action-label">Send a Request</span>
         </button>
 
         <button class="action-btn" onclick="showIssueScreen()">
-          <span style="font-size:20px;">⚠️</span>
+          <span class="action-icon">⚠️</span>
           <span class="action-label">Report an Issue</span>
         </button>
 
         <button class="action-btn action-btn--primary" onclick="pushScreen('contact')">
-          <span style="font-size:20px;">📞</span>
+          <span class="action-icon">📞</span>
           <span class="action-label">Contact Reception</span>
         </button>
 
