@@ -598,6 +598,15 @@ html, body {
   grid-column: span 2;
 }
 
+.guide-card--secondary {
+  margin: 8px 0 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  opacity: 0.85;
+}
+
 .guide-card-icon { font-size: 26px; line-height: 1; }
 
 .guide-card-label {

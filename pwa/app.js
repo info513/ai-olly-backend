@@ -11,6 +11,8 @@ const TOKEN  = params.get('token') || '';
 // ── Module state ──────────────────────────────────────────────────────────
 let roomGuideData  = null;
 let servicesData   = null;
+let poisData       = null;   // loaded from /api/pwa-pois
+let routesData     = null;   // loaded from /api/pwa-routes
 let currentService = null;
 let currentPoi     = null;
 let currentRoute   = null;
@@ -236,24 +238,30 @@ function initCityMap() {
     .addTo(cityMapObj)
     .bindTooltip('Hotel Antique Split', { permanent: false });
 
-  // POI markers
-  POIS.forEach((poi, idx) => {
-    const poiIcon = L.divIcon({
-      className: '',
-      html: '<div style="width:10px;height:10px;background:#8b6914;border:1.5px solid #fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>',
-      iconSize: [10, 10],
-      iconAnchor: [5, 5],
-    });
-    L.marker([poi.coords.lat, poi.coords.lng], { icon: poiIcon })
-      .addTo(cityMapObj)
-      .on('click', () => showPoiMiniCard(idx));
-  });
+  // POI markers — added now if data is ready, otherwise added by loadPois() callback
+  if (poisData) addPoiMarkersToMap();
 
   cityMapInited = true;
 }
 
+function addPoiMarkersToMap() {
+  if (!cityMapObj || !poisData) return;
+  const poiIcon = L.divIcon({
+    className: '',
+    html: '<div style="width:10px;height:10px;background:#8b6914;border:1.5px solid #fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>',
+    iconSize: [10, 10],
+    iconAnchor: [5, 5],
+  });
+  poisData.forEach((poi, idx) => {
+    if (!poi.coords) return; // skip POIs without coordinates in Airtable
+    L.marker([poi.coords.lat, poi.coords.lng], { icon: poiIcon })
+      .addTo(cityMapObj)
+      .on('click', () => showPoiMiniCard(idx));
+  });
+}
+
 function showPoiMiniCard(idx) {
-  const poi = POIS[idx];
+  const poi = poisData ? poisData[idx] : null;
   if (!poi) return;
   currentPoi = poi;
   setText('poi-mini-category', poi.category);
@@ -297,35 +305,44 @@ function popToMap() {
 function renderRoutesList() {
   const container = document.getElementById('routes-list');
   if (!container) return;
-  container.innerHTML = ROUTES.map((r, i) => `
+  if (!routesData) {
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:14px;padding:16px 0;">Loading routes\u2026</p>';
+    return;
+  }
+  if (!routesData.length) {
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:14px;padding:16px 0;">No routes available at this time.</p>';
+    return;
+  }
+  container.innerHTML = routesData.map((r, i) => `
     <div class="route-card" onclick="openRouteDetail(${i})">
       <div class="route-card-meta">
-        <span>${escHtml(r.type)}</span>
-        <span>\u00b7</span>
-        <span>${escHtml(r.duration)}</span>
+        ${r.type     ? `<span>${escHtml(r.type)}</span><span>\u00b7</span>` : ''}
+        ${r.duration ? `<span>${escHtml(r.duration)}</span>` : ''}
       </div>
       <div class="route-card-title">${escHtml(r.name)}</div>
-      <div class="route-card-desc">${escHtml(r.shortDesc)}</div>
+      ${r.shortDesc ? `<div class="route-card-desc">${escHtml(r.shortDesc)}</div>` : ''}
     </div>
   `).join('');
 }
 
 function openRouteDetail(idx) {
-  currentRoute = ROUTES[idx];
+  currentRoute = routesData ? routesData[idx] : null;
   if (!currentRoute) return;
 
   setText('route-detail-title', currentRoute.name);
   setText('route-map-title',    currentRoute.name);
-  setText('route-type',         currentRoute.type);
-  setText('route-duration',     currentRoute.duration);
-  setText('route-desc',         currentRoute.longDesc);
-  setText('route-start',        currentRoute.startPoint ? 'Start: ' + currentRoute.startPoint.name : '');
+  setText('route-type',         currentRoute.type     || '');
+  setText('route-duration',     currentRoute.duration || '');
+  setText('route-desc',         currentRoute.longDesc || '');
+  setText('route-start',
+    currentRoute.startPointName ? 'Start: ' + currentRoute.startPointName : '');
 
-  // POI list
+  // POI list — route.poiIds are Airtable record IDs; look up in poisData
   const poisContainer = document.getElementById('route-pois-list');
   if (poisContainer) {
+    const localPois = poisData || [];
     const routePois = (currentRoute.poiIds || [])
-      .map(id => POIS.find(p => p.id === id))
+      .map(id => localPois.find(p => p.id === id))
       .filter(Boolean);
     poisContainer.innerHTML = routePois.length
       ? routePois.map(p => `
@@ -340,19 +357,15 @@ function openRouteDetail(idx) {
   // Profile
   const profileEl = document.getElementById('route-profile');
   if (profileEl) {
-    if (currentRoute.profile) {
-      profileEl.textContent = currentRoute.profile;
-      profileEl.hidden = false;
-    } else {
-      profileEl.hidden = true;
-    }
+    profileEl.textContent = currentRoute.profile || '';
+    profileEl.hidden = !currentRoute.profile;
   }
 
   pushScreen('route-detail');
 }
 
 function openPoiFromRoute(poiId) {
-  const poi = POIS.find(p => p.id === poiId);
+  const poi = (poisData || []).find(p => p.id === poiId);
   if (!poi) return;
   currentPoi = poi;
   _populatePoiDetail(poi);
@@ -373,7 +386,7 @@ function initRouteMap() {
     routeMapObj = null;
   }
 
-  const startCoords = currentRoute.startPoint?.coords || CONFIG.hotelCoords;
+  const startCoords = currentRoute.startPointCoords || CONFIG.hotelCoords;
   routeMapObj = L.map('route-map-leaflet').setView([startCoords.lat, startCoords.lng], 14);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -390,11 +403,11 @@ function initRouteMap() {
   });
   L.marker([startCoords.lat, startCoords.lng], { icon: startIcon })
     .addTo(routeMapObj)
-    .bindTooltip('Start: ' + (currentRoute.startPoint?.name || ''), { permanent: false });
+    .bindTooltip('Start: ' + (currentRoute.startPointName || ''), { permanent: false });
 
-  // Route POI markers
+  // Route POI markers — look up from live poisData
   const routePois = (currentRoute.poiIds || [])
-    .map(id => POIS.find(p => p.id === id))
+    .map(id => (poisData || []).find(p => p.id === id))
     .filter(Boolean);
 
   routePois.forEach((poi, i) => {
@@ -805,6 +818,45 @@ async function loadServices() {
   }
 }
 
+async function loadPois() {
+  if (!ROOM || !TOKEN) return;
+  try {
+    const res  = await fetch((CONFIG.apiBase || '') + '/api/pwa-pois', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ slug: SLUG || 'antique-split', room: ROOM, token: TOKEN }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.ok && Array.isArray(data.pois)) {
+      poisData = data.pois;
+      addPoiMarkersToMap();   // no-op if map not yet inited; called again from initCityMap
+    }
+  } catch (_) {
+    // Silent fallback
+  }
+}
+
+async function loadRoutes() {
+  if (!ROOM || !TOKEN) return;
+  try {
+    const res  = await fetch((CONFIG.apiBase || '') + '/api/pwa-routes', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ slug: SLUG || 'antique-split', room: ROOM, token: TOKEN }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.ok && Array.isArray(data.routes)) {
+      routesData = data.routes;
+      // Re-render routes list if it's already showing
+      if (currentScreen === 'routes') renderRoutesList();
+    }
+  } catch (_) {
+    // Silent fallback
+  }
+}
+
 // ── DOM helpers ───────────────────────────────────────────────────────────
 function hide(id)             { const el = document.getElementById(id); if (el) el.hidden = true;  }
 function show(id)             { const el = document.getElementById(id); if (el) el.hidden = false; }
@@ -858,6 +910,8 @@ function boot() {
     fetchWelcomeData();
     loadRoomGuide();
     loadServices();
+    loadPois();
+    loadRoutes();
   }
 }
 

@@ -27,6 +27,8 @@ const {
   TABLE_OUTPUT_RULES = 'AI_OUTPUT_RULES',
   TABLE_ROOM_GUIDE = 'ROOM GUIDE',
   TABLE_REQUESTS   = 'REQUESTS',
+  TABLE_POI        = 'POI',
+  TABLE_ROUTES     = 'ROUTES',
 
   // CORS
   CORS_ORIGINS = '',
@@ -2261,6 +2263,158 @@ app.post('/api/pwa-services', async (req, res) => {
 
   } catch (e) {
     console.error('pwa-services error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// ── POI + ROUTES record mappers ───────────────────────────────────────────
+
+function mapPoiRecord(rec) {
+  const f   = rec.fields || {};
+  const lat = parseFloat(f.Latitude  ?? f.Lat ?? f.lat ?? '');
+  const lng = parseFloat(f.Longitude ?? f.Lng ?? f.lng ?? '');
+  const hasCoords = isFinite(lat) && isFinite(lng);
+  return {
+    id:        rec.id,
+    name:      pickFirstNonEmpty(f.Name,  f.Naziv,  f.naziv,  ''),
+    category:  pickFirstNonEmpty(f.Category, f.Kategorija, f.kategorija, ''),
+    city:      pickFirstNonEmpty(f.City,  f.Grad,   f.grad,   'Split'),
+    shortDesc: pickFirstNonEmpty(f['Short Description'], f['Kratki opis'], f['kratki opis'], ''),
+    longDesc:  pickFirstNonEmpty(f['Long Description'],  f['Dugi opis'],   f.Opis, f.opis, ''),
+    visit:     pickFirstNonEmpty(f['Visit Duration'], f['Trajanje posjete'], f.Trajanje, f.trajanje, ''),
+    dist:      pickFirstNonEmpty(f['Distance from Hotel'], f.Udaljenost, f.udaljenost, ''),
+    coords:    hasCoords ? { lat, lng } : null,
+    nav:       pickFirstNonEmpty(f['Google Maps URL'], f['Maps URL'], '') ||
+               (hasCoords ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}` : ''),
+  };
+}
+
+function mapRouteRecord(rec) {
+  const f        = rec.fields || {};
+  const startLat = parseFloat(f['Start Lat'] ?? f['Start Latitude'] ?? '');
+  const startLng = parseFloat(f['Start Lng'] ?? f['Start Longitude'] ?? '');
+  const hasStart = isFinite(startLat) && isFinite(startLng);
+  // POIs may be a linked-records array of Airtable record IDs
+  const rawPois  = f.POIs ?? f['POI'] ?? f.Pois ?? [];
+  return {
+    id:        rec.id,
+    name:      pickFirstNonEmpty(f.Name,   f.Naziv,   f.naziv,   ''),
+    type:      pickFirstNonEmpty(f.Type,   f.Tip,     f.tip,     ''),
+    duration:  pickFirstNonEmpty(f.Duration, f.Trajanje, f.trajanje, ''),
+    shortDesc: pickFirstNonEmpty(f['Short Description'], f['Kratki opis'], ''),
+    longDesc:  pickFirstNonEmpty(f.Description, f.Opis, f['Long Description'], f.opis, ''),
+    startPointName:   pickFirstNonEmpty(f['Start Point'], f['Početak'], f['Pocetak'], ''),
+    startPointCoords: hasStart ? { lat: startLat, lng: startLng } : null,
+    poiIds:    Array.isArray(rawPois) ? rawPois : [],
+    profile:   pickFirstNonEmpty(f['Guest Profile'], f['Profil gosta'], f.Profil, f.profil, ''),
+  };
+}
+
+// -------------------------
+// /api/pwa-pois — return curated POI list for the PWA city layer
+//
+// Input:  { slug, room, token }
+// Auth:   Same ROOM GUIDE access-token validation (timing-safe)
+// Output: { ok, pois: [{ id, name, category, city, shortDesc, longDesc,
+//                        visit, dist, coords, nav }] }
+// -------------------------
+app.post('/api/pwa-pois', async (req, res) => {
+  const started = Date.now();
+  try {
+    const hotelSlug  = pickFirstNonEmpty(req.body?.slug,  req.query?.slug,  HOTEL_SLUG_DEFAULT);
+    const roomNumber = pickFirstNonEmpty(req.body?.room,  req.query?.room,  '');
+    const token      = pickFirstNonEmpty(req.body?.token, req.query?.token, '');
+
+    if (!roomNumber) return res.status(400).json({ ok: false, error: 'Missing room' });
+
+    const roomGuide   = await getRoomGuideRecord(hotelSlug, roomNumber);
+    const storedToken = roomGuide?.accessToken ?? '';
+    const tokenValid  = (
+      token.length > 0 && storedToken.length > 0 &&
+      token.length === storedToken.length &&
+      timingSafeEqual(Buffer.from(token), Buffer.from(storedToken))
+    );
+    if (!tokenValid) {
+      console.warn(`[pwa-pois] 403: slug=${hotelSlug} room=${roomNumber} token_len=${token.length} stored_len=${storedToken.length} room_found=${roomGuide !== null}`);
+      return res.status(403).json({ ok: false, error: 'Access denied' });
+    }
+
+    const slugEsc = escapeAirtableFormulaString(hotelSlug);
+    const recs = await airtableSelectAllSafe(
+      TABLE_POI,
+      [{ pageSize: 100, filterByFormula: `FIND("${slugEsc}", ARRAYJOIN({Hotel Slug}))` }]
+    );
+
+    // If hotel-filtered fetch returns nothing, fall back to all POI records
+    const allRecs = recs.length ? recs : await airtableSelectAllSafe(
+      TABLE_POI,
+      [{ pageSize: 100 }]
+    );
+
+    const pois = allRecs.map(mapPoiRecord).filter(p => p.name);
+
+    return res.json({
+      ok:   true,
+      pois,
+      meta: { hotelSlug, count: pois.length, ms: Date.now() - started },
+    });
+
+  } catch (e) {
+    console.error('pwa-pois error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// -------------------------
+// /api/pwa-routes — return curated routes for the PWA city layer
+//
+// Input:  { slug, room, token }
+// Auth:   Same ROOM GUIDE access-token validation (timing-safe)
+// Output: { ok, routes: [{ id, name, type, duration, shortDesc, longDesc,
+//                          startPointName, startPointCoords, poiIds, profile }] }
+// -------------------------
+app.post('/api/pwa-routes', async (req, res) => {
+  const started = Date.now();
+  try {
+    const hotelSlug  = pickFirstNonEmpty(req.body?.slug,  req.query?.slug,  HOTEL_SLUG_DEFAULT);
+    const roomNumber = pickFirstNonEmpty(req.body?.room,  req.query?.room,  '');
+    const token      = pickFirstNonEmpty(req.body?.token, req.query?.token, '');
+
+    if (!roomNumber) return res.status(400).json({ ok: false, error: 'Missing room' });
+
+    const roomGuide   = await getRoomGuideRecord(hotelSlug, roomNumber);
+    const storedToken = roomGuide?.accessToken ?? '';
+    const tokenValid  = (
+      token.length > 0 && storedToken.length > 0 &&
+      token.length === storedToken.length &&
+      timingSafeEqual(Buffer.from(token), Buffer.from(storedToken))
+    );
+    if (!tokenValid) {
+      console.warn(`[pwa-routes] 403: slug=${hotelSlug} room=${roomNumber} token_len=${token.length} stored_len=${storedToken.length} room_found=${roomGuide !== null}`);
+      return res.status(403).json({ ok: false, error: 'Access denied' });
+    }
+
+    const slugEsc = escapeAirtableFormulaString(hotelSlug);
+    const recs = await airtableSelectAllSafe(
+      TABLE_ROUTES,
+      [{ pageSize: 100, filterByFormula: `FIND("${slugEsc}", ARRAYJOIN({Hotel Slug}))` }]
+    );
+
+    const allRecs = recs.length ? recs : await airtableSelectAllSafe(
+      TABLE_ROUTES,
+      [{ pageSize: 100 }]
+    );
+
+    const routes = allRecs.map(mapRouteRecord).filter(r => r.name);
+
+    return res.json({
+      ok:     true,
+      routes,
+      meta: { hotelSlug, count: routes.length, ms: Date.now() - started },
+    });
+
+  } catch (e) {
+    console.error('pwa-routes error:', e);
     res.status(500).json({ ok: false, error: 'Server error' });
   }
 });
