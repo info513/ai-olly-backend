@@ -2171,6 +2171,100 @@ app.post('/api/pwa-welcome', async (req, res) => {
   }
 });
 
+// -------------------------
+// /api/pwa-room-guide — return room-specific guide content
+//
+// Input:  { slug, room, token }
+// Auth:   Same ROOM GUIDE access-token validation as /api/pwa-ask (timing-safe)
+// Output: { ok, wifi, klimaUpute, tvUpute, sefUpute, roomFeatures, napomene, aiWelcome }
+// -------------------------
+app.post('/api/pwa-room-guide', async (req, res) => {
+  try {
+    const hotelSlug  = pickFirstNonEmpty(req.body?.slug,  req.query?.slug,  HOTEL_SLUG_DEFAULT);
+    const roomNumber = pickFirstNonEmpty(req.body?.room,  req.query?.room,  '');
+    const token      = pickFirstNonEmpty(req.body?.token, req.query?.token, '');
+
+    if (!roomNumber) return res.status(400).json({ ok: false, error: 'Missing room' });
+
+    const roomGuide = await getRoomGuideRecord(hotelSlug, roomNumber);
+
+    const storedToken = roomGuide?.accessToken ?? '';
+    const tokenValid = (
+      token.length > 0 &&
+      storedToken.length > 0 &&
+      token.length === storedToken.length &&
+      timingSafeEqual(Buffer.from(token), Buffer.from(storedToken))
+    );
+    if (!tokenValid) {
+      console.warn(`[pwa-room-guide] 403: slug=${hotelSlug} room=${roomNumber} token_len=${token.length} stored_len=${storedToken.length} room_found=${roomGuide !== null}`);
+      return res.status(403).json({ ok: false, error: 'Access denied' });
+    }
+
+    return res.json({
+      ok:           true,
+      wifi:         roomGuide?.wifi         ?? '',
+      klimaUpute:   roomGuide?.klimaUpute   ?? '',
+      tvUpute:      roomGuide?.tvUpute      ?? '',
+      sefUpute:     roomGuide?.sefUpute     ?? '',
+      roomFeatures: roomGuide?.roomFeatures ?? '',
+      napomene:     roomGuide?.napomene     ?? '',
+      aiWelcome:    roomGuide?.aiWelcome    ?? '',
+    });
+
+  } catch (e) {
+    console.error('pwa-room-guide error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// -------------------------
+// /api/pwa-services — return hotel services list for the PWA
+//
+// Input:  { slug, room, token }
+// Auth:   Same ROOM GUIDE access-token validation as /api/pwa-ask (timing-safe)
+// Output: { ok, services: [{ id, naziv, opis, radnoVrijeme, kategorija, aiIntent }] }
+// -------------------------
+app.post('/api/pwa-services', async (req, res) => {
+  try {
+    const hotelSlug  = pickFirstNonEmpty(req.body?.slug,  req.query?.slug,  HOTEL_SLUG_DEFAULT);
+    const roomNumber = pickFirstNonEmpty(req.body?.room,  req.query?.room,  '');
+    const token      = pickFirstNonEmpty(req.body?.token, req.query?.token, '');
+
+    if (!roomNumber) return res.status(400).json({ ok: false, error: 'Missing room' });
+
+    const roomGuide = await getRoomGuideRecord(hotelSlug, roomNumber);
+
+    const storedToken = roomGuide?.accessToken ?? '';
+    const tokenValid = (
+      token.length > 0 &&
+      storedToken.length > 0 &&
+      token.length === storedToken.length &&
+      timingSafeEqual(Buffer.from(token), Buffer.from(storedToken))
+    );
+    if (!tokenValid) {
+      console.warn(`[pwa-services] 403: slug=${hotelSlug} room=${roomNumber} token_len=${token.length} stored_len=${storedToken.length} room_found=${roomGuide !== null}`);
+      return res.status(403).json({ ok: false, error: 'Access denied' });
+    }
+
+    const rawServices = await getServicesForHotelPwa(hotelSlug);
+
+    const services = rawServices.map(s => ({
+      id:           s.id,
+      naziv:        s.naziv         || '',
+      opis:         s.opis          || '',
+      radnoVrijeme: s.radnoVrijeme  || '',
+      kategorija:   Array.isArray(s.kategorija) ? s.kategorija : [],
+      aiIntent:     Array.isArray(s.aiIntent)   ? s.aiIntent   : [],
+    }));
+
+    return res.json({ ok: true, services });
+
+  } catch (e) {
+    console.error('pwa-services error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`✅ AI Olly HUB WEB server running on :${PORT} (build=${BUILD})`);
 });

@@ -8,12 +8,14 @@
   <meta name="theme-color" content="#2c1f14">
   <title>Hotel Antique Split</title>
   <link rel="manifest" href="/pwa/manifest.json">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
 </head>
 <body>
 
-  <!-- ── Screen: Welcome ─────────────────────────────────────────────── -->
-  <div id="screen-welcome" class="screen">
+  <!-- ── Screen: Home Dashboard ─────────────────────────────────────────── -->
+  <div id="screen-home" class="screen screen--root">
 
     <div class="welcome-header">
       <div class="hotel-name" id="hotel-name">Hotel Antique Split</div>
@@ -24,25 +26,366 @@
       This link appears to be incomplete. Please scan the QR code in your room again.
     </div>
 
+    <p id="welcome-text" class="welcome-text" style="padding:0 20px;" hidden></p>
+
     <div class="screen-body">
+      <div class="guide-grid">
 
-      <p id="welcome-text" class="welcome-text" hidden></p>
+        <div class="guide-card" onclick="openModule('room-guide')">
+          <span class="guide-card-icon">🛏</span>
+          <span class="guide-card-label">Room Guide</span>
+        </div>
 
-      <div class="action-list">
+        <div class="guide-card" onclick="openModule('services')">
+          <span class="guide-card-icon">🍽</span>
+          <span class="guide-card-label">Hotel Services</span>
+        </div>
 
-        <button class="action-btn" onclick="showScreen('ask')">
-          <span class="action-label">Ask the Assistant</span>
-        </button>
+        <div class="guide-card" onclick="gotoRoot('city-map')">
+          <span class="guide-card-icon">🗺</span>
+          <span class="guide-card-label">City Map</span>
+        </div>
 
-        <button class="action-btn" onclick="showScreen('request')">
+        <div class="guide-card" onclick="openModule('routes')">
+          <span class="guide-card-icon">🚶</span>
+          <span class="guide-card-label">Routes</span>
+        </div>
+
+        <div class="guide-card" onclick="openModule('near-me')">
+          <span class="guide-card-icon">📍</span>
+          <span class="guide-card-label">Near Me</span>
+        </div>
+
+        <div class="guide-card" onclick="openModule('help')">
+          <span class="guide-card-icon">🔔</span>
+          <span class="guide-card-label">Help &amp; Requests</span>
+        </div>
+
+        <div class="guide-card guide-card--wide" onclick="gotoRoot('ask')">
+          <span class="guide-card-icon">✦</span>
+          <span class="guide-card-label">Ask Olly</span>
+        </div>
+
+        <div class="guide-card guide-card--wide" onclick="openModule('info')">
+          <span class="guide-card-icon">ⓘ</span>
+          <span class="guide-card-label">Info</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Room Guide ─────────────────────────────────────────────── -->
+  <div id="screen-room-guide" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title">Room Guide</div>
+    </div>
+
+    <div id="rg-loading" class="screen-body screen-body--centered" hidden>
+      <div class="spinner"></div>
+      <p class="loading-text">Loading room information&hellip;</p>
+    </div>
+
+    <div class="screen-body">
+      <div class="section-list">
+
+        <div class="section-item" onclick="openRoomGuideSection('wifi')">
+          <span>📶</span>
+          <span>WiFi</span>
+          <span class="section-arrow">›</span>
+        </div>
+
+        <div class="section-item" onclick="openRoomGuideSection('ac')">
+          <span>❄️</span>
+          <span>Air Conditioning</span>
+          <span class="section-arrow">›</span>
+        </div>
+
+        <div class="section-item" onclick="openRoomGuideSection('tv')">
+          <span>📺</span>
+          <span>TV</span>
+          <span class="section-arrow">›</span>
+        </div>
+
+        <div class="section-item" onclick="openRoomGuideSection('safe')">
+          <span>🔒</span>
+          <span>Safe</span>
+          <span class="section-arrow">›</span>
+        </div>
+
+        <div class="section-item" onclick="openRoomGuideSection('features')">
+          <span>✨</span>
+          <span>Room Features</span>
+          <span class="section-arrow">›</span>
+        </div>
+
+        <div class="section-item" onclick="openRoomGuideSection('notes')">
+          <span>📋</span>
+          <span>Room Notes</span>
+          <span class="section-arrow">›</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Room Guide Section ────────────────────────────────────── -->
+  <div id="screen-room-guide-section" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div id="rg-section-title" class="screen-title">Section</div>
+    </div>
+
+    <div class="screen-body">
+      <div id="rg-section-body"></div>
+      <div id="rg-section-fallback" hidden>
+        <div class="rg-content-block">
+          <p class="rg-content-text">Information is not available for this section. Please contact Reception for help.</p>
+        </div>
+        <button class="action-btn action-btn--primary" onclick="pushScreen('contact')">Contact Reception</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Hotel Services ─────────────────────────────────────────── -->
+  <div id="screen-services" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title">Hotel Services</div>
+    </div>
+
+    <div class="screen-body">
+      <div id="services-loading" class="screen-body--centered" hidden>
+        <div class="spinner"></div>
+        <p class="loading-text">Loading services&hellip;</p>
+      </div>
+      <div id="services-empty" hidden>
+        <p style="color:var(--text-muted);font-size:15px;">No services available at this time.</p>
+      </div>
+      <div id="services-list"></div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Service Detail ─────────────────────────────────────────── -->
+  <div id="screen-service-detail" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title">Service</div>
+    </div>
+
+    <div class="screen-body">
+      <div id="svc-category" class="detail-category"></div>
+      <h2 id="svc-title" class="detail-title"></h2>
+      <div id="svc-hours" class="detail-meta"></div>
+      <div id="svc-desc" class="detail-section-text" style="margin-bottom:20px;"></div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="action-btn" onclick="gotoRoot('ask')">Ask Olly</button>
+        <button class="action-btn" onclick="pushScreen('contact')">Contact Reception</button>
+        <button class="action-btn action-btn--primary" onclick="pushScreen('request')">Send a Request</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen: City Map ───────────────────────────────────────────────── -->
+  <div id="screen-city-map" class="screen screen--root">
+
+    <div class="screen-header">
+      <div class="screen-title" style="margin-left:0;">City Map</div>
+    </div>
+
+    <div class="map-screen-body">
+      <div id="city-map-leaflet" style="height:55vh;width:100%;"></div>
+
+      <div id="poi-mini-card" class="poi-mini-card" hidden>
+        <button class="poi-mini-close" onclick="closePoisMiniCard()">&#x2715;</button>
+        <div id="poi-mini-category" class="poi-mini-category"></div>
+        <div id="poi-mini-name" class="poi-mini-name"></div>
+        <div id="poi-mini-info" class="poi-mini-info"></div>
+        <div class="poi-mini-actions">
+          <button class="action-btn" onclick="openPoiDetail()">Details</button>
+          <button class="action-btn action-btn--primary" onclick="navigateToPoi()">Navigate</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- POI list below map -->
+    <div class="screen-body" style="flex:none;padding-top:12px;">
+      <p class="screen-subtitle">Tap a marker to explore. All distances from the hotel.</p>
+    </div>
+
+  </div>
+
+  <!-- ── Screen: POI Detail ─────────────────────────────────────────────── -->
+  <div id="screen-poi-detail" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <button class="back-btn" id="poi-back-to-map-btn" onclick="popToMap()" style="margin-left:auto;">Map</button>
+    </div>
+
+    <div class="screen-body">
+      <div id="poi-category" class="detail-category"></div>
+      <h2 id="poi-name" class="detail-title"></h2>
+      <div id="poi-meta" class="detail-meta"></div>
+      <div id="poi-short-desc" class="detail-section-text" style="margin-bottom:12px;"></div>
+      <div id="poi-long-desc" class="detail-section-text"></div>
+      <div style="margin-top:24px;">
+        <a id="poi-nav-btn" href="#" target="_blank" rel="noopener" class="action-btn action-btn--primary" style="display:flex;justify-content:center;text-decoration:none;">
+          Navigate
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Routes ─────────────────────────────────────────────────── -->
+  <div id="screen-routes" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title">Routes</div>
+    </div>
+
+    <div class="screen-body">
+      <p class="screen-subtitle">Curated walks and excursions from the hotel.</p>
+      <div id="routes-list"></div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Route Detail ───────────────────────────────────────────── -->
+  <div id="screen-route-detail" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div id="route-detail-title" class="screen-title"></div>
+    </div>
+
+    <div class="screen-body">
+      <div style="display:flex;gap:10px;margin-bottom:4px;">
+        <div id="route-type" class="detail-category"></div>
+        <div id="route-duration" class="detail-category"></div>
+      </div>
+      <div id="route-desc" class="detail-section-text" style="margin-bottom:16px;"></div>
+      <div id="route-start" class="detail-meta"></div>
+
+      <div class="detail-section">
+        <div class="detail-section-label">Stops</div>
+        <div id="route-pois-list" class="section-list" style="margin-top:6px;"></div>
+      </div>
+
+      <div id="route-profile" class="rg-content-block" style="margin-top:16px;" hidden></div>
+
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button class="action-btn" style="flex:1;" onclick="openRouteMap()">Open on Map</button>
+        <button class="action-btn action-btn--primary" style="flex:1;" onclick="navigateToRouteStart()">Navigate to Start</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Route Map ──────────────────────────────────────────────── -->
+  <div id="screen-route-map" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div id="route-map-title" class="screen-title"></div>
+    </div>
+
+    <div style="flex:1;">
+      <div id="route-map-leaflet" style="height:60vh;width:100%;"></div>
+    </div>
+
+    <div class="screen-body" style="flex:none;padding-top:12px;">
+      <div id="route-map-legend"></div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Near Me ────────────────────────────────────────────────── -->
+  <div id="screen-near-me" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title">Near Me</div>
+    </div>
+
+    <div class="screen-body">
+      <p class="screen-subtitle">Find places near Hotel Antique Split.</p>
+      <div class="nm-grid">
+
+        <div class="nm-card" onclick="openNearMeCategory('landmarks')">
+          <span class="nm-card-icon">🏛</span>
+          <span class="nm-card-label">Landmarks</span>
+        </div>
+
+        <div class="nm-card" onclick="openNearMeCategory('beach')">
+          <span class="nm-card-icon">🏖</span>
+          <span class="nm-card-label">Beach</span>
+        </div>
+
+        <div class="nm-card" onclick="openNearMeCategory('pharmacy')">
+          <span class="nm-card-icon">💊</span>
+          <span class="nm-card-label">Pharmacy</span>
+        </div>
+
+        <div class="nm-card" onclick="openNearMeCategory('atm')">
+          <span class="nm-card-icon">🏧</span>
+          <span class="nm-card-label">ATM</span>
+        </div>
+
+        <div class="nm-card" onclick="openNearMeCategory('supermarket')">
+          <span class="nm-card-icon">🛒</span>
+          <span class="nm-card-label">Supermarket</span>
+        </div>
+
+        <div class="nm-card" onclick="openNearMeCategory('transport')">
+          <span class="nm-card-icon">🚌</span>
+          <span class="nm-card-label">Ferry / Bus / Taxi</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Near Me Results ───────────────────────────────────────── -->
+  <div id="screen-near-me-results" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <h2 id="nm-category-title" class="screen-title"></h2>
+    </div>
+
+    <div class="screen-body">
+      <p class="screen-subtitle">Results near Hotel Antique Split</p>
+      <div id="nm-results-list"></div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Help & Requests ───────────────────────────────────────── -->
+  <div id="screen-help" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title">Help &amp; Requests</div>
+    </div>
+
+    <div class="screen-body">
+      <div class="help-list">
+
+        <button class="action-btn" onclick="showRequestScreen()">
+          <span style="font-size:20px;">📋</span>
           <span class="action-label">Send a Request</span>
         </button>
 
         <button class="action-btn" onclick="showIssueScreen()">
+          <span style="font-size:20px;">⚠️</span>
           <span class="action-label">Report an Issue</span>
         </button>
 
-        <button class="action-btn action-btn--primary" onclick="showScreen('contact')">
+        <button class="action-btn action-btn--primary" onclick="pushScreen('contact')">
+          <span style="font-size:20px;">📞</span>
           <span class="action-label">Contact Reception</span>
         </button>
 
@@ -50,11 +393,11 @@
     </div>
   </div>
 
-  <!-- ── Screen: Send a Request ──────────────────────────────────────── -->
+  <!-- ── Screen: Send a Request ──────────────────────────────────────────── -->
   <div id="screen-request" class="screen">
 
     <div class="screen-header">
-      <button class="back-btn" onclick="showScreen('welcome')">&larr; Back</button>
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
       <div class="screen-title" id="req-screen-title">Send a Request</div>
     </div>
 
@@ -128,22 +471,63 @@
       <div class="success-heading" id="req-success-heading">Request sent</div>
       <p class="success-text" id="req-success-text">Reception has been notified and will take care of it shortly.</p>
       <p class="success-ref" id="success-ref"></p>
-      <button class="action-btn action-btn--primary" onclick="showScreen('welcome')">Back to menu</button>
+      <button class="action-btn action-btn--primary" onclick="gotoRoot('home')">Back to home</button>
     </div>
 
   </div>
 
-  <!-- ── Screen: Ask Assistant ──────────────────────────────────────── -->
-  <div id="screen-ask" class="screen">
+  <!-- ── Screen: Contact Reception ──────────────────────────────────────── -->
+  <div id="screen-contact" class="screen">
 
     <div class="screen-header">
-      <button class="back-btn" onclick="showScreen('welcome')">&larr; Back</button>
-      <div class="screen-title">Assistant</div>
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title">Reception</div>
+    </div>
+
+    <div class="screen-body">
+      <div class="contact-card">
+
+        <p class="contact-note" id="reception-note">Reception is available 24 hours a day.</p>
+
+        <a id="contact-phone" class="contact-link contact-link--phone" href="tel:+38521785208">
+          <div class="action-label">
+            <div>Call Reception</div>
+            <div class="contact-link-sub" id="phone-display">+38521785208</div>
+          </div>
+        </a>
+
+        <a id="contact-whatsapp" class="contact-link contact-link--whatsapp" href="https://wa.me/38521785208" target="_blank" rel="noopener">
+          <div class="action-label">
+            <div>WhatsApp</div>
+            <div class="contact-link-sub">Open in WhatsApp</div>
+          </div>
+        </a>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Ask Olly ───────────────────────────────────────────────── -->
+  <div id="screen-ask" class="screen screen--root">
+
+    <div class="screen-header">
+      <div class="screen-title" style="margin-left:0;">Ask Olly</div>
     </div>
 
     <div class="screen-body ask-body">
 
-      <p class="ask-hint">Ask about WiFi, AC, TV, the safe, or anything about your stay.</p>
+      <p class="ask-hint">Ask about WiFi, AC, TV, the safe, breakfast, or anything about your stay.</p>
+
+      <div class="ask-chips">
+        <button class="chip" onclick="onChipClick('WiFi password')">WiFi</button>
+        <button class="chip" onclick="onChipClick('How do I use the air conditioning?')">AC</button>
+        <button class="chip" onclick="onChipClick('How do I use the TV?')">TV</button>
+        <button class="chip" onclick="onChipClick('How do I use the safe?')">Safe</button>
+        <button class="chip" onclick="onChipClick('What time is breakfast?')">Breakfast</button>
+        <button class="chip" onclick="onChipClick('Is there parking at the hotel?')">Parking</button>
+        <button class="chip" onclick="onChipClick('How do I get to the ferry terminal?')">Ferry</button>
+        <button class="chip" onclick="onChipClick('What is the nearest beach?')">Nearest beach</button>
+      </div>
 
       <div class="ask-input-row">
         <input
@@ -171,44 +555,81 @@
       <div id="ask-error" class="ask-error-box" hidden></div>
 
       <div id="ask-contact-hint" class="ask-contact-hint" hidden>
-        <button class="action-btn" onclick="showScreen('contact')">Contact Reception</button>
+        <button class="action-btn" onclick="pushScreen('contact')">Contact Reception</button>
       </div>
 
     </div>
   </div>
 
-  <!-- ── Screen: Contact Reception ──────────────────────────────────── -->
-  <div id="screen-contact" class="screen">
+  <!-- ── Screen: Info ───────────────────────────────────────────────────── -->
+  <div id="screen-info" class="screen screen--root">
 
     <div class="screen-header">
-      <button class="back-btn" onclick="showScreen('welcome')">&larr; Back</button>
-      <div class="screen-title">Reception</div>
+      <div class="screen-title" style="margin-left:0;">Info</div>
     </div>
 
     <div class="screen-body">
-      <div class="contact-card">
 
-        <p class="contact-note" id="reception-note">Reception is available 24 hours a day.</p>
-
-        <a id="contact-phone" class="contact-link contact-link--phone" href="tel:+38521785208">
-          <div class="action-label">
-            <div>Call Reception</div>
-            <div class="contact-link-sub" id="phone-display">+38521785208</div>
-          </div>
-        </a>
-
-        <a id="contact-whatsapp" class="contact-link contact-link--whatsapp" href="https://wa.me/38521785208" target="_blank" rel="noopener">
-          <div class="action-label">
-            <div>WhatsApp</div>
-            <div class="contact-link-sub">Open in WhatsApp</div>
-          </div>
-        </a>
-
+      <div class="info-section">
+        <div class="info-row">
+          <span class="info-label">Hotel</span>
+          <span id="info-hotel-name" class="info-value"></span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Address</span>
+          <span id="info-address" class="info-value"></span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Phone</span>
+          <span id="info-phone" class="info-value"></span>
+        </div>
       </div>
+
+      <div class="info-section">
+        <div class="info-row">
+          <span class="info-label">Check-in</span>
+          <span id="info-checkin" class="info-value"></span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Check-out</span>
+          <span id="info-checkout" class="info-value"></span>
+        </div>
+      </div>
+
+      <div class="info-section">
+        <div class="info-row">
+          <span class="info-label">How to use this guide</span>
+          <span class="info-value" style="color:var(--text-muted);font-size:14px;line-height:1.65;">
+            Use the home screen to navigate all sections of the guide. Room Guide shows your room's WiFi, AC, TV and safe instructions. Hotel Services lists dining and amenities. City Map displays points of interest. Routes offers curated walks. Ask Olly answers questions about your stay.
+          </span>
+        </div>
+      </div>
+
     </div>
   </div>
 
+  <!-- ── Bottom Navigation ──────────────────────────────────────────────── -->
+  <nav id="bottom-nav" class="bottom-nav" hidden>
+    <button class="bottom-nav-item" data-screen="home" onclick="gotoRoot('home')">
+      <span class="bottom-nav-icon">⌂</span>
+      <span>Home</span>
+    </button>
+    <button class="bottom-nav-item" data-screen="city-map" onclick="gotoRoot('city-map')">
+      <span class="bottom-nav-icon">◎</span>
+      <span>Map</span>
+    </button>
+    <button class="bottom-nav-item" data-screen="ask" onclick="gotoRoot('ask')">
+      <span class="bottom-nav-icon">✦</span>
+      <span>Ask Olly</span>
+    </button>
+    <button class="bottom-nav-item" data-screen="info" onclick="gotoRoot('info')">
+      <span class="bottom-nav-icon">ⓘ</span>
+      <span>Info</span>
+    </button>
+  </nav>
+
   <script src="config.js"></script>
+  <script src="data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
