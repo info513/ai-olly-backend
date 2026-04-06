@@ -2271,42 +2271,53 @@ app.post('/api/pwa-services', async (req, res) => {
 
 function mapPoiRecord(rec) {
   const f   = rec.fields || {};
+  // Actual Airtable field names confirmed: POI Naziv, Kategorije, Opis (kratki/hook),
+  // Opis (dugi), Trajanje posjeta (min), Udaljenost od hotela. No lat/lng fields.
   const lat = parseFloat(f.Latitude  ?? f.Lat ?? f.lat ?? '');
   const lng = parseFloat(f.Longitude ?? f.Lng ?? f.lng ?? '');
   const hasCoords = isFinite(lat) && isFinite(lng);
+
+  const name = pickFirstNonEmpty(f['POI Naziv'], f.Name, f.Naziv, f.naziv, '');
+
+  // Fall back to name-based Maps search if no coords
+  const nav = pickFirstNonEmpty(f['Google Maps URL'], f['Maps URL'], '') ||
+    (hasCoords
+      ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+      : (name ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ', Split')}` : ''));
+
   return {
     id:        rec.id,
-    name:      pickFirstNonEmpty(f.Name,  f.Naziv,  f.naziv,  ''),
-    category:  pickFirstNonEmpty(f.Category, f.Kategorija, f.kategorija, ''),
+    name,
+    category:  pickFirstNonEmpty(f.Kategorije, f.Category, f.Kategorija, f.kategorija, ''),
     city:      pickFirstNonEmpty(f.City,  f.Grad,   f.grad,   'Split'),
-    shortDesc: pickFirstNonEmpty(f['Short Description'], f['Kratki opis'], f['kratki opis'], ''),
-    longDesc:  pickFirstNonEmpty(f['Long Description'],  f['Dugi opis'],   f.Opis, f.opis, ''),
-    visit:     pickFirstNonEmpty(f['Visit Duration'], f['Trajanje posjete'], f.Trajanje, f.trajanje, ''),
-    dist:      pickFirstNonEmpty(f['Distance from Hotel'], f.Udaljenost, f.udaljenost, ''),
+    shortDesc: pickFirstNonEmpty(f['Opis (kratki/hook)'], f['Short Description'], f['Kratki opis'], f['kratki opis'], ''),
+    longDesc:  pickFirstNonEmpty(f['Opis (dugi)'], f['Long Description'], f['Dugi opis'], f.Opis, f.opis, ''),
+    visit:     pickFirstNonEmpty(f['Trajanje posjeta (min)'], f['Visit Duration'], f['Trajanje posjete'], f.Trajanje, f.trajanje, ''),
+    dist:      pickFirstNonEmpty(f['Udaljenost od hotela'], f['Distance from Hotel'], f.Udaljenost, f.udaljenost, ''),
     coords:    hasCoords ? { lat, lng } : null,
-    nav:       pickFirstNonEmpty(f['Google Maps URL'], f['Maps URL'], '') ||
-               (hasCoords ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}` : ''),
+    nav,
   };
 }
 
 function mapRouteRecord(rec) {
   const f        = rec.fields || {};
+  // Actual Airtable field names confirmed: Ruta naziv, Tip rute, Trajanje (min), Opis rute.
+  // No Start Lat/Lng or POI linked fields in current schema.
   const startLat = parseFloat(f['Start Lat'] ?? f['Start Latitude'] ?? '');
   const startLng = parseFloat(f['Start Lng'] ?? f['Start Longitude'] ?? '');
   const hasStart = isFinite(startLat) && isFinite(startLng);
-  // POIs may be a linked-records array of Airtable record IDs
   const rawPois  = f.POIs ?? f['POI'] ?? f.Pois ?? [];
   return {
-    id:        rec.id,
-    name:      pickFirstNonEmpty(f.Name,   f.Naziv,   f.naziv,   ''),
-    type:      pickFirstNonEmpty(f.Type,   f.Tip,     f.tip,     ''),
-    duration:  pickFirstNonEmpty(f.Duration, f.Trajanje, f.trajanje, ''),
-    shortDesc: pickFirstNonEmpty(f['Short Description'], f['Kratki opis'], ''),
-    longDesc:  pickFirstNonEmpty(f.Description, f.Opis, f['Long Description'], f.opis, ''),
+    id:               rec.id,
+    name:             pickFirstNonEmpty(f['Ruta naziv'], f.Name, f.Naziv, f.naziv, ''),
+    type:             pickFirstNonEmpty(f['Tip rute'], f.Type, f.Tip, f.tip, ''),
+    duration:         pickFirstNonEmpty(f['Trajanje (min)'], f.Duration, f.Trajanje, f.trajanje, ''),
+    shortDesc:        pickFirstNonEmpty(f['Short Description'], f['Kratki opis'], ''),
+    longDesc:         pickFirstNonEmpty(f['Opis rute'], f.Description, f.Opis, f['Long Description'], f.opis, ''),
     startPointName:   pickFirstNonEmpty(f['Start Point'], f['Početak'], f['Pocetak'], ''),
     startPointCoords: hasStart ? { lat: startLat, lng: startLng } : null,
-    poiIds:    Array.isArray(rawPois) ? rawPois : [],
-    profile:   pickFirstNonEmpty(f['Guest Profile'], f['Profil gosta'], f.Profil, f.profil, ''),
+    poiIds:           Array.isArray(rawPois) ? rawPois : [],
+    profile:          pickFirstNonEmpty(f['Guest Profile'], f['Profil gosta'], f.Profil, f.profil, ''),
   };
 }
 
