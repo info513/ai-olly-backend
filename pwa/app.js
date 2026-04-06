@@ -61,8 +61,8 @@ function updateReqCopy() {
 }
 
 function showIssueScreen() {
-  requestMode = 'issue';
-  showScreen('request');        // resets form, then we override below
+  showScreen('request');        // resets form (sets requestMode = 'request' inside)
+  requestMode = 'issue';        // override AFTER reset so it survives resetRequestForm()
   selectCategory('Issue / Complaint');
   updateReqCopy();
 }
@@ -207,7 +207,10 @@ function errorMessage(status, serverMsg) {
 
 // ── Ask Assistant ─────────────────────────────────────────────────────────
 
+let askInFlight = false; // prevents double-submit from rapid Enter presses
+
 function resetAskScreen() {
+  askInFlight = false;
   const input = document.getElementById('ask-input');
   if (input) { input.value = ''; input.disabled = false; }
   const btn = document.getElementById('ask-btn');
@@ -229,6 +232,7 @@ function onAskKeydown(e) {
 }
 
 async function submitAsk() {
+  if (askInFlight) return;
   const input    = document.getElementById('ask-input');
   const question = input ? input.value.trim() : '';
   if (!question) return;
@@ -239,6 +243,7 @@ async function submitAsk() {
     return;
   }
 
+  askInFlight = true;
   const btn = document.getElementById('ask-btn');
   if (input) input.disabled = true;
   if (btn)   btn.disabled   = true;
@@ -273,12 +278,12 @@ async function submitAsk() {
 
   } catch (_) {
     hide('ask-loading');
-    const input2 = document.getElementById('ask-input');
-    const btn2   = document.getElementById('ask-btn');
-    if (input2) input2.disabled = false;
-    if (btn2)   btn2.disabled   = !input2?.value.trim();
+    if (input) input.disabled = false;
+    if (btn)   btn.disabled   = !(input && input.value.trim());
     setText('ask-error', 'Unable to connect. Please check your connection and try again.');
     show('ask-error');
+  } finally {
+    askInFlight = false;
   }
 }
 
