@@ -1,5 +1,7 @@
-// server.js — AI OLLY HUB (WEB widget only)
-// Endpoints: /api/health, /api/debug, /api/web-ask
+// server.js — AI OLLY HUB
+// Endpoints: /api/health, /api/debug, /api/web-ask,
+//            /api/pwa-ask, /api/pwa-request, /api/pwa-welcome,
+//            /api/pwa-room-guide, /api/pwa-services, /api/pwa-pois, /api/pwa-routes
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -1349,10 +1351,119 @@ function renderTvAnswer(roomGuide) {
 }
 
 // PWA safe renderer — reads Upute Sef from ROOM GUIDE.
-// Returns null if room guide missing or field empty → GPT stub fallthrough.
+// Returns null if room guide missing or field empty → GPT fallthrough.
 function renderSafeAnswer(roomGuide) {
   if (!roomGuide?.sefUpute) return null;
   return roomGuide.sefUpute.trim();
+}
+
+// Builds a structured room-context string from a ROOM GUIDE record for GPT injection.
+// Fields included: name, features, WiFi, AC, TV, safe, notes, AI master prompt.
+// AI Master prompt is appended last so hotel-specific overrides take precedence.
+// Returns '' when roomGuide is null — callers should handle gracefully.
+function buildRoomContext(roomGuide) {
+  if (!roomGuide) return '';
+  const parts = [];
+  if (roomGuide.naziv)          parts.push(`Room: ${roomGuide.naziv}`);
+  if (roomGuide.roomFeatures)   parts.push(`Room features: ${roomGuide.roomFeatures}`);
+  if (roomGuide.wifi)           parts.push(`WiFi: ${roomGuide.wifi}`);
+  if (roomGuide.klimaUpute)     parts.push(`AC instructions: ${roomGuide.klimaUpute}`);
+  if (roomGuide.tvUpute)        parts.push(`TV instructions: ${roomGuide.tvUpute}`);
+  if (roomGuide.sefUpute)       parts.push(`Safe instructions: ${roomGuide.sefUpute}`);
+  if (roomGuide.napomene)       parts.push(`Room notes: ${roomGuide.napomene}`);
+  if (roomGuide.aiMasterPrompt) parts.push(`\n# ROOM AI RULES\n${roomGuide.aiMasterPrompt}`);
+  return parts.join('\n');
+}
+
+// -------------------------
+// GPT answer generation — PWA (in-room concierge)
+// Variant of generateAnswer() tailored for the guest PWA:
+//  • System prompt identifies AI Olly as an in-room concierge (not web widget)
+//  • Room context (buildRoomContext) is injected alongside hotel + services context
+//  • AI Master Prompt from ROOM GUIDE is passed verbatim as overrideable rules
+//  • Persona voice injected when available
+// -------------------------
+async function generateAnswerPwa({ question, hotelSlug, lang, hotelRec, intentPick, recordsToUse, roomGuide, outputRule }) {
+  const personaBlock = hotelRec?.personaVoice
+    ? `PERSONA:\n${hotelRec.personaVoice}\n\n`
+    : '';
+
+  const styleText = outputRule
+    ? `OUTPUT RULE (Scope=${outputRule.scope}, Format=${outputRule.format}):
+STYLE: ${outputRule.style}
+EXAMPLE: ${outputRule.example}`
+    : 'OUTPUT RULE: none (use clear short paragraphs).';
+
+  const hotelBlock = hotelRec ? `# HOTEL CORE
+Naziv: ${hotelRec.hotelNaziv || '-'}
+Adresa: ${hotelRec.adresa || '-'}
+Telefon recepcija: ${hotelRec.telefon || '-'}
+Check-in: ${hotelRec.checkIn || '-'}
+Check-out: ${hotelRec.checkOut || '-'}` : '# HOTEL CORE\n(no hotel record found)';
+
+  const roomBlock = buildRoomContext(roomGuide) || '(no room context available)';
+
+  const contextBlocks = (recordsToUse || []).map((r, idx) => {
+    const aiPromptShort = (r.aiPrompt || '').slice(0, 700);
+    const opisShort     = (r.opis     || '').slice(0, 1600);
+    return `# SERVICE ${idx + 1}
+Naziv: ${r.naziv || '-'}
+Kategorija: ${(r.kategorija || []).join(', ') || '-'}
+Radno vrijeme: ${r.radnoVrijeme || '-'}
+Opis: ${opisShort || '-'}
+AI_PROMPT (internal): ${aiPromptShort || '-'}`;
+  });
+
+  const sys = `You are "AI Olly" — an in-room digital concierge for hotel guests.
+
+ABSOLUTE RULES (no exceptions):
+- Answer hotel-specific facts ONLY using HOTEL CORE, ROOM CONTEXT, or SERVICE RECORDS provided.
+- If a detail is not in the provided data, say it is not available and suggest contacting reception.
+- Do NOT guess prices, policies, times, services, room features, phone numbers, or procedures.
+- You CAN help with in-room topics (AC, TV, safe, WiFi) using the ROOM CONTEXT data.
+- For real problems or emergencies, always direct the guest to call reception.
+- Do NOT repeat greetings unless the user greets first.
+- Keep answers concise (1–4 sentences) unless the user explicitly asks for more detail.
+- Never output a price unless it appears verbatim in the provided data.
+
+${personaBlock}${styleText}
+
+Language:
+- If lang=HR respond in Croatian.
+- If lang=EN respond in English.
+
+Data usage:
+- Keep proper nouns/labels exactly as provided (do not invent or translate them).`;
+
+  const userPayload = {
+    lang,
+    hotel_slug:      hotelSlug,
+    question,
+    picked_intent:   intentPick?.intent  || null,
+    confidence:      intentPick?.confidence ?? null,
+    hotel_core:      hotelBlock,
+    room_context:    roomBlock,
+    service_records: contextBlocks,
+  };
+
+  try {
+    const resp = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      temperature: 0,
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user',   content: JSON.stringify(userPayload) },
+      ],
+    });
+    return resp.choices?.[0]?.message?.content?.trim() || '';
+  } catch (e) {
+    if (isOpenAIRateLimitError(e)) {
+      const err = new Error('OPENAI_RATE_LIMIT');
+      err._isRate = true;
+      throw err;
+    }
+    throw e;
+  }
 }
 
 // -------------------------
@@ -1888,7 +1999,7 @@ app.post('/api/web-ask', async (req, res) => {
 // Input:  { question, slug, room, token }
 // Sources: HOTELI + SERVICES(PWA) + ROOM GUIDE(room-specific)
 // Auth:   QR token validated against ROOM GUIDE.Access Token (timing-safe)
-// GPT path: stubbed — returns 501 until implemented
+// Flow:   deterministic chain → intent routing (PWA patterns) → generateAnswerPwa()
 // -------------------------
 app.post('/api/pwa-ask', async (req, res) => {
   const started = Date.now();
@@ -2041,20 +2152,70 @@ app.post('/api/pwa-ask', async (req, res) => {
       }
     }
 
-    // ── GPT path: not yet implemented ──────────────────────────────────────────
-    // TODO: call getIntentPatternsForPwa(), run chooseIntent(), build context from
-    //       pwaServices + roomGuide (room features + AI master prompt),
-    //       call generateAnswer() with room context injected.
-    // ──────────────────────────────────────────────────────────────────────────
-    return res.status(501).json({
-      ok: false,
-      error: 'GPT path not yet implemented for PWA',
+    // ── GPT path ──────────────────────────────────────────────────────────────
+    // Intent routing (PWA patterns) → linked/fallback service records →
+    // generateAnswerPwa() with room context + hotel context + persona voice.
+    // Rate limit → renderWait20s(). Empty answer → renderNoInfo(). Price guard applied.
+    // ─────────────────────────────────────────────────────────────────────────
+    const patterns  = await getIntentPatternsForPwa();
+    const intentPick = await chooseIntent(question, patterns);
+
+    // Prefer service records linked to the matched intent; fall back to scoring
+    let recordsToUse = [];
+    if (intentPick.intent) {
+      const p      = patterns.find(x => String(x.intent) === String(intentPick.intent));
+      const svcIds = asArray(p?.servicesLink);
+      if (svcIds.length) {
+        const svcRecs = await airtableFindByIds(TABLE_SERVICES, svcIds, 30);
+        const linked  = svcRecs.map(mapServiceRecord).filter(r =>
+          r.active && allowForPWA(r.aiSource) && matchesHotelSlug(r.hotelSlugRaw, hotelSlug)
+        );
+        if (linked.length) recordsToUse = linked;
+      }
+    }
+    if (!recordsToUse.length) {
+      recordsToUse = pickFallbackRecords(question, pwaServices, 3);
+    }
+
+    // Output rule — prefer PWA scope, fall back to General/PWA
+    const scopeWanted = intentPick?.outputScope || 'General';
+    const outputRule  =
+      await getOutputRule({ scopeWanted, aiSourceWanted: 'PWA' }) ||
+      await getOutputRule({ scopeWanted: 'General', aiSourceWanted: 'PWA' });
+
+    let answer = '';
+    try {
+      answer = await generateAnswerPwa({
+        question, hotelSlug, lang, hotelRec, intentPick,
+        recordsToUse, roomGuide, outputRule,
+      });
+    } catch (e) {
+      if (e?._isRate || isOpenAIRateLimitError(e)) {
+        return res.json({
+          ok: true,
+          answer: renderWait20s(lang),
+          meta: { hotelSlug, roomNumber, ms: Date.now() - started, openai_rate_limited: true },
+        });
+      }
+      throw e;
+    }
+
+    if (!answer) answer = renderNoInfo(lang);
+    answer = applyPriceGuard(answer, { lang, hotelRec, recordsToUse });
+
+    return res.json({
+      ok: true,
+      answer,
       meta: {
         hotelSlug,
         roomNumber,
+        intent:            intentPick.intent,
+        confidence:        intentPick.confidence ?? null,
+        deterministic:     false,
         pwaServicesLoaded: pwaServices.length,
-        roomGuideFound: !!roomGuide,
-        ms: Date.now() - started,
+        roomGuideFound:    !!roomGuide,
+        usedRecords:       recordsToUse.map(r => ({ type: r.type, naziv: r.naziv, id: r.id })),
+        ms:                Date.now() - started,
       },
     });
 
