@@ -63,7 +63,7 @@
 
         <div class="guide-card" onclick="gotoRoot('ask')">
           <span class="guide-card-icon">✦</span>
-          <span class="guide-card-label">Ask Olly</span>
+          <span class="guide-card-label">Ask Dioclea</span>
         </div>
 
       </div>
@@ -86,7 +86,7 @@
 
     <div id="rg-loading" class="screen-body screen-body--centered" hidden>
       <div class="spinner"></div>
-      <p class="loading-text">Loading room information&hellip;</p>
+      <p class="loading-text">Preparing your room guide&hellip;</p>
     </div>
 
     <div class="screen-body">
@@ -186,7 +186,7 @@
       <div id="svc-hours" class="detail-meta"></div>
       <div id="svc-desc" class="detail-section-text"></div>
       <div class="detail-actions">
-        <button class="action-btn" onclick="gotoRoot('ask')">Ask Olly</button>
+        <button class="action-btn" onclick="gotoRoot('ask')">Ask Dioclea</button>
         <button class="action-btn" onclick="pushScreen('contact')">Contact Reception</button>
         <button class="action-btn action-btn--primary" onclick="pushScreen('request')">Send a Request</button>
       </div>
@@ -217,6 +217,10 @@
 
     <div class="map-footer">
       <p id="poi-loading-hint" class="screen-subtitle" hidden>Loading points of interest&hellip;</p>
+      <div class="map-legend">
+        <span class="map-legend-item"><span class="map-legend-dot map-legend-dot--hotel"></span>Hotel</span>
+        <span class="map-legend-item"><span class="map-legend-dot map-legend-dot--poi"></span>Points of interest</span>
+      </div>
       <p class="screen-subtitle">Tap a marker to explore. Distances from the hotel.</p>
     </div>
 
@@ -507,11 +511,11 @@
     </div>
   </div>
 
-  <!-- ── Screen: Ask Olly ───────────────────────────────────────────────── -->
+  <!-- ── Screen: Ask Dioclea ───────────────────────────────────────────────── -->
   <div id="screen-ask" class="screen screen--root">
 
     <div class="screen-header">
-      <div class="screen-title">Ask Olly</div>
+      <div class="screen-title">Ask Dioclea</div>
     </div>
 
     <div class="screen-body ask-body">
@@ -569,6 +573,7 @@
     </div>
 
     <div class="screen-body">
+      <p class="screen-subtitle" style="padding:0 0 8px;">If you need any assistance, please contact reception and we will be happy to help.</p>
 
       <div class="info-section">
         <div class="info-row">
@@ -600,7 +605,7 @@
         <div class="info-row">
           <span class="info-label">About this guide</span>
           <span class="info-value info-value--muted">
-            Your digital room guide. Use Room Guide for in-room instructions, Ask Olly for quick answers, and City Map &amp; Routes to explore Split.
+            Your digital room guide. Use Room Guide for in-room instructions, Ask Dioclea for quick answers, and City Map &amp; Routes to explore Split.
           </span>
         </div>
       </div>
@@ -620,7 +625,7 @@
     </button>
     <button class="bottom-nav-item" data-screen="ask" onclick="gotoRoot('ask')">
       <span class="bottom-nav-icon">✦</span>
-      <span>Ask Olly</span>
+      <span>Ask Dioclea</span>
     </button>
     <button class="bottom-nav-item" data-screen="info" onclick="gotoRoot('info')">
       <span class="bottom-nav-icon">ⓘ</span>

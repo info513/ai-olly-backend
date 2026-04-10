@@ -225,20 +225,22 @@ function initCityMap() {
   }
 
   cityMapObj = L.map('city-map-leaflet', { zoomControl: true }).setView(
-    [CONFIG.hotelCoords.lat, CONFIG.hotelCoords.lng], 15
+    [CONFIG.hotelCoords.lat, CONFIG.hotelCoords.lng], 16
   );
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '\u00a9 <a href="https://openstreetmap.org">OpenStreetMap</a>',
-    maxZoom: 19,
+  // CartoDB Voyager — cleaner, more minimal look than default OSM tiles
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '\u00a9 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> \u00a9 <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 20,
   }).addTo(cityMapObj);
 
-  // Hotel marker
+  // Hotel marker — larger, more distinctive
   const hotelIcon = L.divIcon({
     className: '',
-    html: '<div style="width:14px;height:14px;background:#2c1f14;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 2px #2c1f14;"></div>',
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
+    html: '<div style="width:20px;height:20px;background:#2c1f14;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div>',
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
   });
   L.marker([CONFIG.hotelCoords.lat, CONFIG.hotelCoords.lng], { icon: hotelIcon, zIndexOffset: 1000 })
     .addTo(cityMapObj)
@@ -255,9 +257,9 @@ function addPoiMarkersToMap() {
   hide('poi-loading-hint');
   const poiIcon = L.divIcon({
     className: '',
-    html: '<div style="width:10px;height:10px;background:#8b6914;border:1.5px solid #fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>',
-    iconSize: [10, 10],
-    iconAnchor: [5, 5],
+    html: '<div style="width:16px;height:16px;background:#c9a227;border:2.5px solid #fff;border-radius:50%;box-shadow:0 1px 6px rgba(0,0,0,0.35);"></div>',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
   });
   poisData.forEach((poi, idx) => {
     if (!poi.coords) return; // skip POIs without coordinates in Airtable
@@ -300,8 +302,21 @@ function _populatePoiDetail(poi) {
   if (navBtn) navBtn.href = poi.nav || '#';
 }
 
+// Opens an external URL reliably in PWA standalone mode on iOS/Android.
+// window.open() is blocked by some mobile browsers when called from a non-direct
+// user gesture context; a programmatically clicked anchor is more reliable.
+function _openExternal(url) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 function navigateToPoi() {
-  if (currentPoi && currentPoi.nav) window.open(currentPoi.nav, '_blank');
+  if (currentPoi && currentPoi.nav) _openExternal(currentPoi.nav);
 }
 
 function popToMap() {
@@ -448,7 +463,7 @@ function initRouteMap() {
 
 function navigateToRouteStart() {
   const coords = currentRoute?.startPointCoords || CONFIG.hotelCoords;
-  window.open(`https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`, '_blank');
+  _openExternal(`https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`);
 }
 
 // ── Near Me ───────────────────────────────────────────────────────────────
@@ -783,7 +798,11 @@ async function fetchWelcomeData() {
     if (!data.ok) return;
     if (data.hotelName) setText('hotel-name', data.hotelName);
     if (data.aiWelcome) {
-      setText('welcome-text', data.aiWelcome);
+      // Show only the first sentence — keeps the welcome elegant and concise
+      const full  = data.aiWelcome.trim();
+      const match = full.match(/^[^.!?]+[.!?]/);
+      const welcome = match ? match[0].trim() : (full.length > 120 ? full.slice(0, 120).trimEnd() + '.' : full);
+      setText('welcome-text', welcome);
       show('welcome-text');
     }
   } catch (_) {
