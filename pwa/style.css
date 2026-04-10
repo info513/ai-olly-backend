@@ -3,17 +3,19 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:           #fafaf8;
+  --bg:           #f8f6f2;
   --surface:      #ffffff;
-  --border:       #e8e4dc;
-  --text:         #1c1c1c;
-  --text-muted:   #6b6b6b;
+  --surface-warm: #faf7f3;
+  --border:       #e6e1d7;
+  --text:         #1a1a1a;
+  --text-muted:   #6a6560;
   --accent:       #2c1f14;
-  --accent-light: #f3ede3;
-  --gold:         #8b6914;
-  --radius:       12px;
-  --radius-sm:    8px;
-  --shadow:       0 1px 4px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+  --accent-light: #f2ece1;
+  --gold:         #a07730;
+  --radius:       14px;
+  --radius-sm:    10px;
+  --shadow:       0 1px 3px rgba(44,31,20,0.06), 0 4px 16px rgba(44,31,20,0.05);
+  --shadow-sm:    0 1px 3px rgba(44,31,20,0.07);
 }
 
 html, body {
@@ -42,7 +44,7 @@ html, body {
 /* ── Header ─────────────────────────────────────────────────────────────── */
 
 .screen-header {
-  padding: 20px 20px 0;
+  padding: 22px 20px 0;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -52,10 +54,11 @@ html, body {
   background: none;
   border: none;
   font-size: 15px;
-  color: var(--gold);
+  color: var(--accent);
   cursor: pointer;
   padding: 8px 0;
   font-weight: 500;
+  opacity: 0.7;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -65,9 +68,10 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 19px;
+  font-weight: 700;
   color: var(--text);
+  letter-spacing: -0.01em;
 }
 
 .action-icon {
@@ -77,29 +81,30 @@ html, body {
 /* ── Welcome header ─────────────────────────────────────────────────────── */
 
 .welcome-header {
-  padding: 32px 20px 24px;
-  background: var(--accent);
+  padding: 48px 24px 30px;
+  background: linear-gradient(155deg, #382518 0%, #2c1f14 100%);
   color: #fff;
   border-radius: 0 0 var(--radius) var(--radius);
 }
 
 .hotel-name {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.65);
-  margin-bottom: 6px;
+  color: rgba(255,255,255,0.55);
+  margin-bottom: 10px;
 }
 
 .room-badge {
-  font-size: 28px;
+  font-size: 34px;
   font-weight: 700;
   color: #fff;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
-.room-badge span { color: #e8c87a; }
+.room-badge span { color: #e0bc6a; }
 
 /* ── Screen body ─────────────────────────────────────────────────────────── */
 
@@ -108,7 +113,7 @@ html, body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .screen-body--centered {
@@ -143,10 +148,10 @@ html, body {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 16px 18px;
+  padding: 18px 18px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   font-size: 16px;
   font-weight: 500;
   color: var(--text);
@@ -540,7 +545,7 @@ html, body {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 64px;
+  height: 68px;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   background: var(--surface);
   border-top: 1px solid var(--border);
@@ -571,7 +576,7 @@ html, body {
 
 .bottom-nav-item--active { color: var(--accent); }
 
-.bottom-nav-icon { font-size: 20px; line-height: 1; }
+.bottom-nav-icon { font-size: 22px; line-height: 1; }
 
 /* Root screens need bottom padding for the nav bar */
 .screen--root .screen-body { padding-bottom: 80px; }
@@ -586,14 +591,14 @@ html, body {
 }
 
 .guide-card {
-  background: var(--surface);
+  background: var(--surface-warm);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px 14px;
+  padding: 22px 16px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
   cursor: pointer;
   box-shadow: var(--shadow);
   -webkit-tap-highlight-color: transparent;
@@ -615,7 +620,7 @@ html, body {
   opacity: 0.85;
 }
 
-.guide-card-icon { font-size: 26px; line-height: 1; }
+.guide-card-icon { font-size: 28px; line-height: 1; }
 
 .guide-card-label {
   font-size: 15px;
@@ -637,7 +642,7 @@ html, body {
 
 .section-item {
   background: var(--surface);
-  padding: 16px 18px;
+  padding: 18px 20px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -700,10 +705,10 @@ html, body {
 /* ── Service cards ──────────────────────────────────────────────────────── */
 
 .service-card {
-  background: var(--surface);
+  background: var(--surface-warm);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px 18px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -791,10 +796,10 @@ html, body {
 /* ── Route cards ────────────────────────────────────────────────────────── */
 
 .route-card {
-  background: var(--surface);
+  background: var(--surface-warm);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px 18px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -815,7 +820,7 @@ html, body {
   letter-spacing: 0.06em;
 }
 
-.route-card-title { font-size: 16px; font-weight: 700; }
+.route-card-title { font-size: 17px; font-weight: 700; }
 
 .route-card-desc {
   font-size: 13px;
@@ -832,10 +837,10 @@ html, body {
 }
 
 .nm-card {
-  background: var(--surface);
+  background: var(--surface-warm);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 24px 14px;
+  padding: 28px 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -848,7 +853,7 @@ html, body {
 
 .nm-card:active { background: var(--accent-light); }
 
-.nm-card-icon { font-size: 30px; line-height: 1; }
+.nm-card-icon { font-size: 32px; line-height: 1; }
 
 .nm-card-label {
   font-size: 14px;
@@ -958,7 +963,7 @@ html, body {
 }
 
 .detail-title {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   margin-bottom: 4px;
 }
