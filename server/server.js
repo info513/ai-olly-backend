@@ -1332,24 +1332,27 @@ function stripChatWrap(answer) {
   }
 
   // 2) Closing sign-off removal (iterative — strips multiple if stacked)
+  // Terminal punctuation allows . ! ? , ; — GPT sometimes produces incomplete
+  // trailing phrases ending with a comma ("Ako trebate pomoć s bilo čim,")
   const SIGN_OFFS = [
     // HR — "Trebate li X" is ALWAYS a sign-off at end of answer
-    /\s*Trebate li [^\n]*[.!?]$/i,
-    /\s*Slobodno (?:se )?(?:obratite|kontaktirajte)[^\n]*[.!?]$/i,
-    /\s*Slobodno nam se javite[^\n]*[.!?]$/i,
-    /\s*Stojim vam na raspolaganju[^\n]*[.!?]$/i,
-    /\s*Javite (?:mi )?se (?:ako|slobodno)[^\n]*[.!?]$/i,
-    /\s*Ako trebate (?:pomoć|još|išta)[^\n]*[.!?]$/i,
+    /\s*Trebate li [^\n]*[.!?,;]$/i,
+    /\s*Slobodno (?:se )?(?:obratite|kontaktirajte)[^\n]*[.!?,;]$/i,
+    /\s*Slobodno nam se javite[^\n]*[.!?,;]$/i,
+    /\s*Stojim vam na raspolaganju[^\n]*[.!?,;]$/i,
+    /\s*Javite (?:mi )?se (?:ako|slobodno)[^\n]*[.!?,;]$/i,
+    /\s*Ako trebate (?:pomoć|još|išta)[^\n]*[.!?,;]$/i,
+    /\s*Za (?:sve )?(?:dodatne|ostale) informacije[^\n]*[.!?,;]$/i,
     // EN
-    /\s*If you need an(?:y|ything)\b[^\n]*[.!?]$/i,
-    /\s*If there'?s? anything\b[^\n]*[.!?]$/i,
-    /\s*Feel free to (?:contact|ask|reach|let)[^\n]*[.!?]$/i,
-    /\s*Let me know if\b[^\n]*[.!?]$/i,
-    /\s*I hope (?:that )?(?:this )?help\w*[^\n]*[.!?]$/i,
-    /\s*Is there anything else\b[^\n]*[.!?]$/i,
-    /\s*Don'?t hesitate\b[^\n]*[.!?]$/i,
-    /\s*Happy to (?:help|assist)\b[^\n]*[.!?]$/i,
-    /\s*Please (?:do not|don'?t) hesitate\b[^\n]*[.!?]$/i,
+    /\s*If you need an(?:y|ything)\b[^\n]*[.!?,;]$/i,
+    /\s*If there'?s? anything\b[^\n]*[.!?,;]$/i,
+    /\s*Feel free to (?:contact|ask|reach|let)[^\n]*[.!?,;]$/i,
+    /\s*Let me know if\b[^\n]*[.!?,;]$/i,
+    /\s*I hope (?:that )?(?:this )?help\w*[^\n]*[.!?,;]$/i,
+    /\s*Is there anything else\b[^\n]*[.!?,;]$/i,
+    /\s*Don'?t hesitate\b[^\n]*[.!?,;]$/i,
+    /\s*Happy to (?:help|assist)\b[^\n]*[.!?,;]$/i,
+    /\s*Please (?:do not|don'?t) hesitate\b[^\n]*[.!?,;]$/i,
   ];
 
   let prev;
@@ -1360,6 +1363,10 @@ function stripChatWrap(answer) {
       if (stripped) s = stripped;  // only apply if result is non-empty
     }
   } while (s !== prev);
+
+  // 3) Trailing-comma cleanup — remove any dangling comma (or comma+whitespace)
+  // left at the end of the final sentence after sign-off stripping, e.g. "...čim,"
+  s = s.replace(/[,;]\s*$/, '').trim();
 
   return s || answer.trim();
 }
