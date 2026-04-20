@@ -258,9 +258,25 @@ export function isPetPolicyQuestion(question) {
 //   'ac' matched with word-boundary regex to prevent false positives with
 //   substrings like 'access', 'activate', 'place', 'snack', etc.
 //   normalizeText preserves diacritics and lowercases — /\bac\b/ is safe on its output.
+//
+//   Safety/maintenance fix: "AC is not working / broken / ne radi" is a
+//   maintenance report, NOT a how-to question. These must fall through to GPT
+//   which will correctly direct the guest to contact reception.
 export function isAcQuestion(question) {
   const q = normalizeText(question);
-  return (
+  // Guard: complaint / breakdown reports — route to GPT → reception handoff.
+  const isMaintenanceReport = (
+    q.includes('not working')  ||
+    q.includes('not work')     ||
+    q.includes('broken')       ||
+    q.includes('ne radi')      ||   // HR: it's not working
+    q.includes('pokvar')       ||   // HR: pokvaren/pokvarena (broken, all inflections)
+    q.includes('problem')      ||
+    q.includes('issue')        ||
+    q.includes('doesnt work')  ||
+    q.includes('doesn t work')
+  );
+  return !isMaintenanceReport && (
     q.includes('air con')    ||   // EN: air conditioning / air conditioner / air con
     q.includes('aircon')     ||   // EN: alternative no-space spelling
     /\bac\b/.test(q)         ||   // EN: bare "AC" — word-boundary prevents access/activate/etc.
@@ -297,15 +313,26 @@ export function isTvQuestion(question) {
 //   Returns instructions from ROOM GUIDE.Upute Sef.
 //
 //   'lock', 'key', 'box' omitted — too broad (door locks, key policy, lockers).
-//   Known tradeoff: "is it safe to walk outside?" also matches 'safe'.
-//   Accepted for v1 — in-room PWA context makes this rare; returning
-//   safe-box instructions is preferable to hallucination.
+//
+//   Safety/security fix: personal safety questions ("is it safe to walk?",
+//   "safe at night") must NOT trigger safe-box instructions. They are guarded
+//   via isPersonalSafety and fall through to GPT for a proper answer.
 export function isSafeQuestion(question) {
   const q = normalizeText(question);
-  return (
-    q.includes('safe')        ||   // EN: safe / safe box / safe deposit
-    q.includes('sef')         ||   // HR: sef (safe-deposit box)
-    q.includes('valuables')        // EN: where to store valuables
+  // Guard: "is it safe to walk?", "safe at night", "safe around here" etc.
+  // are personal-safety questions, not safe-deposit questions.
+  const isPersonalSafety = (
+    q.includes('safe to')      ||   // "is it safe to walk / swim / go out"
+    q.includes('is it safe')   ||   // "is it safe around here"
+    q.includes('safe at')      ||   // "safe at night"
+    q.includes('safe walk')    ||   // "safe walking"
+    q.includes('safe around')  ||   // "safe around the hotel"
+    q.includes('safe outside')      // "safe outside at night"
+  );
+  return !isPersonalSafety && (
+    q.includes('safe')         ||   // EN: safe / safe box / safe deposit
+    q.includes('sef')          ||   // HR: sef (safe-deposit box)
+    q.includes('valuables')         // EN: where to store valuables
   );
 }
 
@@ -388,4 +415,43 @@ export function isCheckinTimeOnlyQuestion(question) {
   );
 
   return hasCheckinKey && hasTimeSignal && !hasNonTiming;
+}
+
+// ✅ deterministički (PWA only): hitna/medicinska pitanja i pitanja o vatrogasnoj sigurnosti
+//
+// Fires when a guest signals a potential emergency, medical need, or fire.
+// Must fire BEFORE isContactCoreQuestion so medical queries ("I need a doctor,
+// who should I call?") never trigger the hotel-card dump with Instagram links.
+//
+// Returns renderEmergencyAnswer() which includes:
+//   — reception phone number (from hotelRec.telefon)
+//   — EU emergency number 112
+//   — ambulance number 194 (Croatia)
+//
+// Intentionally broad — false positives (e.g. "fire exit?") are safe because
+// returning the reception number + emergency numbers is always a helpful response
+// for any fire-related question.
+export function isEmergencyQuestion(question) {
+  const q = normalizeText(question);
+  return (
+    q.includes('emergency')   ||   // EN: emergency / emergency number
+    q.includes('hitno')       ||   // HR: urgently / it's urgent
+    q.includes('hitna')       ||   // HR: hitna pomoć = ambulance / emergency services
+    q.includes('ambulan')     ||   // EN: ambulance
+    q.includes('doctor')      ||   // EN: I need a doctor
+    q.includes('liječnik')    ||   // HR: doctor (with diacritic)
+    q.includes('ljecnik')     ||   // HR: doctor (no diacritic)
+    q.includes('hospital')    ||   // EN: hospital
+    q.includes('bolnica')     ||   // HR: hospital
+    q.includes('fire')        ||   // EN: fire / fire escape / fire alarm / fire exit
+    q.includes('požar')       ||   // HR: fire (with diacritic)
+    q.includes('pozar')       ||   // HR: fire (no diacritic)
+    q.includes('hurt')        ||   // EN: I'm hurt
+    q.includes('injured')     ||   // EN: I'm injured
+    q.includes('ozlijed')     ||   // HR: injured (stem: ozlijeđen/ozlijeđena)
+    q.includes('povrijed')    ||   // HR: hurt (stem: povrijeđen)
+    q.includes('pomozite')    ||   // HR: help! (urgent imperative)
+    q.includes('upomoć')      ||   // HR: help! (interjection, with diacritic)
+    q.includes('upomoc')           // HR: help! (interjection, no diacritic)
+  );
 }

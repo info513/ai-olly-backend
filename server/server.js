@@ -7,7 +7,7 @@ import express from 'express';
 import cors from 'cors';
 import Airtable from 'airtable';
 import OpenAI from 'openai';
-import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion } from './classify.js';
+import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion } from './classify.js';
 import { timingSafeEqual } from 'node:crypto';
 import { asArray, isEmptyArray, fieldHasAny, valuesToStrings, matchesHotelSlug, allowForWeb, allowForPWA } from './filters.js';
 
@@ -1085,6 +1085,19 @@ function renderCheckinTimeAnswer(hotelRec, lang = 'HR') {
     : `Prijava: ${ci}. Odjava: ${co}. Za ranu prijavu ili kasnu odjavu, obratite se recepciji.`;
 }
 
+// ✅ deterministički (PWA only): emergency / medical / fire
+// Returns reception phone + Croatian emergency numbers (112, 194) immediately.
+// Avoids routing medical or fire queries through hotel-card dump or GPT.
+function renderEmergencyAnswer(hotelRec, lang = 'HR') {
+  const phone = hotelRec?.telefon;
+  const phoneLine = phone
+    ? (lang === 'EN' ? ` Reception: ${phone}.` : ` Recepcija: ${phone}.`)
+    : '';
+  return lang === 'EN'
+    ? `Please contact Reception immediately for urgent assistance.${phoneLine} For medical emergencies call 194 (ambulance). For all emergencies call 112.`
+    : `Molimo odmah kontaktirajte recepciju za hitnu pomoć.${phoneLine} Za hitnu medicinsku pomoć nazovite 194. Za sve hitne slučajeve nazovite 112.`;
+}
+
 // ✅ deterministički (PWA only): city/activity hint — points guest to app features
 // Used when guest asks about local attractions, sightseeing, or excursions.
 // The PWA has City Map and Routes sections that serve this need directly.
@@ -2148,6 +2161,18 @@ app.post('/api/pwa-ask', async (req, res) => {
       return res.status(403).json({ ok: false, error: 'Access denied' });
     }
     // ───────────────────────────────────────────────────────────────────────────
+
+    // ✅ -2) Deterministic: emergency / medical / fire — fires first, before all other handlers
+    // Returns reception phone number + emergency numbers (112 / 194) immediately.
+    // Must fire before isContactCoreQuestion to prevent hotel-card dump on medical queries
+    // such as "I need a doctor, who should I call?" or "There is an emergency in my room."
+    if (isEmergencyQuestion(question)) {
+      return res.json({
+        ok: true,
+        answer: renderEmergencyAnswer(hotelRec, lang),
+        meta: { hotelSlug, roomNumber, deterministic: 'emergency', ms: Date.now() - started },
+      });
+    }
 
     // ✅ -1) Deterministic: concise check-in/out time only (fires before hotel_core card)
     // "What time is check-in?" → concise timing answer, not the full hotel card.
