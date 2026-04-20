@@ -328,3 +328,64 @@ export function isCityQuestion(question) {
   const q = normalizeText(question);
   return q.includes('split') || q.includes('dioklecijan') || q.includes('palač') || q.includes('palace') || q.includes('peristil');
 }
+
+// ✅ deterministički (PWA only): pitanja o gradskim atrakcijama / razgledavanju / izletima
+//
+// Fires when a guest asks about sightseeing, local attractions, excursions, or walks.
+// Returns a hint pointing to the City Map and Routes sections in the PWA.
+// Deliberately narrow — excludes ambiguous terms like "things to do" (could mean hotel
+// activities) and bare "nearby" (could mean parking, restaurant, etc.).
+export function isCityActivityQuestion(question) {
+  const q = normalizeText(question);
+  return (
+    q.includes('what to see')     ||  // EN: "what to see nearby"
+    q.includes('things to see')   ||  // EN: "things to see in Split"
+    q.includes('what to visit')   ||  // EN: "what to visit"
+    q.includes('sightseeing')     ||  // EN
+    q.includes('attraction')      ||  // EN: attraction/s
+    q.includes('landmark')        ||  // EN: landmark/s
+    q.includes('excursion')       ||  // EN
+    q.includes('znamenit')        ||  // HR: znamenitosti / znamenitost
+    q.includes('razgledavanj')    ||  // HR: razgledavanje
+    q.includes('atrakcij')        ||  // HR: atrakcije
+    q.includes('izlet')           ||  // HR: izlet (excursion/day trip)
+    // HR: "što posjetiti / što vidjeti" + location word
+    (q.includes('posjetit') && (q.includes('blizin') || q.includes('grad') || q.includes('split'))) ||
+    (q.includes('vidjeti')  && (q.includes('blizin') || q.includes('grad') || q.includes('split')))
+  );
+}
+
+// ✅ deterministički (PWA only): pitanja isključivo o vremenu prijave/odjave
+//
+// Fires only when the question asks WHEN check-in or check-out is — no other context.
+// Returns a concise check-in/out time answer instead of the full hotel card.
+// Must fire BEFORE isContactCoreQuestion so the full card is never shown for timing questions.
+// Guards mirror isContactCoreQuestion to avoid double-catching non-timing requests.
+export function isCheckinTimeOnlyQuestion(question) {
+  const q = normalizeText(question);
+
+  const hasCheckinKey = (
+    q.includes('check in')  || q.includes('checkin')  ||
+    q.includes('check out') || q.includes('checkout') ||
+    (q.includes('prijava') && !q.includes('wifi') && !q.includes('wi fi') && !q.includes('internet')) ||
+    q.includes('odjava')
+  );
+
+  const hasTimeSignal = (
+    q.includes('time')     || q.includes('when')     || q.includes('what time') ||
+    q.includes('kada')     || q.includes('koliko')   ||
+    q.includes('u koliko') || q.includes('sati')     || q.includes('sat ')
+  );
+
+  // Non-timing modifiers: early/late requests, luggage, experiential queries, contact/links
+  const hasNonTiming = (
+    q.includes('early')   || q.includes('rano')     || q.includes('late')    ||
+    q.includes('kasn')    || q.includes('luggage')  || q.includes('prtljag') ||
+    q.includes('possible')|| q.includes('request')  || q.includes('experience') ||
+    q.includes('process') || q.includes('during')   || q.includes('after')   ||
+    q.includes('contact') || q.includes('phone')    || q.includes('address') ||
+    q.includes('adresa')  || q.includes('telefon')
+  );
+
+  return hasCheckinKey && hasTimeSignal && !hasNonTiming;
+}

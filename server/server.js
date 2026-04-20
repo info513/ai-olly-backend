@@ -7,7 +7,7 @@ import express from 'express';
 import cors from 'cors';
 import Airtable from 'airtable';
 import OpenAI from 'openai';
-import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion } from './classify.js';
+import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion } from './classify.js';
 import { timingSafeEqual } from 'node:crypto';
 import { asArray, isEmptyArray, fieldHasAny, valuesToStrings, matchesHotelSlug, allowForWeb, allowForPWA } from './filters.js';
 
@@ -1073,6 +1073,27 @@ function renderHotelCoreAnswer(hotelRec, lang = 'HR') {
   return parts.join('\n');
 }
 
+// ✅ deterministički (PWA only): concise check-in/out timing answer
+// Used when guest asks specifically “what time is check-in/out?” — avoids returning
+// the full hotel card (which includes social media links) for a simple timing question.
+function renderCheckinTimeAnswer(hotelRec, lang = 'HR') {
+  if (!hotelRec) return renderNoInfo(lang);
+  const ci = hotelRec.checkIn  || (lang === 'EN' ? 'not specified' : 'nije navedeno');
+  const co = hotelRec.checkOut || (lang === 'EN' ? 'not specified' : 'nije navedeno');
+  return lang === 'EN'
+    ? `Check-in: ${ci}. Check-out: ${co}. For early check-in or late check-out requests, please contact Reception.`
+    : `Prijava: ${ci}. Odjava: ${co}. Za ranu prijavu ili kasnu odjavu, obratite se recepciji.`;
+}
+
+// ✅ deterministički (PWA only): city/activity hint — points guest to app features
+// Used when guest asks about local attractions, sightseeing, or excursions.
+// The PWA has City Map and Routes sections that serve this need directly.
+function renderCityActivityHint(lang = 'HR') {
+  return lang === 'EN'
+    ? `For local attractions and walks, check the **City Map** and **Routes** sections in your guide — they include curated walks and points of interest near the hotel. For personal recommendations, Reception is happy to help.`
+    : `Za lokalne atrakcije i šetnje, pogledajte **Kartu grada** i **Rute** u vodiču — tamo ćete naći predložene rute i zanimljiva mjesta u blizini hotela. Za osobne preporuke, recepcija vam stoji na raspolaganju.`;
+}
+
 // ✅ deterministički: “Which rooms have UNESCO/Palace view?”
 function renderRoomsByViewAnswer(rooms, question, lang = 'HR') {
   const q = normalizeText(question);
@@ -1422,9 +1443,11 @@ ABSOLUTE RULES (no exceptions):
 - Do NOT guess prices, policies, times, services, room features, phone numbers, or procedures.
 - You CAN help with in-room topics (AC, TV, safe, WiFi) using the ROOM CONTEXT data.
 - For real problems or emergencies, always direct the guest to call reception.
-- Do NOT repeat greetings unless the user greets first.
+- Never open an answer with a greeting ("Welcome", "Hello", "Good morning", "Dobrodošli", etc.) unless the guest's own message was itself a greeting.
+- Never end an answer with a filler sign-off ("If you need anything, let me know", "Feel free to contact us", "I hope that helps", etc.). Stop after the last meaningful sentence.
 - Keep answers concise (1–4 sentences) unless the user explicitly asks for more detail.
 - Never output a price unless it appears verbatim in the provided data.
+- When a guest asks about nearby attractions, sightseeing, or local activities, reference the City Map or Routes sections in their guide app.
 
 ${personaBlock}${styleText}
 
@@ -2052,6 +2075,16 @@ app.post('/api/pwa-ask', async (req, res) => {
     }
     // ───────────────────────────────────────────────────────────────────────────
 
+    // ✅ -1) Deterministic: concise check-in/out time only (fires before hotel_core card)
+    // "What time is check-in?" → concise timing answer, not the full hotel card.
+    if (isCheckinTimeOnlyQuestion(question)) {
+      return res.json({
+        ok: true,
+        answer: renderCheckinTimeAnswer(hotelRec, lang),
+        meta: { hotelSlug, roomNumber, deterministic: 'checkin_time', ms: Date.now() - started },
+      });
+    }
+
     // ✅ 0) Deterministic: hotel core (contact / address / check-in-out)
     if (isContactCoreQuestion(question)) {
       return res.json({
@@ -2150,6 +2183,16 @@ app.post('/api/pwa-ask', async (req, res) => {
           meta: { hotelSlug, roomNumber, deterministic: 'safe_instructions', ms: Date.now() - started },
         });
       }
+    }
+
+    // ✅ 1.3) Deterministic (PWA only): city / sightseeing / excursion questions
+    // No attraction data exists in SERVICES — point guest to City Map + Routes in the app.
+    if (isCityActivityQuestion(question)) {
+      return res.json({
+        ok: true,
+        answer: renderCityActivityHint(lang),
+        meta: { hotelSlug, roomNumber, deterministic: 'city_activity', ms: Date.now() - started },
+      });
     }
 
     // ── GPT path ──────────────────────────────────────────────────────────────
