@@ -1090,8 +1090,8 @@ function renderCheckinTimeAnswer(hotelRec, lang = 'HR') {
 // The PWA has City Map and Routes sections that serve this need directly.
 function renderCityActivityHint(lang = 'HR') {
   return lang === 'EN'
-    ? `For local attractions and walks, check the **City Map** and **Routes** sections in your guide — they include curated walks and points of interest near the hotel. For personal recommendations, Reception is happy to help.`
-    : `Za lokalne atrakcije i šetnje, pogledajte **Kartu grada** i **Rute** u vodiču — tamo ćete naći predložene rute i zanimljiva mjesta u blizini hotela. Za osobne preporuke, recepcija vam stoji na raspolaganju.`;
+    ? `For local attractions and walks, check the City Map and Routes sections in your guide — they include curated walks and points of interest near the hotel. For personal recommendations, contact Reception.`
+    : `Za lokalne atrakcije i šetnje, pogledajte Kartu grada i Rute u vodiču — tamo ćete naći predložene rute i zanimljiva mjesta u blizini hotela. Za osobne preporuke, obratite se recepciji.`;
 }
 
 // ✅ deterministički: “Which rooms have UNESCO/Palace view?”
@@ -1301,6 +1301,69 @@ function renderRoomDifference(roomA, roomB, lang = 'HR') {
 }
 
 // -------------------------
+// ── GPT answer post-processor ────────────────────────────────────────────────
+// Belt-and-suspenders cleanup: strip opening greetings and closing sign-offs
+// that GPT sometimes adds despite system-prompt rules.
+//
+// Opening patterns stripped (first sentence/line if it is a greeting):
+//   "Dobrodošli u vašu sobu. \n..."   "Welcome to your room! \n..."
+//   "Hello! \n..."                    "Good morning! \n..."
+//
+// Closing patterns stripped (last sentence if it is a filler sign-off):
+//   HR: "Trebate li pomoć?", "Slobodno se obratite...", "Stojim vam na..."
+//   EN: "If you need anything...", "Feel free to...", "Let me know if...",
+//       "I hope that helps.", "Is there anything else?", "Don't hesitate...",
+//       "Happy to help."
+//
+// Only strips if remaining content is non-empty (never empties the answer).
+// ─────────────────────────────────────────────────────────────────────────────
+function stripChatWrap(answer) {
+  if (!answer) return answer;
+  let s = answer.trim();
+  if (!s) return answer;
+
+  // 1) Opening greeting removal
+  // Matches a greeting sentence at the very start, followed by optional whitespace.
+  // Only fires when there is more content after the greeting (prevents total erasure).
+  const GREET = /^(Dobrodošl\w[^.!?\n]*[.!?]\s*\n*|Welcome\b[^.!?\n]*[.!?]\s*\n*|Hello\b[^.!?\n]*[.!?]\s*\n*|Good (?:morning|afternoon|evening)\b[^.!?\n]*[.!?]\s*\n*)/i;
+  const gm = s.match(GREET);
+  if (gm && s.length > gm[0].length) {
+    s = s.slice(gm[0].length).trim();
+  }
+
+  // 2) Closing sign-off removal (iterative — strips multiple if stacked)
+  const SIGN_OFFS = [
+    // HR — "Trebate li X" is ALWAYS a sign-off at end of answer
+    /\s*Trebate li [^\n]*[.!?]$/i,
+    /\s*Slobodno (?:se )?(?:obratite|kontaktirajte)[^\n]*[.!?]$/i,
+    /\s*Slobodno nam se javite[^\n]*[.!?]$/i,
+    /\s*Stojim vam na raspolaganju[^\n]*[.!?]$/i,
+    /\s*Javite (?:mi )?se (?:ako|slobodno)[^\n]*[.!?]$/i,
+    /\s*Ako trebate (?:pomoć|još|išta)[^\n]*[.!?]$/i,
+    // EN
+    /\s*If you need an(?:y|ything)\b[^\n]*[.!?]$/i,
+    /\s*If there'?s? anything\b[^\n]*[.!?]$/i,
+    /\s*Feel free to (?:contact|ask|reach|let)[^\n]*[.!?]$/i,
+    /\s*Let me know if\b[^\n]*[.!?]$/i,
+    /\s*I hope (?:that )?(?:this )?help\w*[^\n]*[.!?]$/i,
+    /\s*Is there anything else\b[^\n]*[.!?]$/i,
+    /\s*Don'?t hesitate\b[^\n]*[.!?]$/i,
+    /\s*Happy to (?:help|assist)\b[^\n]*[.!?]$/i,
+    /\s*Please (?:do not|don'?t) hesitate\b[^\n]*[.!?]$/i,
+  ];
+
+  let prev;
+  do {
+    prev = s;
+    for (const re of SIGN_OFFS) {
+      const stripped = s.replace(re, '').trim();
+      if (stripped) s = stripped;  // only apply if result is non-empty
+    }
+  } while (s !== prev);
+
+  return s || answer.trim();
+}
+
 // Price hallucination guard
 // -------------------------
 function textContainsCurrency(s) {
@@ -2244,6 +2307,7 @@ app.post('/api/pwa-ask', async (req, res) => {
     }
 
     if (!answer) answer = renderNoInfo(lang);
+    answer = stripChatWrap(answer);
     answer = applyPriceGuard(answer, { lang, hotelRec, recordsToUse });
 
     return res.json({

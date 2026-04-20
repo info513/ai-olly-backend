@@ -2,6 +2,9 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Ensure [hidden] attribute always wins regardless of element-specific display rules */
+[hidden] { display: none !important; }
+
 :root {
   --bg:           #f7f4ef;
   --surface:      #ffffff;
