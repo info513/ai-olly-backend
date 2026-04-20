@@ -1454,7 +1454,7 @@ function buildRoomContext(roomGuide) {
   if (roomGuide.klimaUpute)     parts.push(`AC instructions: ${roomGuide.klimaUpute}`);
   if (roomGuide.tvUpute)        parts.push(`TV instructions: ${roomGuide.tvUpute}`);
   if (roomGuide.sefUpute)       parts.push(`Safe instructions: ${roomGuide.sefUpute}`);
-  if (roomGuide.napomene)       parts.push(`Room notes: ${roomGuide.napomene}`);
+  if (roomGuide.napomene)       parts.push(`Room notes (internal — rephrase naturally for guest): ${roomGuide.napomene}`);
   if (roomGuide.aiMasterPrompt) parts.push(`\n# ROOM AI RULES\n${roomGuide.aiMasterPrompt}`);
   return parts.join('\n');
 }
@@ -1508,9 +1508,13 @@ ABSOLUTE RULES (no exceptions):
 - For real problems or emergencies, always direct the guest to call reception.
 - Never open an answer with a greeting ("Welcome", "Hello", "Good morning", "Dobrodošli", etc.) unless the guest's own message was itself a greeting.
 - Never end an answer with a filler sign-off ("If you need anything, let me know", "Feel free to contact us", "I hope that helps", etc.). Stop after the last meaningful sentence.
-- Keep answers concise (1–4 sentences) unless the user explicitly asks for more detail.
 - Never output a price unless it appears verbatim in the provided data.
 - When a guest asks about nearby attractions, sightseeing, or local activities, reference the City Map or Routes sections in their guide app.
+
+OUTPUT FORMAT:
+- Write in 2–4 natural flowing prose sentences. Do NOT use bullet points (•, -, *) or numbered lists unless the guest explicitly asks "list" or "what are all".
+- If room notes contain raw shorthand, internal abbreviations, or non-English phrases, rephrase them clearly in the answer language — do not copy them verbatim.
+- For room feature questions, describe the room naturally as a short paragraph, not a feature inventory.
 
 ${personaBlock}${styleText}
 
@@ -1519,7 +1523,7 @@ Language:
 - If lang=EN respond in English.
 
 Data usage:
-- Keep proper nouns/labels exactly as provided (do not invent or translate them).`;
+- Keep hotel names, service names, and brand names exactly as provided. Rephrase raw internal notes naturally.`;
 
   const userPayload = {
     lang,
