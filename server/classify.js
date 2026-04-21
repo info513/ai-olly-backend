@@ -70,8 +70,10 @@ export function isContactCoreQuestion(question) {
     q.includes('during')  ||   // "during check-in"
     q.includes('after')   ||   // "after check-out"
     q.includes('nakon')   ||   // HR: "after"
-    q.includes('possible')||   // "is early check-in possible"
-    q.includes('request')      // "request a late check-out"
+    q.includes('possible')  ||   // "is early check-in possible"
+    q.includes('request')   ||   // "request a late check-out"
+    q.includes('procedure') ||   // "checkout procedure" — route to GPT, not hotel card
+    q.includes('postupak')       // HR: "procedure" — "postupak prijave/odjave"
   );
 
   // Fix #6: Croatian check-in/out terms — same guards as English equivalents.
