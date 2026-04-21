@@ -73,7 +73,32 @@ export function isContactCoreQuestion(question) {
     q.includes('possible')  ||   // "is early check-in possible"
     q.includes('request')   ||   // "request a late check-out"
     q.includes('procedure') ||   // "checkout procedure" — route to GPT, not hotel card
-    q.includes('postupak')       // HR: "procedure" — "postupak prijave/odjave"
+    q.includes('postupak')  ||   // HR: "procedure" — "postupak prijave/odjave"
+    q.includes('how do i')  ||   // Fix #8a: "how do I check out" — procedure question
+    q.includes('how to')    ||   // Fix #8a: "how to check out"
+    q.includes('key card')  ||   // Fix #8a: "return the key card" — checkout detail
+    q.includes('key fob')        // Fix #8a: alternative key term
+  );
+
+  // Fix #8b: local-guide context — questions about nearby places that happen
+  // to mention "Google Maps" or "maps" should route to the relevant service
+  // record, not the hotel-core card.  The hotel-core card fires on 'maps'
+  // to answer "send me the hotel Google Maps link" — but that must not extend
+  // to pharmacy/ATM/supermarket/nearest questions.
+  const isLocalGuideContext = (
+    q.includes('pharmacy')      ||   // "nearest pharmacy — Google Maps link?"
+    q.includes('ljekarna')      ||   // HR: pharmacy
+    q.includes('atm')           ||   // "nearest ATM"
+    q.includes('bankomat')      ||   // HR: ATM
+    q.includes('supermarket')   ||   // "nearest supermarket"
+    q.includes('nearest')       ||   // "nearest [anything]"
+    q.includes('najbliž')       ||   // HR: "nearest"
+    q.includes('nearby')        ||   // "nearby options"
+    q.includes('near the hotel') ||  // "near the hotel"
+    q.includes('blizin')        ||   // HR: "in the vicinity"
+    q.includes('restaurant')    ||   // "restaurant with Google Maps"
+    q.includes('beach')         ||   // "beach — Google Maps link?"
+    q.includes('plaž')               // HR: beach (plaža / plaže…)
   );
 
   // Fix #6: Croatian check-in/out terms — same guards as English equivalents.
@@ -102,8 +127,8 @@ export function isContactCoreQuestion(question) {
     q.includes('recepc') ||
     q.includes('address') ||
     q.includes('adresa') ||
-    q.includes('google maps') ||
-    q.includes('maps') ||
+    (q.includes('google maps') && !isLocalGuideContext) ||   // Fix #8b: not for nearby-place questions
+    (q.includes('maps') && !isLocalGuideContext) ||           // Fix #8b: same guard
     q.includes('instagram') ||
     q.includes('review') ||
     (hasCheckin     && !isExperiential && !isNonTimingCheckinout) ||  // Fix #4b + #5
