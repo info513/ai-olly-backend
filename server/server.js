@@ -7,7 +7,7 @@ import express from 'express';
 import cors from 'cors';
 import Airtable from 'airtable';
 import OpenAI from 'openai';
-import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion } from './classify.js';
+import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery } from './classify.js';
 import { timingSafeEqual } from 'node:crypto';
 import { asArray, isEmptyArray, fieldHasAny, valuesToStrings, matchesHotelSlug, allowForWeb, allowForPWA } from './filters.js';
 
@@ -2300,6 +2300,48 @@ app.post('/api/pwa-ask', async (req, res) => {
     // Rate limit → renderWait20s(). Empty answer → renderNoInfo(). Price guard applied.
     // ─────────────────────────────────────────────────────────────────────────
     const patterns  = await getIntentPatternsForPwa();
+
+    // ✅ 1.4) Pre-GPT parking guard — force parking_availability_query
+    // GPT tends to misclassify "Is there parking near…" / "Do you have parking near…"
+    // as the 'drop off' intent.  When isParkingAvailabilityQuery fires we skip
+    // chooseIntent() entirely and wire the correct pattern directly.
+    if (isParkingAvailabilityQuery(question)) {
+      const parkPat  = patterns.find(x => String(x.intent) === 'parking_availability_query');
+      const parkIds  = asArray(parkPat?.servicesLink);
+      if (parkIds.length) {
+        const parkRecs = await airtableFindByIds(TABLE_SERVICES, parkIds, 30);
+        const linked   = parkRecs.map(mapServiceRecord).filter(r =>
+          r.active && allowForPWA(r.aiSource) && matchesHotelSlug(r.hotelSlugRaw, hotelSlug)
+        );
+        if (linked.length) {
+          const forcedIntent = { intent: 'parking_availability_query', confidence: 1, outputScope: 'General' };
+          const outputRule   =
+            await getOutputRule({ scopeWanted: 'General', aiSourceWanted: 'PWA' });
+          let answer = '';
+          try {
+            answer = await generateAnswerPwa({
+              question, hotelSlug, lang, hotelRec, intentPick: forcedIntent,
+              recordsToUse: linked, roomGuide, outputRule,
+            });
+          } catch (e) {
+            if (e?._isRate || isOpenAIRateLimitError(e)) {
+              return res.json({ ok: true, answer: renderWait20s(lang),
+                meta: { hotelSlug, roomNumber, ms: Date.now() - started, openai_rate_limited: true } });
+            }
+            throw e;
+          }
+          if (!answer) answer = renderNoInfo(lang);
+          answer = stripChatWrap(answer);
+          answer = applyPriceGuard(answer, { lang, hotelRec, recordsToUse: linked });
+          return res.json({
+            ok: true, answer,
+            meta: { hotelSlug, roomNumber, intent: 'parking_availability_query',
+                    deterministic: 'parking_guard', ms: Date.now() - started },
+          });
+        }
+      }
+    }
+
     const intentPick = await chooseIntent(question, patterns);
 
     // Prefer service records linked to the matched intent; fall back to scoring

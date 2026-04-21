@@ -460,3 +460,25 @@ export function isEmergencyQuestion(question) {
     q.includes('upomoc')           // HR: help! (interjection, no diacritic)
   );
 }
+
+// ── isParkingAvailabilityQuery ─────────────────────────────────────────────
+// Narrow guard for parking-availability questions that GPT tends to
+// misclassify as the 'drop off' intent.
+//
+// Deliberately narrow: only fires on explicit parking-existence phrases.
+// Does NOT match:
+//   • "drop off" / "drop-off point" — no 'parking' or 'park near' present
+//   • "where can I park?" — already handled by Airtable phrase matching
+//   • "can I park at the hotel?" — same
+//
+// Kept as a pre-GPT guard: when it fires, server.js skips chooseIntent()
+// and forces the parking_availability_query intent pattern directly.
+export function isParkingAvailabilityQuery(question) {
+  const q = normalizeText(question);
+  return (
+    q.includes('is there parking') ||   // "Is there parking near the hotel?"
+    q.includes('do you have parking') || // "Do you have parking near the hotel?"
+    q.includes('parking near')       || // "Is parking available near …?"
+    q.includes('park near')             // "Can I park near the hotel?"
+  );
+}
