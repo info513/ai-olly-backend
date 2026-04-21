@@ -444,6 +444,14 @@ function preRouteIntent(question, patterns) {
     { keys: ['parking', 'parkiranje', 'rampa', 'gate', 'drop off', 'drop-off'], note: 'pre_router_parking' },
     { keys: ['smoking', 'non smoking', 'smoke', 'pušenje', 'pusenje'], note: 'pre_router_smoking' },
     { keys: ['minibar', 'mini bar', 'price list', 'cjenik'], note: 'pre_router_minibar' },
+    // Fix #9: breakfast_included must fire BEFORE generic breakfast bucket —
+    // "is breakfast included in the rate?" contains 'breakfast' so the generic
+    // bucket would capture it first and route to breakfast_menu_main.
+    { keys: ['breakfast included', 'included in the rate', 'rate include breakfast',
+             'price include breakfast', 'part of the booking', 'included in my stay',
+             'doručak uključen', 'dorucak ukljucen', 'uključuje li cijena doručak',
+             'ukljucuje li cijena dorucak', 'je li doručak uključen', 'je li dorucak ukljucen'],
+      note: 'pre_router_breakfast_included' },
     { keys: ['breakfast', 'doručak', 'dorucak', 'buffet', 'a la carte', 'kids breakfast'], note: 'pre_router_breakfast' },
     { keys: ['transfer', 'airport', 'zračna luka', 'zracna luka', 'pickup', 'shuttle'], note: 'pre_router_transfer' },
     { keys: ['taxi', 'uber'], note: 'pre_router_taxi_uber' },
