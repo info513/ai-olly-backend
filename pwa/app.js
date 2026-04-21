@@ -759,6 +759,8 @@ async function submitAsk() {
     if (res.ok && data.ok && data.answer) {
       setText('ask-answer-text', data.answer);
       show('ask-answer-card');
+      if (input) { input.value = ''; }   // clear input after successful answer
+      if (btn)   btn.disabled = true;    // disable Ask button (input is now empty)
       return;
     }
 
