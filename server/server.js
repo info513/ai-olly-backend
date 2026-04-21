@@ -1088,11 +1088,31 @@ function renderCheckinTimeAnswer(hotelRec, lang = 'HR') {
 // ✅ deterministički (PWA only): emergency / medical / fire
 // Returns reception phone + Croatian emergency numbers (112, 194) immediately.
 // Avoids routing medical or fire queries through hotel-card dump or GPT.
-function renderEmergencyAnswer(hotelRec, lang = 'HR') {
+function renderEmergencyAnswer(hotelRec, lang = 'HR', question = '') {
   const phone = hotelRec?.telefon;
   const phoneLine = phone
     ? (lang === 'EN' ? ` Reception: ${phone}.` : ` Recepcija: ${phone}.`)
     : '';
+
+  // Fire / evacuation branch — detected from the raw question string
+  const qn = String(question || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ');
+  const isFireRelated = (
+    qn.includes('fire')          ||
+    qn.includes('požar')         ||
+    qn.includes('pozar')         ||
+    qn.includes('evacuat')       ||
+    qn.includes('evakuacij')     ||
+    qn.includes('fire exit')     ||
+    qn.includes('požarni izlaz') ||
+    qn.includes('pozarni izlaz')
+  );
+
+  if (isFireRelated) {
+    return lang === 'EN'
+      ? `If there is a fire or immediate danger, stay calm and leave the building immediately using the nearest safe exit. Follow any instructions from hotel staff.${phoneLine} Call 112 for all emergencies, or 194 for ambulance assistance. Contact Reception for guidance if it is safe to do so.`
+      : `U slučaju požara ili neposredne opasnosti, ostanite mirni i napustite zgradu odmah koristeći najbliži siguran izlaz. Slijedite upute hotelskog osoblja.${phoneLine} Nazovite 112 za sve hitne slučajeve, ili 194 za hitnu medicinsku pomoć. Ako je sigurno, kontaktirajte recepciju za smjernice.`;
+  }
+
   return lang === 'EN'
     ? `Please contact Reception immediately for urgent assistance.${phoneLine} For medical emergencies call 194 (ambulance). For all emergencies call 112.`
     : `Molimo odmah kontaktirajte recepciju za hitnu pomoć.${phoneLine} Za hitnu medicinsku pomoć nazovite 194. Za sve hitne slučajeve nazovite 112.`;
@@ -2169,7 +2189,7 @@ app.post('/api/pwa-ask', async (req, res) => {
     if (isEmergencyQuestion(question)) {
       return res.json({
         ok: true,
-        answer: renderEmergencyAnswer(hotelRec, lang),
+        answer: renderEmergencyAnswer(hotelRec, lang, question),
         meta: { hotelSlug, roomNumber, deterministic: 'emergency', ms: Date.now() - started },
       });
     }
