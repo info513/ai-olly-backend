@@ -374,6 +374,9 @@ export function isCityActivityQuestion(question) {
     q.includes('attraction')      ||  // EN: attraction/s
     q.includes('landmark')        ||  // EN: landmark/s
     q.includes('excursion')       ||  // EN
+    q.includes('walking tour')    ||  // EN: "walking tour", "guided walking tour"
+    q.includes('city walk')       ||  // EN: "city walk", "city walking"
+    q.includes('guided tour')     ||  // EN: "guided tour"
     q.includes('znamenit')        ||  // HR: znamenitosti / znamenitost
     q.includes('razgledavanj')    ||  // HR: razgledavanje
     q.includes('atrakcij')        ||  // HR: atrakcije
