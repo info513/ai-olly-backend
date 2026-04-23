@@ -7,7 +7,7 @@ import express from 'express';
 import cors from 'cors';
 import Airtable from 'airtable';
 import OpenAI from 'openai';
-import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery } from './classify.js';
+import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion } from './classify.js';
 import { timingSafeEqual } from 'node:crypto';
 import { asArray, isEmptyArray, fieldHasAny, valuesToStrings, matchesHotelSlug, allowForWeb, allowForPWA } from './filters.js';
 
@@ -621,6 +621,11 @@ async function getHotelRecord(hotelSlug) {
     // parking (ako ga ima u hotel tablici)
     parking: pickFirstNonEmpty(f.Parking, f.parking),
 
+    // WhatsApp URL — wa.me link for the hotel's WhatsApp contact.
+    // Field must be created manually in Airtable (REST API cannot create fields).
+    // Returns '' if field not yet populated; renderWhatsAppAnswer falls back to service Opis.
+    whatsapp: pickFirstNonEmpty(f['WhatsApp'], f['WhatsApp URL'], f.Whatsapp, f.whatsapp, ''),
+
     // Persona voice — hotel-specific tone injected into every GPT call.
     // Field must be created manually in Airtable (REST API cannot create fields).
     // Returns '' if field not yet populated; generateAnswer gracefully skips it.
@@ -1079,6 +1084,38 @@ function renderHotelCoreAnswer(hotelRec, lang = 'HR') {
   if (!parts.length) return renderNoInfo(lang);
 
   return parts.join('\n');
+}
+
+// ✅ deterministički: WhatsApp kontakt
+// Hard guard — always returns WA link when available, never lets GPT say “no WhatsApp”.
+// Priority: 1) hotelRec.whatsapp field, 2) wa.me URL found in any service Opis,
+//           3) graceful fallback to reception contact.
+// Works for both /api/web-ask and /api/pwa-ask.
+function renderWhatsAppAnswer(hotelRec, services, lang) {
+  // Priority 1: dedicated WhatsApp field on hotel record (set in Airtable HOTELI)
+  const waFromHotel = (hotelRec?.whatsapp || '').trim();
+  if (waFromHotel) {
+    const url = waFromHotel.startsWith('http') ? waFromHotel : `https://wa.me/${waFromHotel}`;
+    return lang === 'EN'
+      ? `Yes, you can contact us on WhatsApp: ${url}`
+      : `Da, možete nas kontaktirati putem WhatsAppa: ${url}`;
+  }
+
+  // Priority 2: wa.me URL embedded in any active service record Opis
+  for (const r of (services || [])) {
+    const match = (r.opis || '').match(/https?:\/\/wa\.me\/\S+/);
+    if (match) {
+      return lang === 'EN'
+        ? `Yes, you can contact us on WhatsApp: ${match[0]}`
+        : `Da, možete nas kontaktirati putem WhatsAppa: ${match[0]}`;
+    }
+  }
+
+  // Fallback: no WA data found — direct to reception
+  const phone = hotelRec?.telefon;
+  return lang === 'EN'
+    ? `For direct assistance, please contact Reception${phone ? ` at ${phone}` : ''}.`
+    : `Za izravnu pomoć, kontaktirajte recepciju${phone ? ` na broju ${phone}` : ''}.`;
 }
 
 // ✅ deterministički (PWA only): concise check-in/out timing answer
@@ -1870,6 +1907,24 @@ app.post('/api/web-ask', async (req, res) => {
       // answer is null (no pet policy record found) — fall through to GPT
     }
 
+    // ✅ 0.9) Deterministički: WhatsApp contact
+    // Hard guard — fires before intent routing; returns WA link directly.
+    // Prevents GPT from hallucinating “we don't have WhatsApp” when no WA
+    // data was in the linked service record's Opis.
+    if (isWhatsAppQuestion(question)) {
+      const answer = renderWhatsAppAnswer(hotelRec, services, lang);
+      const ms = Date.now() - started;
+      return res.json({
+        ok: true,
+        answer,
+        meta: {
+          hotelSlug,
+          deterministic: 'whatsapp',
+          ms,
+        },
+      });
+    }
+
     // 4) Deterministički: “vrste soba”
     if (isRoomTypesQuestion(question)) {
       const answer = renderRoomTypesAnswer(rooms, lang);
@@ -2310,6 +2365,15 @@ app.post('/api/pwa-ask', async (req, res) => {
           meta: { hotelSlug, roomNumber, deterministic: 'safe_instructions', ms: Date.now() - started },
         });
       }
+    }
+
+    // ✅ 0.9) Deterministic: WhatsApp contact — same guard as web-ask
+    if (isWhatsAppQuestion(question)) {
+      return res.json({
+        ok: true,
+        answer: renderWhatsAppAnswer(hotelRec, pwaServices, lang),
+        meta: { hotelSlug, roomNumber, deterministic: 'whatsapp', ms: Date.now() - started },
+      });
     }
 
     // ✅ 1.3) Deterministic (PWA only): city / sightseeing / excursion questions

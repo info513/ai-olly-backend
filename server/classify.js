@@ -486,6 +486,18 @@ export function isEmergencyQuestion(question) {
   );
 }
 
+// ✅ deterministički: pitanja o WhatsApp kontaktu
+//
+// Fires when a visitor or guest asks whether the hotel has WhatsApp,
+// how to contact via WhatsApp, or asks for the WhatsApp number.
+// Deliberately narrow — only fires on explicit "whatsapp" mentions.
+// Returns a deterministic answer with the WA link, bypassing GPT
+// which has no WA data and hallucinated "we don't have WhatsApp".
+export function isWhatsAppQuestion(question) {
+  const q = normalizeText(question);
+  return q.includes('whatsapp') || q.includes('whats app');
+}
+
 // ── isParkingAvailabilityQuery ─────────────────────────────────────────────
 // Narrow guard for parking-availability questions that GPT tends to
 // misclassify as the 'drop off' intent.

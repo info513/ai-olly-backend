@@ -7,6 +7,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#2c1f14">
   <title>Hotel Antique Split</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="manifest" href="/pwa/manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="style.css">
@@ -512,57 +515,58 @@
   </div>
 
   <!-- ── Screen: Ask Dioclea ───────────────────────────────────────────────── -->
-  <div id="screen-ask" class="screen screen--root">
+  <div id="screen-ask" class="screen screen--root screen--chat">
 
-    <div class="screen-header">
+    <div class="screen-header screen-header--chat">
       <div class="screen-title">Ask Dioclea</div>
+      <button class="chat-clear-btn" onclick="clearChat()" title="Clear chat" hidden id="chat-clear-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+      </button>
     </div>
 
-    <div class="screen-body ask-body">
-
-      <p class="ask-hint">Ask about WiFi, AC, TV, the safe, breakfast, or anything about your stay.</p>
-
-      <div class="ask-chips">
-        <button class="chip" onclick="onChipClick('WiFi password')">WiFi</button>
-        <button class="chip" onclick="onChipClick('How do I use the air conditioning?')">AC</button>
-        <button class="chip" onclick="onChipClick('How do I use the TV?')">TV</button>
-        <button class="chip" onclick="onChipClick('How do I use the safe?')">Safe</button>
-        <button class="chip" onclick="onChipClick('What time is breakfast?')">Breakfast</button>
-        <button class="chip" onclick="onChipClick('Is there parking at the hotel?')">Parking</button>
-        <button class="chip" onclick="onChipClick('How do I get to the ferry terminal?')">Ferry</button>
-        <button class="chip" onclick="onChipClick('What is the nearest beach?')">Nearest beach</button>
+    <!-- Quick chips — horizontal scroll, always visible -->
+    <div class="chat-chips-wrap">
+      <div class="chat-chips">
+        <button class="chip" onclick="onChipClick('WiFi password')">📶 WiFi</button>
+        <button class="chip" onclick="onChipClick('How do I use the air conditioning?')">❄️ AC</button>
+        <button class="chip" onclick="onChipClick('How do I use the TV?')">📺 TV</button>
+        <button class="chip" onclick="onChipClick('How do I use the safe?')">🔒 Safe</button>
+        <button class="chip" onclick="onChipClick('What time is breakfast?')">☕ Breakfast</button>
+        <button class="chip" onclick="onChipClick('Is there parking at the hotel?')">🅿️ Parking</button>
+        <button class="chip" onclick="onChipClick('How do I get to the ferry terminal?')">⛴ Ferry</button>
+        <button class="chip" onclick="onChipClick('What is the nearest beach?')">🏖 Beach</button>
       </div>
-
-      <div class="ask-input-row">
-        <input
-          id="ask-input"
-          class="ask-input"
-          type="text"
-          placeholder="Your question..."
-          autocomplete="off"
-          autocorrect="off"
-          oninput="onAskInput()"
-          onkeydown="onAskKeydown(event)"
-        >
-        <button id="ask-btn" class="ask-btn" onclick="submitAsk()" disabled>Ask</button>
-      </div>
-
-      <div id="ask-loading" class="ask-loading" hidden>
-        <div class="spinner"></div>
-        <span class="loading-text">Looking that up&hellip;</span>
-      </div>
-
-      <div id="ask-answer-card" class="ask-answer-card" hidden>
-        <div id="ask-answer-text" class="ask-answer-text"></div>
-      </div>
-
-      <div id="ask-error" class="ask-error-box" hidden></div>
-
-      <div id="ask-contact-hint" class="ask-contact-hint" hidden>
-        <button class="action-btn" onclick="pushScreen('contact')">Contact Reception</button>
-      </div>
-
     </div>
+
+    <!-- Messages area -->
+    <div id="chat-messages" class="chat-messages">
+      <div id="chat-empty" class="chat-empty">
+        <div class="chat-empty-icon">✦</div>
+        <p class="chat-empty-title">Ask me anything</p>
+        <p class="chat-empty-hint">WiFi, breakfast, AC, the safe, local tips&thinsp;— I'm here for your stay.</p>
+      </div>
+    </div>
+
+    <!-- Sticky input bar -->
+    <div class="chat-input-bar">
+      <input
+        id="ask-input"
+        class="chat-input"
+        type="text"
+        placeholder="Ask anything…"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+        oninput="onAskInput()"
+        onkeydown="onAskKeydown(event)"
+      >
+      <button id="ask-btn" class="chat-send-btn" onclick="submitAsk()" disabled aria-label="Send">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/>
+        </svg>
+      </button>
+    </div>
+
   </div>
 
   <!-- ── Screen: Info ───────────────────────────────────────────────────── -->

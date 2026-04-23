@@ -26,11 +26,17 @@ const ROOT_SCREENS = new Set(['home', 'city-map', 'ask', 'info']);
 let currentScreen  = 'home';
 let navStack       = [];
 
-function _activateScreen(name) {
-  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+function _activateScreen(name, direction = 'forward') {
+  document.querySelectorAll('.screen').forEach(el => {
+    el.classList.remove('active', 'entering', 'entering-back');
+  });
   const el = document.getElementById('screen-' + name);
   if (el) {
     el.classList.add('active');
+    // Trigger entrance animation on next frame so CSS transition picks it up
+    requestAnimationFrame(() => {
+      el.classList.add(direction === 'back' ? 'entering-back' : 'entering');
+    });
     currentScreen = name;
   }
   window.scrollTo(0, 0);
@@ -63,7 +69,7 @@ function pushScreen(name) {
 
 function popScreen() {
   const prev = navStack.pop();
-  _activateScreen(prev || 'home');
+  _activateScreen(prev || 'home', 'back');
 }
 
 function gotoRoot(name) {
@@ -509,11 +515,11 @@ function showRequestScreen() {
 // ── Ask Olly chips ────────────────────────────────────────────────────────
 function onChipClick(text) {
   const input = document.getElementById('ask-input');
-  if (input) {
-    input.value = text;
-    input.focus();
-    onAskInput();
-  }
+  if (!input) return;
+  input.value = text;
+  onAskInput();
+  // Submit immediately — chip tap = instant send
+  submitAsk();
 }
 
 // ── Request form state ────────────────────────────────────────────────────
@@ -697,19 +703,104 @@ function errorMessage(status) {
   return 'Something went wrong. Please try again or contact Reception directly.';
 }
 
-// ── Ask Assistant ─────────────────────────────────────────────────────────
-let askInFlight = false;
+// ── Chat (Ask Dioclea) — full conversation UI ─────────────────────────────
+let askInFlight  = false;
+let chatMessages = [];   // [{ role: 'user'|'assistant', text: string }]
 
-function resetAskScreen() {
+function _chatMessagesEl()  { return document.getElementById('chat-messages'); }
+function _chatEmptyEl()     { return document.getElementById('chat-empty');    }
+function _chatClearBtnEl()  { return document.getElementById('chat-clear-btn');}
+
+// Append a message bubble to the chat
+function _appendChatBubble(role, text) {
+  const container = _chatMessagesEl();
+  if (!container) return null;
+
+  // Hide empty state on first message
+  const empty = _chatEmptyEl();
+  if (empty) empty.hidden = true;
+
+  // Show clear button once there's content
+  const clearBtn = _chatClearBtnEl();
+  if (clearBtn) clearBtn.hidden = false;
+
+  const el = document.createElement('div');
+  el.className = 'chat-msg chat-msg--' + role;
+
+  const safeText = escHtml(text).replace(/\n/g, '<br>');
+
+  if (role === 'assistant') {
+    el.innerHTML =
+      '<div class="chat-msg-avatar">✦</div>' +
+      '<div class="chat-msg-bubble">' + safeText + '</div>';
+  } else {
+    el.innerHTML = '<div class="chat-msg-bubble">' + safeText + '</div>';
+  }
+
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+  return el;
+}
+
+// Show bouncing-dots typing indicator
+function _showTypingIndicator() {
+  const container = _chatMessagesEl();
+  if (!container) return;
+  _removeTypingIndicator();  // ensure no duplicate
+
+  const el = document.createElement('div');
+  el.id = 'chat-typing';
+  el.className = 'chat-msg chat-msg--assistant chat-msg--typing';
+  el.innerHTML =
+    '<div class="chat-msg-avatar">✦</div>' +
+    '<div class="chat-msg-bubble">' +
+      '<span class="typing-dot"></span>' +
+      '<span class="typing-dot"></span>' +
+      '<span class="typing-dot"></span>' +
+    '</div>';
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+}
+
+function _removeTypingIndicator() {
+  const el = document.getElementById('chat-typing');
+  if (el) el.remove();
+}
+
+function clearChat() {
+  chatMessages = [];
   askInFlight = false;
+  _removeTypingIndicator();
+
+  const container = _chatMessagesEl();
+  if (container) {
+    // Remove all message bubbles, keep empty state div
+    Array.from(container.children).forEach(ch => {
+      if (ch.id !== 'chat-empty') ch.remove();
+    });
+  }
+
+  const empty = _chatEmptyEl();
+  if (empty) empty.hidden = false;
+
+  const clearBtn = _chatClearBtnEl();
+  if (clearBtn) clearBtn.hidden = true;
+
   const input = document.getElementById('ask-input');
   if (input) { input.value = ''; input.disabled = false; }
+
   const btn = document.getElementById('ask-btn');
   if (btn) btn.disabled = true;
-  hide('ask-loading');
-  hide('ask-answer-card');
-  hide('ask-error');
-  hide('ask-contact-hint');
+}
+
+function resetAskScreen() {
+  // Called on navigation — keep chat history in-session, just unlock the input
+  askInFlight = false;
+  const input = document.getElementById('ask-input');
+  if (input) { input.disabled = false; }
+  const btn = document.getElementById('ask-btn');
+  if (btn) btn.disabled = !(input && input.value.trim());
+  _removeTypingIndicator();
 }
 
 function onAskInput() {
@@ -729,20 +820,23 @@ async function submitAsk() {
   if (!question) return;
 
   if (!TOKEN) {
-    setText('ask-error', 'Your room link is incomplete. Please scan the QR code in your room again.');
-    show('ask-error');
+    _appendChatBubble('assistant',
+      'Your room link is incomplete. Please scan the QR code in your room again.');
     return;
   }
 
+  // Lock input, capture question, clear field
   askInFlight = true;
-  const btn   = document.getElementById('ask-btn');
-  if (input) input.disabled = true;
-  if (btn)   btn.disabled   = true;
+  const btn = document.getElementById('ask-btn');
+  if (input) { input.value = ''; input.disabled = true; }
+  if (btn)   btn.disabled = true;
 
-  hide('ask-answer-card');
-  hide('ask-error');
-  hide('ask-contact-hint');
-  show('ask-loading');
+  // Add user bubble immediately
+  chatMessages.push({ role: 'user', text: question });
+  _appendChatBubble('user', question);
+
+  // Show typing indicator while waiting
+  _showTypingIndicator();
 
   try {
     const res  = await fetch((CONFIG.apiBase || '') + '/api/pwa-ask', {
@@ -752,40 +846,39 @@ async function submitAsk() {
     });
     const data = await res.json().catch(() => ({}));
 
-    hide('ask-loading');
-    if (input) input.disabled = false;
-    if (btn)   btn.disabled   = !(input && input.value.trim());
+    _removeTypingIndicator();
 
-    if (res.ok && data.ok && data.answer) {
-      setText('ask-answer-text', data.answer);
-      show('ask-answer-card');
-      if (input) { input.value = ''; }   // clear input after successful answer
-      if (btn)   btn.disabled = true;    // disable Ask button (input is now empty)
-      return;
-    }
+    const answer = (res.ok && data.ok && data.answer)
+      ? data.answer
+      : _askErrorText(res.status);
 
-    const [errMsg, showContact] = askErrorMessage(res.status);
-    setText('ask-error', errMsg);
-    show('ask-error');
-    if (showContact) show('ask-contact-hint');
+    chatMessages.push({ role: 'assistant', text: answer });
+    _appendChatBubble('assistant', answer);
 
   } catch (_) {
-    hide('ask-loading');
-    if (input) input.disabled = false;
-    if (btn)   btn.disabled   = !(input && input.value.trim());
-    setText('ask-error', 'Unable to connect. Please check your connection and try again.');
-    show('ask-error');
+    _removeTypingIndicator();
+    const msg = 'Unable to connect. Please check your connection and try again.';
+    chatMessages.push({ role: 'assistant', text: msg });
+    _appendChatBubble('assistant', msg);
   } finally {
     askInFlight = false;
+    if (input) {
+      input.disabled = false;
+      input.focus();
+      onAskInput();
+    }
   }
 }
 
-function askErrorMessage(status) {
-  if (status === 403) return ['Your room link has expired. Please scan the QR code in your room again.', false];
-  if (status === 501) return ['Our assistant is temporarily unavailable. Please contact Reception for help.', true];
-  if (status === 400) return ['Your question could not be processed. Please try rephrasing it.', false];
-  return ['Something went wrong. Please try again or contact Reception directly.', true];
+function _askErrorText(status) {
+  if (status === 403) return 'Your room link has expired. Please scan the QR code in your room again.';
+  if (status === 501) return 'Our assistant is temporarily unavailable. Please contact Reception for help.';
+  if (status === 400) return 'Your question could not be processed. Please try rephrasing it.';
+  return 'Something went wrong. Please try again or contact Reception directly.';
 }
+
+// Legacy alias — kept in case any other code calls this
+function askErrorMessage(status) { return [_askErrorText(status), false]; }
 
 // ── API loaders ───────────────────────────────────────────────────────────
 async function fetchWelcomeData() {
