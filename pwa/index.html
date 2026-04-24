@@ -769,6 +769,18 @@
         </div>
       </div>
 
+      <div class="conc-section-label" style="margin-top:24px;">Hotel Services</div>
+      <div class="conc-menu">
+        <div class="conc-item" onclick="openConciergeForm('wakeup')">
+          <span class="conc-item-icon">⏰</span>
+          <div class="conc-item-body">
+            <div class="conc-item-title">Wake-up Call</div>
+            <div class="conc-item-sub">Reception will call your room at the requested time</div>
+          </div>
+          <span class="section-arrow">›</span>
+        </div>
+      </div>
+
       <div class="conc-section-label" style="margin-top:24px;">Dining</div>
       <div class="conc-menu" id="conc-restaurants-list">
         <div style="padding:16px;color:var(--text-muted);font-size:14px;">Loading partner restaurants…</div>
@@ -796,11 +808,11 @@
           <label class="form-label">Time</label>
           <input type="time" id="conc-time" class="form-input" required>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="conc-group-guests">
           <label class="form-label">Number of guests</label>
           <input type="number" id="conc-guests" class="form-input" min="1" max="20" value="2" required>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="conc-group-name">
           <label class="form-label">Your name</label>
           <input type="text" id="conc-name" class="form-input" placeholder="Name for the reservation">
         </div>

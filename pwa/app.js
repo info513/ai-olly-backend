@@ -21,7 +21,7 @@ let currentService   = null;
 let currentPoi       = null;
 let currentRoute     = null;
 let currentPartner   = null; // currently selected restaurant/partner
-let currentConciForm = null; // 'taxi' | 'boat' | 'shuttle' | 'restaurant'
+let currentConciForm = null; // 'taxi' | 'boat' | 'shuttle' | 'restaurant' | 'wakeup'
 let currentNmCat     = null;
 let cityMapObj       = null;
 let cityMapInited    = false;
@@ -1694,9 +1694,9 @@ function openConciergeForm(type) {
 }
 
 function _buildConciergeForm(type) {
-  const titles = { taxi: 'Taxi Request', boat: 'Boat Transfer', shuttle: 'Airport Shuttle', restaurant: 'Reserve a Table' };
-  const icons  = { taxi: '🚕', boat: '⛵', shuttle: '🚐', restaurant: '🍽' };
-  const emojis = { taxi: '🚕', boat: '⛵', shuttle: '🚐', restaurant: '🍽' };
+  const titles = { taxi: 'Taxi Request', boat: 'Boat Transfer', shuttle: 'Airport Shuttle', restaurant: 'Reserve a Table', wakeup: 'Wake-up Call' };
+  const icons  = { taxi: '🚕', boat: '⛵', shuttle: '🚐', restaurant: '🍽', wakeup: '⏰' };
+  const emojis = { taxi: '🚕', boat: '⛵', shuttle: '🚐', restaurant: '🍽', wakeup: '⏰' };
 
   setText('conc-form-title', titles[type] || 'Request');
 
@@ -1714,6 +1714,8 @@ function _buildConciergeForm(type) {
         <label class="form-label">Restaurant</label>
         <input type="text" id="conc-partner" class="form-input" value="${currentPartner ? escHtml(currentPartner.name) : ''}" readonly>
       </div>`;
+  } else if (type === 'wakeup') {
+    fieldsEl.innerHTML = ''; // date + time fields below are enough
   } else {
     fieldsEl.innerHTML = `
       <div class="form-group">
@@ -1729,14 +1731,30 @@ function _buildConciergeForm(type) {
   // Reset common fields
   const dateEl = document.getElementById('conc-date');
   const timeEl = document.getElementById('conc-time');
-  if (dateEl) { dateEl.value = ''; dateEl.required = true; }
-  if (timeEl) { timeEl.value = ''; timeEl.required = true; }
   const noteEl = document.getElementById('conc-note');
-  if (noteEl) noteEl.value = '';
   const nameEl = document.getElementById('conc-name');
-  if (nameEl) nameEl.value = '';
   const guestsEl = document.getElementById('conc-guests');
+
+  if (type === 'wakeup') {
+    // Pre-fill date = tomorrow, label as "Wake-up date"
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (dateEl) { dateEl.value = tomorrow.toISOString().slice(0, 10); dateEl.required = true; }
+    if (timeEl) { timeEl.value = '07:00'; timeEl.required = true; }
+  } else {
+    if (dateEl) { dateEl.value = ''; dateEl.required = true; }
+    if (timeEl) { timeEl.value = ''; timeEl.required = true; }
+  }
+  if (noteEl)   noteEl.value = '';
+  if (nameEl)   nameEl.value = '';
   if (guestsEl) guestsEl.value = '2';
+
+  // Hide guests + name fields for wake-up call (not needed)
+  const guestsGroup = document.getElementById('conc-group-guests');
+  const nameGroup   = document.getElementById('conc-group-name');
+  const isWakeup    = type === 'wakeup';
+  if (guestsGroup) guestsGroup.hidden = isWakeup;
+  if (nameGroup)   nameGroup.hidden   = isWakeup;
 }
 
 async function submitConciergeForm(e) {
@@ -1755,7 +1773,7 @@ async function submitConciergeForm(e) {
   const partner   = currentPartner?.name || document.getElementById('conc-partner')?.value || '';
 
   // Map type to Airtable Kategorija
-  const categoryMap = { taxi: 'Taxi', boat: 'Boat Transfer', shuttle: 'Airport Shuttle', restaurant: 'Restaurant' };
+  const categoryMap = { taxi: 'Taxi', boat: 'Boat Transfer', shuttle: 'Airport Shuttle', restaurant: 'Restaurant', wakeup: 'Wake-up Call' };
   const category = categoryMap[type] || 'Guest Services';
 
   // Build human-readable message summary
