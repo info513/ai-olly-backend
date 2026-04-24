@@ -613,12 +613,32 @@ function openPoiDetail() {
 function _populatePoiDetail(poi) {
   setText('poi-category', poi.category);
   setText('poi-name', poi.name);
-  const meta = [poi.dist, poi.visit].filter(Boolean).join('  \u00b7  ');
-  setText('poi-meta', meta);
+
+  // Meta line: 📍 distance  ·  🕐 visit duration
+  const parts = [];
+  if (poi.dist)  parts.push('📍 ' + poi.dist);
+  if (poi.visit) parts.push('🕐 ' + poi.visit);
+  setText('poi-meta', parts.join('   ·   '));
+
   setText('poi-short-desc', poi.shortDesc);
   setText('poi-long-desc', poi.longDesc);
   const navBtn = document.getElementById('poi-nav-btn');
   if (navBtn) navBtn.href = poi.nav || '#';
+
+  // Hero — category-based gradient placeholder (swap with real image when available)
+  const hero = document.getElementById('poi-detail-hero');
+  if (hero) {
+    const gradients = {
+      'History':      'linear-gradient(135deg, #2a1a0e 0%, #4a2c10 100%)',
+      'Food & Drink': 'linear-gradient(135deg, #1a2a0e 0%, #2d4a15 100%)',
+      'Beaches':      'linear-gradient(135deg, #0e2040 0%, #1040a0 60%, #20a0c0 100%)',
+      'Nature':       'linear-gradient(135deg, #0e2a10 0%, #1e4a20 100%)',
+      'Nightlife':    'linear-gradient(135deg, #1a0e2a 0%, #3a1060 100%)',
+      'Shopping':     'linear-gradient(135deg, #2a1a10 0%, #50301a 100%)',
+      'Culture':      'linear-gradient(135deg, #1a1020 0%, #3a2050 100%)',
+    };
+    hero.style.background = gradients[poi.category] || 'linear-gradient(135deg, #1a1a2e 0%, #2e2e4a 100%)';
+  }
 }
 
 // Opens an external URL reliably in PWA standalone mode on iOS/Android.
@@ -657,7 +677,10 @@ function renderRoutesList() {
     return;
   }
   container.innerHTML = routesData.map((r, i) => {
-    const meta = [r.type, r.duration].filter(Boolean).map(escHtml).join('<span class="route-dot">\u00b7</span>');
+    const metaParts = [];
+    if (r.type)     metaParts.push(`<span class="route-meta-type">${escHtml(r.type)}</span>`);
+    if (r.duration) metaParts.push(`<span class="route-meta-dur"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${escHtml(r.duration)}</span>`);
+    const meta = metaParts.join('<span class="route-dot">\u00b7</span>');
     return `
       <div class="route-card" onclick="openRouteDetail(${i})">
         <div class="route-card-hero"></div>
@@ -690,9 +713,12 @@ function openRouteDetail(idx) {
       .map(id => localPois.find(p => p.id === id))
       .filter(Boolean);
     poisContainer.innerHTML = routePois.length
-      ? routePois.map(p => `
+      ? routePois.map((p, idx) => `
           <div class="section-item" onclick="openPoiFromRoute('${escHtml(p.id)}')">
-            <span>${escHtml(p.name)}</span>
+            <div class="stop-info">
+              <span class="stop-name">${escHtml(p.name)}</span>
+              ${p.visit ? `<span class="stop-walk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4" r="2"/><path d="M9 22l1.5-6L8 13l2-5"/><path d="M15 22l-1.5-6 2.5-3-2-5"/><path d="M6 11l2-2 4 1 2-2"/></svg>${escHtml(p.visit)}</span>` : ''}
+            </div>
             <span class="section-arrow">\u203a</span>
           </div>
         `).join('')

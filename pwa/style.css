@@ -964,6 +964,18 @@ html, body {
   letter-spacing: 0.1em;
 }
 
+.route-meta-dur {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.route-meta-dur svg,
+.stop-walk svg {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
 .route-card-title {
   font-family: var(--font-serif);
   font-size: 21px;
@@ -992,6 +1004,44 @@ html, body {
   height: 200px;
   background: linear-gradient(135deg, #1e3040 0%, #2c3e20 100%);
   flex-shrink: 0;
+}
+
+/* ── POI / Stop detail hero ──────────────────────────────────────────────── */
+
+.poi-hero {
+  height: 200px;
+  background: linear-gradient(135deg, #2a1f3d 0%, #1a3040 60%, #1e2820 100%);
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+/* ── Route stop list item ────────────────────────────────────────────────── */
+
+.stop-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.stop-name {
+  font-size: 15px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stop-walk {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--gold);
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 /* ── Near Me grid ────────────────────────────────────────────────────────── */
