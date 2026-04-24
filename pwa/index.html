@@ -211,6 +211,14 @@
     <!-- Category filter chips — float below title -->
     <div id="map-filter-bar" class="map-filter-bar"></div>
 
+    <!-- Category list panel — slides up when a filter chip is tapped -->
+    <div id="map-category-panel" class="map-category-panel">
+      <div class="poi-mini-drag-handle"></div>
+      <button class="poi-mini-close" onclick="closeMapCategoryPanel()">&#x2715;</button>
+      <div id="map-cat-panel-title" class="map-cat-panel-title"></div>
+      <div id="map-cat-panel-list" class="map-cat-panel-list"></div>
+    </div>
+
     <!-- POI mini card — animated slide-up -->
     <div id="poi-mini-card" class="poi-mini-card">
       <div class="poi-mini-drag-handle"></div>

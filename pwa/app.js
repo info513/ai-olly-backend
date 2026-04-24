@@ -342,7 +342,7 @@ function buildMapFilterChips() {
   });
 }
 
-// Show/hide POI markers by category
+// Show/hide POI markers by category; open list panel for non-All filters
 function filterMapPois(category) {
   // Update chip active state
   document.querySelectorAll('.map-filter-chip').forEach(chip => {
@@ -352,15 +352,68 @@ function filterMapPois(category) {
 
   // Show/hide markers
   poiMarkers.forEach(({ marker, poi }) => {
-    const show = !category || poi.category === category;
-    if (show && !cityMapObj.hasLayer(marker)) cityMapObj.addLayer(marker);
-    if (!show && cityMapObj.hasLayer(marker)) cityMapObj.removeLayer(marker);
+    const visible = !category || poi.category === category;
+    if (visible  && !cityMapObj.hasLayer(marker)) cityMapObj.addLayer(marker);
+    if (!visible &&  cityMapObj.hasLayer(marker)) cityMapObj.removeLayer(marker);
   });
 
-  // Close any open mini-card
+  // Close mini-card
   const mc = document.getElementById('poi-mini-card');
   if (mc) mc.classList.remove('visible');
   currentPoi = null;
+
+  // Open category panel for specific category; close for "All"
+  if (category) {
+    openMapCategoryPanel(category);
+  } else {
+    closeMapCategoryPanel();
+  }
+}
+
+function openMapCategoryPanel(category) {
+  const panel    = document.getElementById('map-category-panel');
+  const titleEl  = document.getElementById('map-cat-panel-title');
+  const listEl   = document.getElementById('map-cat-panel-list');
+  if (!panel || !titleEl || !listEl) return;
+
+  const emoji = categoryToEmoji(category);
+  titleEl.textContent = emoji + '\u2009' + category;
+
+  const items = poiMarkers.filter(({ poi }) => poi.category === category);
+
+  listEl.innerHTML = items.length
+    ? items.map(({ poi, idx }) => `
+        <div class="map-cat-panel-item" onclick="panToPoiAndShowCard(${idx})">
+          <div class="map-cat-panel-icon">${categoryToEmoji(poi.category)}</div>
+          <div class="map-cat-panel-item-info">
+            <div class="map-cat-panel-item-name">${escHtml(poi.name)}</div>
+            <div class="map-cat-panel-item-meta">${[poi.dist, poi.visit].filter(Boolean).join(' \u00b7 ') || ''}</div>
+          </div>
+          <div class="map-cat-panel-item-arrow">\u203a</div>
+        </div>
+      `).join('')
+    : '<p style="padding:16px 24px;color:var(--text-muted);font-size:14px;">No places found.</p>';
+
+  requestAnimationFrame(() => panel.classList.add('visible'));
+}
+
+function closeMapCategoryPanel() {
+  const panel = document.getElementById('map-category-panel');
+  if (panel) panel.classList.remove('visible');
+}
+
+// Tap on a list item — pan map to marker, show mini-card
+function panToPoiAndShowCard(idx) {
+  closeMapCategoryPanel();
+  const entry = poiMarkers.find(m => m.idx === idx);
+  if (!entry) return;
+
+  if (cityMapObj && entry.poi.coords) {
+    cityMapObj.setView([entry.poi.coords.lat, entry.poi.coords.lng], 17, { animate: true });
+  }
+
+  // Small delay so pan completes before card appears
+  setTimeout(() => showPoiMiniCard(idx), 280);
 }
 
 function showPoiMiniCard(idx) {
@@ -371,6 +424,8 @@ function showPoiMiniCard(idx) {
   setText('poi-mini-name', poi.name);
   const meta = [poi.dist, poi.visit].filter(Boolean).join(' \u00b7 ');
   setText('poi-mini-info', meta);
+  // Ensure category panel is hidden so cards don't overlap
+  closeMapCategoryPanel();
   const el = document.getElementById('poi-mini-card');
   if (el) requestAnimationFrame(() => el.classList.add('visible'));
 }
