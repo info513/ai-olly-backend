@@ -3049,7 +3049,7 @@ app.post('/api/webhook/request-status', async (req, res) => {
     const hotelSlug  = pickFirstNonEmpty(req.body?.hotelSlug, req.body?.hotel_slug, '');
     const roomNumber = pickFirstNonEmpty(req.body?.room, req.body?.nazivSobe, '');
     const status     = pickFirstNonEmpty(req.body?.status, '');
-    const category   = pickFirstNonEmpty(req.body?.category, 'Request');
+    const category   = pickFirstNonEmpty(req.body?.category, req.body?.requestType, 'Request');
 
     // Verify webhook secret
     if (secret !== WEBHOOK_SECRET) {

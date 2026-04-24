@@ -1809,8 +1809,8 @@ async function submitConciergeForm(e) {
       // Show confirmation screen
       const bodyEl = document.getElementById('req-sent-body');
       if (bodyEl) {
-        const typeLabels = { taxi: 'taxi', boat: 'boat transfer', shuttle: 'airport shuttle', restaurant: 'table reservation' };
-        bodyEl.textContent = `Your ${typeLabels[type] || 'request'} has been sent to reception. We'll confirm shortly.`;
+        const typeLabels = { taxi: 'taxi', boat: 'boat transfer', shuttle: 'airport shuttle', restaurant: 'table reservation', wakeup: 'wake-up call' };
+        bodyEl.textContent = `Your ${typeLabels[type] ? typeLabels[type] + ' request' : 'request'} has been sent to reception. We'll confirm shortly.`;
       }
       pushScreen('request-sent');
     } else {
