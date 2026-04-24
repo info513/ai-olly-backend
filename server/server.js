@@ -2585,10 +2585,9 @@ app.post('/api/pwa-welcome', async (req, res) => {
 
     if (!roomNumber) return res.status(400).json({ ok: false, error: 'Missing room' });
 
-    const [hotelRec, roomGuide, allRooms] = await Promise.all([
+    const [hotelRec, roomGuide] = await Promise.all([
       getHotelRecord(hotelSlug),
       getRoomGuideRecord(hotelSlug, roomNumber),
-      getRoomsForHotelWeb(hotelSlug),
     ]);
 
     const storedToken = roomGuide?.accessToken ?? '';
@@ -2600,11 +2599,21 @@ app.post('/api/pwa-welcome', async (req, res) => {
     );
     if (!tokenValid) return res.status(403).json({ ok: false, error: 'Access denied' });
 
-    // Room type — look up in SOBE table by room number (primary source)
-    const roomRec  = (allRooms || []).find(r =>
-      String(r.naziv || '').trim() === String(roomNumber).trim()
-    );
-    const roomType = roomRec?.tipSobe || '';
+    // Room type — direct lookup in SOBE table, no AI_SOURCE filter
+    // (getRoomsForHotelWeb filters by allowForWeb which excludes rooms without WEB/BOTH flag)
+    let roomType = '';
+    try {
+      const slugEsc = escapeAirtableFormulaString(hotelSlug);
+      const roomEsc = escapeAirtableFormulaString(String(roomNumber));
+      const roomRecs = await airtableSelectAllSafe(TABLE_ROOMS, [
+        { pageSize: 5, filterByFormula: `AND({Hotel Slug (text)}='${slugEsc}', {Naziv sobe}='${roomEsc}')` },
+        { pageSize: 5, filterByFormula: `AND({Hotel Slug}='${slugEsc}', {Naziv sobe}='${roomEsc}')` },
+      ]);
+      if (roomRecs.length > 0) {
+        const f = roomRecs[0].fields || {};
+        roomType = pickFirstNonEmpty(f['Kategorija sobe'], f['Tip sobe'], f.Tip, '');
+      }
+    } catch (_) { /* silent — room type is optional */ }
 
     return res.json({
       ok:        true,
