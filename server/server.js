@@ -35,6 +35,7 @@ const {
   TABLE_ROUTES     = 'ROUTES',
   TABLE_PARTNERS   = 'PARTNERS',
   TABLE_EVENTS     = 'EVENTS',
+  TABLE_FEEDBACK   = 'FEEDBACK',
 
   // Push notifications (VAPID)
   VAPID_PUBLIC_KEY,
@@ -2674,10 +2675,11 @@ app.post('/api/pwa-welcome', async (req, res) => {
     } catch (_) { /* silent — room type is optional */ }
 
     return res.json({
-      ok:        true,
-      hotelName: hotelRec?.hotelNaziv ?? '',
+      ok:             true,
+      hotelName:      hotelRec?.hotelNaziv ?? '',
       roomType,
-      aiWelcome: roomGuide?.aiWelcome ?? '',
+      aiWelcome:      roomGuide?.aiWelcome ?? '',
+      googleReviewUrl: hotelRec?.googleReview ?? '',
     });
 
   } catch (e) {
@@ -3126,6 +3128,103 @@ app.post('/api/pwa-events', async (req, res) => {
     return res.json({ ok: true, events });
   } catch (e) {
     console.error('pwa-events error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// ── /api/pwa-feedback — save guest feedback after checkout ───────────────────
+//
+// Input:  { slug, room, token, overall, room_score, staff, location, cleanliness, comment }
+// Output: { ok, feedbackId }
+// -------------------------
+app.post('/api/pwa-feedback', async (req, res) => {
+  try {
+    const hotelSlug  = pickFirstNonEmpty(req.body?.slug, HOTEL_SLUG_DEFAULT);
+    const roomNumber = pickFirstNonEmpty(req.body?.room, '');
+    const token      = pickFirstNonEmpty(req.body?.token, '');
+
+    if (!roomNumber) return res.status(400).json({ ok: false, error: 'Missing room' });
+
+    // Token validation
+    const roomGuide   = await getRoomGuideRecord(hotelSlug, roomNumber);
+    const storedToken = roomGuide?.accessToken ?? '';
+    const tokenValid  = (
+      token.length > 0 && storedToken.length > 0 &&
+      token.length === storedToken.length &&
+      timingSafeEqual(Buffer.from(token), Buffer.from(storedToken))
+    );
+    if (!tokenValid) return res.status(403).json({ ok: false, error: 'Access denied' });
+
+    const toInt = v => { const n = parseInt(v, 10); return isNaN(n) ? null : Math.min(5, Math.max(1, n)); };
+
+    const fields = {
+      'HotelSlug': hotelSlug,
+      'Soba':      roomNumber,
+      'Datum':     new Date().toISOString().slice(0, 10),
+    };
+    const overall     = toInt(req.body?.overall);
+    const roomScore   = toInt(req.body?.room_score);
+    const staff       = toInt(req.body?.staff);
+    const location    = toInt(req.body?.location);
+    const cleanliness = toInt(req.body?.cleanliness);
+    const comment     = pickFirstNonEmpty(req.body?.comment, '');
+
+    if (overall     !== null) fields['Overall']      = overall;
+    if (roomScore   !== null) fields['Soba ocjena']  = roomScore;
+    if (staff       !== null) fields['Osoblje']      = staff;
+    if (location    !== null) fields['Lokacija']     = location;
+    if (cleanliness !== null) fields['Čistoća']      = cleanliness;
+    if (comment)              fields['Komentar']     = comment;
+
+    const created = await base(TABLE_FEEDBACK).create(fields);
+    return res.status(201).json({ ok: true, feedbackId: created.id });
+
+  } catch (e) {
+    console.error('pwa-feedback error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// ── /api/webhook/checkout — Airtable fires this when room Status → Checkout ──
+//
+// Input:  { secret, hotelSlug, room }
+// Action: sends push notification to guest → opens PWA feedback screen
+// -------------------------
+app.post('/api/webhook/checkout', async (req, res) => {
+  try {
+    const secret    = pickFirstNonEmpty(req.body?.secret, req.headers['x-webhook-secret'], '');
+    const hotelSlug = pickFirstNonEmpty(req.body?.hotelSlug, req.body?.hotel_slug, '');
+    const room      = pickFirstNonEmpty(req.body?.room, '');
+
+    if (secret !== WEBHOOK_SECRET) {
+      console.warn('[webhook/checkout] Invalid secret');
+      return res.status(403).json({ ok: false, error: 'Forbidden' });
+    }
+    if (!hotelSlug || !room) {
+      return res.status(400).json({ ok: false, error: 'Missing hotelSlug or room' });
+    }
+
+    const payload = JSON.stringify({
+      title: '🙏 Thank you for staying with us!',
+      body:  'We\'d love to hear about your experience. Tap to leave feedback.',
+      tag:   'checkout-feedback',
+      url:   '/pwa/?feedback=1',
+    });
+
+    const key          = `${hotelSlug}:${room}`;
+    const subscription = pushSubscriptions.get(key);
+
+    if (!subscription) {
+      console.warn(`[webhook/checkout] No push subscription for ${key}`);
+      return res.json({ ok: true, pushed: false, reason: 'No subscription on record' });
+    }
+
+    await webpush.sendNotification(subscription, payload);
+    console.log(`[webhook/checkout] Checkout push sent to ${key}`);
+    return res.json({ ok: true, pushed: true });
+
+  } catch (e) {
+    console.error('webhook/checkout error:', e);
     res.status(500).json({ ok: false, error: 'Server error' });
   }
 });

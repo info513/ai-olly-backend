@@ -869,6 +869,78 @@
     </div>
   </div>
 
+  <!-- ── Screen: Feedback ──────────────────────────────────────────────────── -->
+  <div id="screen-feedback" class="screen">
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title">Your Feedback</div>
+    </div>
+    <div class="screen-body">
+      <p class="fb-intro">We hope you enjoyed your stay at <strong>Hotel Antique Split</strong>. Your feedback helps us improve for every guest.</p>
+
+      <!-- Overall rating -->
+      <div class="fb-section">
+        <div class="fb-label">Overall stay</div>
+        <div class="fb-stars" id="fb-overall" data-key="overall">
+          <span class="fb-star" data-val="1">★</span><span class="fb-star" data-val="2">★</span><span class="fb-star" data-val="3">★</span><span class="fb-star" data-val="4">★</span><span class="fb-star" data-val="5">★</span>
+        </div>
+      </div>
+
+      <!-- Category ratings -->
+      <div class="fb-cats">
+        <div class="fb-cat">
+          <div class="fb-cat-label">Room</div>
+          <div class="fb-stars fb-stars--sm" id="fb-room" data-key="room_score">
+            <span class="fb-star" data-val="1">★</span><span class="fb-star" data-val="2">★</span><span class="fb-star" data-val="3">★</span><span class="fb-star" data-val="4">★</span><span class="fb-star" data-val="5">★</span>
+          </div>
+        </div>
+        <div class="fb-cat">
+          <div class="fb-cat-label">Staff</div>
+          <div class="fb-stars fb-stars--sm" id="fb-staff" data-key="staff">
+            <span class="fb-star" data-val="1">★</span><span class="fb-star" data-val="2">★</span><span class="fb-star" data-val="3">★</span><span class="fb-star" data-val="4">★</span><span class="fb-star" data-val="5">★</span>
+          </div>
+        </div>
+        <div class="fb-cat">
+          <div class="fb-cat-label">Location</div>
+          <div class="fb-stars fb-stars--sm" id="fb-location" data-key="location">
+            <span class="fb-star" data-val="1">★</span><span class="fb-star" data-val="2">★</span><span class="fb-star" data-val="3">★</span><span class="fb-star" data-val="4">★</span><span class="fb-star" data-val="5">★</span>
+          </div>
+        </div>
+        <div class="fb-cat">
+          <div class="fb-cat-label">Cleanliness</div>
+          <div class="fb-stars fb-stars--sm" id="fb-clean" data-key="cleanliness">
+            <span class="fb-star" data-val="1">★</span><span class="fb-star" data-val="2">★</span><span class="fb-star" data-val="3">★</span><span class="fb-star" data-val="4">★</span><span class="fb-star" data-val="5">★</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Comment -->
+      <div class="fb-section" style="margin-top:20px;">
+        <div class="fb-label">Any comments? <span style="font-weight:400;color:var(--text-muted)">(optional)</span></div>
+        <textarea id="fb-comment" class="form-input" rows="3" placeholder="Tell us about your stay…" style="resize:none;margin-top:8px;"></textarea>
+      </div>
+
+      <button class="action-btn action-btn--primary" style="margin-top:24px;width:100%;" onclick="submitFeedback()">
+        Send Feedback
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Screen: Feedback Thank You ────────────────────────────────────────── -->
+  <div id="screen-feedback-done" class="screen">
+    <div class="screen-body screen-body--centered">
+      <div class="req-sent-icon">🙏</div>
+      <h2 class="req-sent-title">Thank You!</h2>
+      <p class="req-sent-body">Your feedback means a lot to us. We hope to welcome you back to Split soon.</p>
+      <a id="fb-google-btn" class="action-btn action-btn--primary fb-google-btn" href="#" target="_blank" rel="noopener" style="margin-top:28px;display:block;text-align:center;text-decoration:none;">
+        ★ Leave a Google Review
+      </a>
+      <button class="action-btn" style="margin-top:12px;width:100%;" onclick="gotoRoot('home')">
+        Back to Home
+      </button>
+    </div>
+  </div>
+
   <!-- ── Bottom Navigation ──────────────────────────────────────────────── -->
   <nav id="bottom-nav" class="bottom-nav" hidden>
     <button class="bottom-nav-item" data-screen="home" onclick="gotoRoot('home')">

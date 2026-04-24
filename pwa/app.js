@@ -9,6 +9,8 @@ const ROOM   = params.get('room')  || '';
 const TOKEN  = params.get('token') || '';
 
 // ── Module state ──────────────────────────────────────────────────────────
+let GOOGLE_REVIEW_URL = ''; // set from /api/pwa-welcome response
+let feedbackRatings   = {}; // { overall, room_score, staff, location, cleanliness }
 let roomGuideData    = null;
 let servicesData     = null;
 let servicesScrollY  = 0;    // saved scroll position for services list
@@ -91,6 +93,7 @@ function _activateScreen(name, direction = 'forward') {
     if (!eventsData) loadEvents();
     else renderEventsList();
   }
+  if (name === 'feedback') _activateFeedbackScreen();
 }
 
 function pushScreen(name) {
@@ -1256,6 +1259,10 @@ async function fetchWelcomeData() {
       setText('wh-room-type', data.roomType);
       show('wh-sep');
     }
+    // Store Google Review URL for feedback screen
+    if (data.googleReviewUrl) {
+      GOOGLE_REVIEW_URL = data.googleReviewUrl;
+    }
   } catch (_) {
     // Silent fallback
   }
@@ -1523,6 +1530,12 @@ function boot() {
 
   // Register push notifications (non-blocking)
   registerPush();
+
+  // If opened from checkout push notification, go straight to feedback
+  if (params.get('feedback') === '1' && ROOM && TOKEN) {
+    // Give boot a tick to finish rendering, then open feedback
+    setTimeout(() => pushScreen('feedback'), 300);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', boot);
@@ -1903,5 +1916,76 @@ async function registerPush() {
   } catch (e) {
     // User denied or browser doesn't support — silent fail
     console.info('[push] Not subscribed:', e.message);
+  }
+}
+
+// ── Feedback ──────────────────────────────────────────────────────────────
+
+function _initFeedbackStars() {
+  feedbackRatings = {};
+  document.querySelectorAll('.fb-stars').forEach(group => {
+    const key   = group.dataset.key;
+    const stars = group.querySelectorAll('.fb-star');
+    stars.forEach(star => {
+      star.classList.remove('fb-star--on');
+      star.onclick = () => {
+        const val = parseInt(star.dataset.val, 10);
+        feedbackRatings[key] = val;
+        stars.forEach(s => s.classList.toggle('fb-star--on', parseInt(s.dataset.val, 10) <= val));
+      };
+    });
+  });
+}
+
+function _activateFeedbackScreen() {
+  _initFeedbackStars();
+  const commentEl = document.getElementById('fb-comment');
+  if (commentEl) commentEl.value = '';
+}
+
+async function submitFeedback() {
+  const overall = feedbackRatings['overall'];
+  if (!overall) {
+    alert('Please rate your overall stay before submitting.');
+    return;
+  }
+
+  const btn = document.querySelector('#screen-feedback .action-btn--primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+
+  try {
+    const r = await fetch('/api/pwa-feedback', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slug:         SLUG || 'antique-split',
+        room:         ROOM,
+        token:        TOKEN,
+        overall:      feedbackRatings['overall']      || null,
+        room_score:   feedbackRatings['room_score']   || null,
+        staff:        feedbackRatings['staff']        || null,
+        location:     feedbackRatings['location']     || null,
+        cleanliness:  feedbackRatings['cleanliness']  || null,
+        comment:      document.getElementById('fb-comment')?.value || '',
+      }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      // Set Google Review link
+      const googleBtn = document.getElementById('fb-google-btn');
+      if (googleBtn && GOOGLE_REVIEW_URL) {
+        googleBtn.href = GOOGLE_REVIEW_URL;
+        googleBtn.hidden = false;
+      } else if (googleBtn) {
+        googleBtn.hidden = true;
+      }
+      pushScreen('feedback-done');
+    } else {
+      alert('Could not send feedback. Please try again.');
+    }
+  } catch (_) {
+    alert('Network error. Please try again.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send Feedback'; }
   }
 }
