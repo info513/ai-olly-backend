@@ -44,6 +44,42 @@
 
   </div>
 
+  <!-- ── Screen: Permissions ───────────────────────────────────────────── -->
+  <div id="screen-permissions" class="screen screen--permissions">
+
+    <div class="perm-wrap">
+      <div class="perm-logo">✦</div>
+      <h2 class="perm-title">Better with your permission</h2>
+      <p class="perm-intro">To give you the best experience, we'd like to use two features on your device.</p>
+
+      <div class="perm-cards">
+
+        <div class="perm-card" id="perm-card-location">
+          <div class="perm-card-icon">📍</div>
+          <div class="perm-card-body">
+            <div class="perm-card-name">Location</div>
+            <div class="perm-card-desc">Shows nearby restaurants, sights and shops sorted by distance from where you are.</div>
+          </div>
+          <div class="perm-card-status" id="perm-loc-status"></div>
+        </div>
+
+        <div class="perm-card" id="perm-card-notif">
+          <div class="perm-card-icon">🔔</div>
+          <div class="perm-card-body">
+            <div class="perm-card-name">Notifications</div>
+            <div class="perm-card-desc">Receive updates when your concierge requests are ready and get hotel news during your stay.</div>
+          </div>
+          <div class="perm-card-status" id="perm-notif-status"></div>
+        </div>
+
+      </div>
+
+      <button class="perm-allow-btn" onclick="grantPermissions()">Allow &amp; Continue</button>
+      <button class="perm-skip-btn"  onclick="skipPermissions()">Maybe later</button>
+    </div>
+
+  </div>
+
   <!-- ── Screen: Home Dashboard ─────────────────────────────────────────── -->
   <div id="screen-home" class="screen screen--root">
 

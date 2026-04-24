@@ -1478,6 +1478,54 @@ async function fetchSplitTemperature() {
 }
 
 function enterApp() {
+  // If we've already asked for permissions this session (or ever), skip the screen
+  const alreadyAsked = localStorage.getItem('perm-asked');
+  if (alreadyAsked) {
+    gotoRoot('home');
+    return;
+  }
+  // Show the friendly permissions screen
+  _activateScreen('permissions');
+}
+
+async function grantPermissions() {
+  localStorage.setItem('perm-asked', '1');
+
+  // ── Location ──────────────────────────────────────────────────────────
+  const locStatus = document.getElementById('perm-loc-status');
+  if ('geolocation' in navigator) {
+    try {
+      await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 })
+      );
+      if (locStatus) locStatus.textContent = '✓';
+    } catch (_) {
+      if (locStatus) locStatus.textContent = '—';
+    }
+  } else {
+    if (locStatus) locStatus.textContent = '—';
+  }
+
+  // ── Notifications ─────────────────────────────────────────────────────
+  const notifStatus = document.getElementById('perm-notif-status');
+  if ('Notification' in window) {
+    try {
+      const result = await Notification.requestPermission();
+      if (notifStatus) notifStatus.textContent = result === 'granted' ? '✓' : '—';
+      if (result === 'granted') registerPush();
+    } catch (_) {
+      if (notifStatus) notifStatus.textContent = '—';
+    }
+  } else {
+    if (notifStatus) notifStatus.textContent = '—';
+  }
+
+  // Small delay so user sees the ✓ ticks before transitioning
+  setTimeout(() => gotoRoot('home'), 700);
+}
+
+function skipPermissions() {
+  localStorage.setItem('perm-asked', '1');
   gotoRoot('home');
 }
 
@@ -1528,8 +1576,8 @@ function boot() {
     loadEvents();
   }
 
-  // Register push notifications (non-blocking)
-  registerPush();
+  // Register push notifications if permission already granted (returning guest)
+  if (Notification?.permission === 'granted') registerPush();
 
   // If opened from checkout push notification, go straight to feedback
   if (params.get('feedback') === '1' && ROOM && TOKEN) {

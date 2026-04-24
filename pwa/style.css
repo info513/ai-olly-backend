@@ -191,6 +191,137 @@ html, body {
   box-shadow: 0 2px 12px rgba(0,0,0,0.25);
 }
 
+/* ── Permissions screen ──────────────────────────────────────────────────── */
+
+.screen--permissions {
+  background: linear-gradient(155deg, #3e2a1a 0%, #2c1f14 60%, #1a1208 100%);
+  align-items: center;
+  justify-content: center;
+  padding: 0 28px;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
+  min-height: 100dvh;
+}
+
+.perm-wrap {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.perm-logo {
+  font-size: 30px;
+  color: var(--gold);
+  opacity: 0.9;
+}
+
+.perm-title {
+  font-family: var(--font-serif);
+  font-size: 30px;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.perm-intro {
+  font-size: 14px;
+  color: rgba(255,255,255,0.55);
+  text-align: center;
+  line-height: 1.55;
+  max-width: 300px;
+}
+
+.perm-cards {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.perm-card {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.perm-card-icon {
+  font-size: 26px;
+  line-height: 1;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.perm-card-body {
+  flex: 1;
+}
+
+.perm-card-name {
+  font-weight: 700;
+  font-size: 15px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.perm-card-desc {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  line-height: 1.45;
+}
+
+.perm-card-status {
+  font-size: 18px;
+  font-weight: 700;
+  color: #6bcf7f;
+  align-self: center;
+  min-width: 24px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.perm-allow-btn {
+  width: 100%;
+  background: #fff;
+  color: var(--accent);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 17px 32px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s, box-shadow 0.15s;
+  margin-top: 6px;
+}
+
+.perm-allow-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+}
+
+.perm-skip-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.38);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+  -webkit-tap-highlight-color: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* ── Welcome header (home screen) ────────────────────────────────────────── */
 
 .welcome-header {
