@@ -98,7 +98,6 @@ html, body {
 
 .screen--splash {
   background: linear-gradient(155deg, #3e2a1a 0%, #2c1f14 60%, #1a1208 100%);
-  display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
