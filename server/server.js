@@ -677,8 +677,8 @@ function mapRoomRecord(r) {
   return {
     type: 'ROOM',
     id: r.id,
-    naziv: pickFirstNonEmpty(f['Soba oznaka'], f.Naziv, f.Name),
-    tipSobe: pickFirstNonEmpty(f['Tip sobe'], f.Tip, f.tip),
+    naziv: pickFirstNonEmpty(f['Naziv sobe'], f['Soba oznaka'], f.Naziv, f.Name),
+    tipSobe: pickFirstNonEmpty(f['Kategorija sobe'], f['Tip sobe'], f.Tip, f.tip),
     slug: pickFirstNonEmpty(f.Slug, f.slug),
     opis: pickFirstNonEmpty(f['Opis sobe'], f.Opis, f.opis),
 
@@ -2585,9 +2585,10 @@ app.post('/api/pwa-welcome', async (req, res) => {
 
     if (!roomNumber) return res.status(400).json({ ok: false, error: 'Missing room' });
 
-    const [hotelRec, roomGuide] = await Promise.all([
+    const [hotelRec, roomGuide, allRooms] = await Promise.all([
       getHotelRecord(hotelSlug),
       getRoomGuideRecord(hotelSlug, roomNumber),
+      getRoomsForHotelWeb(hotelSlug),
     ]);
 
     const storedToken = roomGuide?.accessToken ?? '';
@@ -2599,10 +2600,16 @@ app.post('/api/pwa-welcome', async (req, res) => {
     );
     if (!tokenValid) return res.status(403).json({ ok: false, error: 'Access denied' });
 
+    // Room type — look up in SOBE table by room number (primary source)
+    const roomRec  = (allRooms || []).find(r =>
+      String(r.naziv || '').trim() === String(roomNumber).trim()
+    );
+    const roomType = roomRec?.tipSobe || '';
+
     return res.json({
       ok:        true,
       hotelName: hotelRec?.hotelNaziv ?? '',
-      roomType:  roomGuide?.tipSobe   ?? '',
+      roomType,
       aiWelcome: roomGuide?.aiWelcome ?? '',
     });
 
