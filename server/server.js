@@ -756,6 +756,23 @@ async function getRoomsForHotelWeb(hotelSlug) {
   return webRows;
 }
 
+// Fetch ALL rooms for a hotel without any AI_SOURCE filter — for room type lookup
+async function getRoomsRaw(hotelSlug) {
+  const cacheKey = 'raw:' + hotelSlug;
+  const cached   = CACHE.roomsByHotel.get(cacheKey);
+  if (cached && cacheFresh(cached.ts) && Array.isArray(cached.rows)) return cached.rows;
+
+  const slugEsc = escapeAirtableFormulaString(hotelSlug);
+  const recs    = await airtableSelectAllSafe(TABLE_ROOMS, [
+    { pageSize: 100, filterByFormula: `{Hotel Slug (text)}='${slugEsc}'` },
+    { pageSize: 100, filterByFormula: `{Hotel Slug}='${slugEsc}'`        },
+  ]);
+
+  const rows = recs.map(mapRoomRecord);
+  if (rows.length > 0) CACHE.roomsByHotel.set(cacheKey, { ts: Date.now(), rows });
+  return rows;
+}
+
 // -------------------------
 // PWA: SERVICES loader — AI_SOURCE=PWA or BOTH
 // -------------------------
@@ -2599,20 +2616,14 @@ app.post('/api/pwa-welcome', async (req, res) => {
     );
     if (!tokenValid) return res.status(403).json({ ok: false, error: 'Access denied' });
 
-    // Room type — direct lookup in SOBE table, no AI_SOURCE filter
-    // (getRoomsForHotelWeb filters by allowForWeb which excludes rooms without WEB/BOTH flag)
+    // Room type — fetch all rooms for hotel (no AI_SOURCE filter), find by number in JS
     let roomType = '';
     try {
-      const slugEsc = escapeAirtableFormulaString(hotelSlug);
-      const roomEsc = escapeAirtableFormulaString(String(roomNumber));
-      const roomRecs = await airtableSelectAllSafe(TABLE_ROOMS, [
-        { pageSize: 5, filterByFormula: `AND({Hotel Slug (text)}='${slugEsc}', {Naziv sobe}='${roomEsc}')` },
-        { pageSize: 5, filterByFormula: `AND({Hotel Slug}='${slugEsc}', {Naziv sobe}='${roomEsc}')` },
-      ]);
-      if (roomRecs.length > 0) {
-        const f = roomRecs[0].fields || {};
-        roomType = pickFirstNonEmpty(f['Kategorija sobe'], f['Tip sobe'], f.Tip, '');
-      }
+      const allRoomsRaw = await getRoomsRaw(hotelSlug);
+      const roomRec     = allRoomsRaw.find(r =>
+        String(r.naziv || '').trim() === String(roomNumber).trim()
+      );
+      roomType = roomRec?.tipSobe || '';
     } catch (_) { /* silent — room type is optional */ }
 
     return res.json({
