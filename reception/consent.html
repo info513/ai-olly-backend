@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Privola gosta — Hotel Antique Split</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #f7f4ef;
+      --surface:  #ffffff;
+      --border:   #e8e2d6;
+      --text:     #1a1714;
+      --muted:    #6a6258;
+      --accent:   #2c1f14;
+      --gold:     #9e7228;
+      --radius:   16px;
+      --radius-sm: 10px;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────── */
+    .page {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-star {
+      font-size: 28px;
+      color: var(--gold);
+    }
+    .header-text h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.01em;
+    }
+    .header-text p {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ── Section card ───────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--gold);
+      margin-bottom: 18px;
+    }
+
+    /* ── Form fields ────────────────────────────────────────────── */
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .field-row.full { grid-template-columns: 1fr; }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .field label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .field input {
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 11px 14px;
+      font-size: 15px;
+      color: var(--text);
+      background: var(--bg);
+      outline: none;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    .field input:focus {
+      border-color: var(--accent);
+      background: #fff;
+    }
+    .field input.prefilled {
+      background: #f2ece0;
+      color: var(--muted);
+    }
+
+    /* ── Checkboxes ─────────────────────────────────────────────── */
+    .consent-items {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .consent-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .consent-item.required {
+      background: #faf7f2;
+    }
+    .consent-item.checked {
+      border-color: var(--accent);
+      background: #f2ece0;
+    }
+    .consent-item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      accent-color: var(--accent);
+      cursor: pointer;
+      margin-top: 2px;
+    }
+    .consent-item-body {}
+    .consent-item-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 3px;
+    }
+    .consent-item-desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .badge-required {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 4px;
+      padding: 1px 6px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    /* ── Signature pad ──────────────────────────────────────────── */
+    .sig-wrap {
+      position: relative;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: #fff;
+      touch-action: none;
+    }
+    .sig-wrap.has-sig {
+      border-color: var(--accent);
+    }
+    #sig-canvas {
+      display: block;
+      width: 100%;
+      height: 180px;
+      cursor: crosshair;
+      touch-action: none;
+    }
+    .sig-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #c5bdb0;
+      font-size: 14px;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .sig-placeholder.hidden { opacity: 0; }
+    .sig-actions {
+      display: flex;
+      justify-content: flex-end;
+      padding: 8px 10px;
+      border-top: 1px solid var(--border);
+    }
+    .btn-clear {
+      background: none;
+      border: none;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-clear:hover { color: var(--text); }
+
+    /* ── Submit ─────────────────────────────────────────────────── */
+    .submit-wrap {
+      margin-top: 8px;
+    }
+    .btn-submit {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 100px;
+      padding: 18px 32px;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    .btn-submit:active { transform: scale(0.98); opacity: 0.9; }
+    .btn-submit:disabled { opacity: 0.4; cursor: default; }
+
+    /* ── Status messages ────────────────────────────────────────── */
+    .msg {
+      padding: 14px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .msg.show { display: block; }
+    .msg-error { background: #fde8e8; color: #b00; }
+    .msg-success { background: #e8f5e9; color: #2e7d32; }
+
+    /* ── Done screen ─────────────────────────────────────────────── */
+    #screen-done {
+      display: none;
+      text-align: center;
+      padding: 60px 24px;
+    }
+    #screen-done.show { display: block; }
+    .done-icon { font-size: 64px; margin-bottom: 20px; }
+    .done-title { font-size: 26px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+    .done-sub { font-size: 15px; color: var(--muted); margin-bottom: 32px; }
+    .done-details {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      text-align: left;
+      max-width: 360px;
+      margin: 0 auto 32px;
+      font-size: 14px;
+    }
+    .done-details p { margin-bottom: 6px; }
+    .done-details p:last-child { margin-bottom: 0; }
+    .done-details strong { color: var(--text); }
+    .btn-new {
+      background: none;
+      border: 2px solid var(--accent);
+      border-radius: 100px;
+      padding: 13px 32px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    @media (max-width: 480px) {
+      .field-row { grid-template-columns: 1fr; }
+      #sig-canvas { height: 160px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page" id="screen-form">
+
+  <div class="header">
+    <div class="header-star">✦</div>
+    <div class="header-text">
+      <h1>Hotel Antique Split</h1>
+      <p>Privola za obradu osobnih podataka</p>
+    </div>
+  </div>
+
+  <div id="msg-error" class="msg msg-error"></div>
+
+  <!-- ── Podaci gosta ─────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">Podaci gosta</div>
+    <div class="field-row" style="margin-bottom:14px;">
+      <div class="field">
+        <label>Soba</label>
+        <input type="text" id="f-room" placeholder="npr. 101" class="prefilled" readonly>
+      </div>
+      <div class="field">
+        <label>Ime i prezime</label>
+        <input type="text" id="f-name" placeholder="Unesite ime gosta" autocomplete="off">
+      </div>
+    </div>
+    <div class="field-row full">
+      <div class="field">
+        <label>Email adresa</label>
+        <input type="email" id="f-email" placeholder="gost@email.com" autocomplete="off">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Privole ───────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">Privola</div>
+    <div class="consent-items">
+
+      <label class="consent-item required" id="item-gdpr">
+        <input type="checkbox" id="cb-gdpr">
+        <div class="consent-item-body">
+          <div class="consent-item-title">
+            Obrada osobnih podataka
+            <span class="badge-required">Obvezno</span>
+          </div>
+          <div class="consent-item-desc">
+            Suglasan/na sam da Hotel Antique Split obrađuje moje osobne podatke (ime, email, podaci o boravku) u svrhu pružanja usluga smještaja i ispunjavanja zakonskih obveza, sukladno GDPR uredbi (EU) 2016/679.
+          </div>
+        </div>
+      </label>
+
+      <label class="consent-item" id="item-marketing">
+        <input type="checkbox" id="cb-marketing">
+        <div class="consent-item-body">
+          <div class="consent-item-title">Marketinška komunikacija</div>
+          <div class="consent-item-desc">
+            Pristajem primati personalizirane ponude, promocije i obavijesti hotela putem emaila ili SMS-a. Privolu mogu opozvati u bilo kojem trenutku.
+          </div>
+        </div>
+      </label>
+
+      <label class="consent-item" id="item-newsletter">
+        <input type="checkbox" id="cb-newsletter">
+        <div class="consent-item-body">
+          <div class="consent-item-title">Newsletter</div>
+          <div class="consent-item-desc">
+            Pristajem na primanje hotelskog newslettera s vijestima, ponudama i novostima. Odjava je moguća u svakom trenutku putem linka u emailu.
+          </div>
+        </div>
+      </label>
+
+    </div>
+  </div>
+
+  <!-- ── Potpis ─────────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">Potpis gosta</div>
+    <div class="sig-wrap" id="sig-wrap">
+      <canvas id="sig-canvas"></canvas>
+      <div class="sig-placeholder" id="sig-placeholder">Potpišite se ovdje</div>
+    </div>
+    <div class="sig-actions">
+      <button class="btn-clear" onclick="clearSignature()">✕ Obriši potpis</button>
+    </div>
+  </div>
+
+  <!-- ── Submit ─────────────────────────────────────────────────── -->
+  <div class="submit-wrap">
+    <button class="btn-submit" id="btn-submit" onclick="submitConsent()">
+      Potvrdi i spremi privolu
+    </button>
+  </div>
+
+</div><!-- /screen-form -->
+
+<!-- ── Done ───────────────────────────────────────────────────── -->
+<div id="screen-done">
+  <div class="done-icon">✅</div>
+  <div class="done-title">Privola zabilježena</div>
+  <div class="done-sub">Podaci su uspješno pohranjeni.</div>
+  <div class="done-details" id="done-details"></div>
+  <button class="btn-new" onclick="resetForm()">Nova privola</button>
+</div>
+
+<script>
+// ── URL params ────────────────────────────────────────────────
+const params    = new URLSearchParams(window.location.search);
+const ROOM      = params.get('room')   || '';
+const SLUG      = params.get('slug')   || 'antique-split';
+const SECRET    = params.get('secret') || '';
+
+// ── Pre-fill room ─────────────────────────────────────────────
+document.getElementById('f-room').value = ROOM;
+
+// ── Checkbox visual toggle ────────────────────────────────────
+['gdpr', 'marketing', 'newsletter'].forEach(key => {
+  const cb   = document.getElementById('cb-' + key);
+  const item = document.getElementById('item-' + key);
+  cb.addEventListener('change', () => {
+    item.classList.toggle('checked', cb.checked);
+  });
+});
+
+// ── Signature pad ─────────────────────────────────────────────
+const canvas      = document.getElementById('sig-canvas');
+const ctx         = canvas.getContext('2d');
+const sigWrap     = document.getElementById('sig-wrap');
+const placeholder = document.getElementById('sig-placeholder');
+let drawing = false;
+let hasSig  = false;
+
+function resizeCanvas() {
+  const ratio = window.devicePixelRatio || 1;
+  const rect  = canvas.getBoundingClientRect();
+  canvas.width  = rect.width  * ratio;
+  canvas.height = rect.height * ratio;
+  ctx.scale(ratio, ratio);
+  ctx.strokeStyle = '#1a1714';
+  ctx.lineWidth   = 2.2;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+}
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const src  = e.touches ? e.touches[0] : e;
+  return {
+    x: src.clientX - rect.left,
+    y: src.clientY - rect.top,
+  };
+}
+
+function startDraw(e) {
+  e.preventDefault();
+  drawing = true;
+  const p = getPos(e);
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+}
+
+function draw(e) {
+  if (!drawing) return;
+  e.preventDefault();
+  const p = getPos(e);
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+  if (!hasSig) {
+    hasSig = true;
+    placeholder.classList.add('hidden');
+    sigWrap.classList.add('has-sig');
+  }
+}
+
+function endDraw(e) { drawing = false; }
+
+canvas.addEventListener('mousedown',  startDraw);
+canvas.addEventListener('mousemove',  draw);
+canvas.addEventListener('mouseup',    endDraw);
+canvas.addEventListener('mouseleave', endDraw);
+canvas.addEventListener('touchstart', startDraw, { passive: false });
+canvas.addEventListener('touchmove',  draw,      { passive: false });
+canvas.addEventListener('touchend',   endDraw);
+
+function clearSignature() {
+  const ratio = window.devicePixelRatio || 1;
+  ctx.clearRect(0, 0, canvas.width / ratio, canvas.height / ratio);
+  hasSig = false;
+  placeholder.classList.remove('hidden');
+  sigWrap.classList.remove('has-sig');
+}
+
+// Init canvas size after layout
+window.addEventListener('load', () => {
+  resizeCanvas();
+});
+window.addEventListener('resize', resizeCanvas);
+
+// ── Helpers ───────────────────────────────────────────────────
+function showError(msg) {
+  const el = document.getElementById('msg-error');
+  el.textContent = msg;
+  el.classList.add('show');
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function hideError() {
+  document.getElementById('msg-error').classList.remove('show');
+}
+
+// ── Submit ────────────────────────────────────────────────────
+async function submitConsent() {
+  hideError();
+
+  const room      = document.getElementById('f-room').value.trim();
+  const name      = document.getElementById('f-name').value.trim();
+  const email     = document.getElementById('f-email').value.trim();
+  const gdpr      = document.getElementById('cb-gdpr').checked;
+  const marketing = document.getElementById('cb-marketing').checked;
+  const newsletter= document.getElementById('cb-newsletter').checked;
+
+  // Validation
+  if (!room)  return showError('Soba je obavezna.');
+  if (!name)  return showError('Unesite ime i prezime gosta.');
+  if (!gdpr)  return showError('GDPR privola je obavezna za nastavak.');
+  if (!hasSig) return showError('Gost mora potpisati privolu.');
+
+  // Get signature as PNG (full resolution)
+  const sigDataUrl = canvas.toDataURL('image/png');
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled   = true;
+  btn.textContent = 'Spremanje...';
+
+  try {
+    const resp = await fetch('/api/reception/save-consent', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        secret: SECRET,
+        slug:   SLUG,
+        room, name, email,
+        gdpr, marketing, newsletter,
+        signature: sigDataUrl,
+      }),
+    });
+
+    const data = await resp.json();
+
+    if (!data.ok) {
+      showError(data.error || 'Greška pri spremanju. Pokušajte ponovo.');
+      btn.disabled    = false;
+      btn.textContent = 'Potvrdi i spremi privolu';
+      return;
+    }
+
+    // Show done screen
+    document.getElementById('screen-form').style.display = 'none';
+    const done = document.getElementById('screen-done');
+    done.classList.add('show');
+
+    document.getElementById('done-details').innerHTML = `
+      <p><strong>Gost:</strong> ${escHtml(name)}</p>
+      <p><strong>Email:</strong> ${escHtml(email || '—')}</p>
+      <p><strong>Soba:</strong> ${escHtml(room)}</p>
+      <p><strong>GDPR:</strong> ✅</p>
+      <p><strong>Marketing:</strong> ${marketing ? '✅' : '—'}</p>
+      <p><strong>Newsletter:</strong> ${newsletter ? '✅' : '—'}</p>
+      <p><strong>Datum:</strong> ${new Date().toLocaleString('hr-HR')}</p>
+    `;
+
+  } catch (e) {
+    showError('Greška pri spajanju na server. Provjerite internet vezu.');
+    btn.disabled    = false;
+    btn.textContent = 'Potvrdi i spremi privolu';
+  }
+}
+
+function resetForm() {
+  document.getElementById('screen-form').style.display = '';
+  document.getElementById('screen-done').classList.remove('show');
+  document.getElementById('f-name').value  = '';
+  document.getElementById('f-email').value = '';
+  ['gdpr','marketing','newsletter'].forEach(k => {
+    document.getElementById('cb-' + k).checked = false;
+    document.getElementById('item-' + k).classList.remove('checked');
+  });
+  clearSignature();
+  hideError();
+  const btn = document.getElementById('btn-submit');
+  btn.disabled    = false;
+  btn.textContent = 'Potvrdi i spremi privolu';
+  window.scrollTo(0, 0);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

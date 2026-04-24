@@ -38,6 +38,7 @@ const {
   TABLE_FEEDBACK        = 'FEEDBACK',
   TABLE_PUSH_SUBS       = 'PUSH_SUBSCRIPTIONS',
   TABLE_NOVOSTI         = 'NOVOSTI',
+  TABLE_PRIVOLE         = 'PRIVOLE',
 
   // Push notifications (VAPID)
   VAPID_PUBLIC_KEY,
@@ -149,8 +150,9 @@ app.use((err, req, res, next) => {
   return next(err);
 });
 
-app.use(express.json({ limit: '1mb' }));
-app.use('/pwa', express.static('pwa'));
+app.use(express.json({ limit: '4mb' }));  // 4mb for signature PNG base64
+app.use('/pwa',       express.static('pwa'));
+app.use('/reception', express.static('reception'));
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
@@ -3350,6 +3352,105 @@ app.post('/api/webhook/novosti', async (req, res) => {
     return res.json({ ok: true, sent, failed, total: hotelEntries.length });
   } catch (e) {
     console.error('webhook/novosti error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// ── /api/reception/save-consent — save guest GDPR consent + signature ─────────
+//
+// Input:  { secret, slug, room, name, email, gdpr, marketing, newsletter, signature }
+//         signature = data:image/png;base64,...
+// Action: creates PRIVOLE record, uploads PNG as Airtable attachment
+// -------------------------
+app.post('/api/reception/save-consent', async (req, res) => {
+  try {
+    const {
+      secret     = '',
+      slug       = HOTEL_SLUG_DEFAULT,
+      room       = '',
+      name       = '',
+      email      = '',
+      gdpr       = false,
+      marketing  = false,
+      newsletter = false,
+      signature  = '',
+    } = req.body || {};
+
+    // Auth — re-use WEBHOOK_SECRET for reception
+    if (secret !== WEBHOOK_SECRET) {
+      console.warn('[reception] Invalid secret');
+      return res.status(403).json({ ok: false, error: 'Forbidden' });
+    }
+
+    if (!room || !name || !gdpr) {
+      return res.status(400).json({ ok: false, error: 'Missing required fields' });
+    }
+
+    // 1. Create PRIVOLE record (without attachment first)
+    const record = await base(TABLE_PRIVOLE).create({
+      'Ime gosta':  name,
+      'Email':      email || '',
+      'Soba':       room,
+      'HotelSlug':  slug,
+      'GDPR':       !!gdpr,
+      'Marketing':  !!marketing,
+      'Newsletter': !!newsletter,
+      'Datum':      new Date().toISOString(),
+    });
+
+    const recordId = record.id;
+
+    // 2. Upload signature PNG as Airtable attachment
+    if (signature && signature.startsWith('data:image/png;base64,')) {
+      try {
+        const base64Data = signature.replace('data:image/png;base64,', '');
+        const pngBuffer  = Buffer.from(base64Data, 'base64');
+        const filename   = `sig_${slug}_${room}_${Date.now()}.png`;
+
+        // Airtable Content API — direct file upload
+        const boundary = '----FormBoundary' + Math.random().toString(36).slice(2);
+        const nl = '\r\n';
+        const header =
+          `--${boundary}${nl}` +
+          `Content-Disposition: form-data; name="file"; filename="${filename}"${nl}` +
+          `Content-Type: image/png${nl}${nl}`;
+        const footer = `${nl}--${boundary}--${nl}`;
+
+        const headerBuf = Buffer.from(header, 'utf8');
+        const footerBuf = Buffer.from(footer, 'utf8');
+        const body = Buffer.concat([headerBuf, pngBuffer, footerBuf]);
+
+        const uploadResp = await fetch(
+          `https://content.airtable.com/v0/${AIRTABLE_BASE_ID}/${recordId}/uploadAttachment/Potpis`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization':  `Bearer ${AIRTABLE_API_KEY}`,
+              'Content-Type':   `multipart/form-data; boundary=${boundary}`,
+              'Content-Length': String(body.length),
+            },
+            body,
+          }
+        );
+
+        if (!uploadResp.ok) {
+          const errText = await uploadResp.text();
+          console.warn('[reception] Attachment upload failed:', uploadResp.status, errText);
+          // Non-fatal — record is already saved, just without attachment
+        } else {
+          console.log(`[reception] Signature uploaded for ${slug}:${room} (record ${recordId})`);
+        }
+      } catch (e) {
+        console.warn('[reception] Signature upload error:', e.message);
+        // Non-fatal
+      }
+    }
+
+    console.log(`[reception] Consent saved: ${slug}:${room} — ${name} | GDPR=${gdpr} mkt=${marketing} nl=${newsletter}`);
+    return res.json({ ok: true, recordId });
+
+  } catch (e) {
+    console.error('reception/save-consent error:', e);
     res.status(500).json({ ok: false, error: 'Server error' });
   }
 });
