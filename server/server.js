@@ -34,6 +34,7 @@ const {
   TABLE_POI        = 'POI',
   TABLE_ROUTES     = 'ROUTES',
   TABLE_PARTNERS   = 'PARTNERS',
+  TABLE_EVENTS     = 'EVENTS',
 
   // Push notifications (VAPID)
   VAPID_PUBLIC_KEY,
@@ -3090,6 +3091,39 @@ app.post('/api/webhook/request-status', async (req, res) => {
     return res.json({ ok: true, pushed: true });
   } catch (e) {
     console.error('webhook/request-status error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// -------------------------
+// /api/pwa-events — return upcoming local events for a hotel
+//
+// Input:  { slug }
+// Output: { ok, events: [{ id, name, date, description, link }] }
+// -------------------------
+app.post('/api/pwa-events', async (req, res) => {
+  try {
+    const hotelSlug = pickFirstNonEmpty(req.body?.slug, req.query?.slug, HOTEL_SLUG_DEFAULT);
+    const slugEsc   = escapeAirtableFormulaString(hotelSlug);
+    const today     = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+    const recs = await airtableSelectAll(TABLE_EVENTS, {
+      filterByFormula: `AND({HotelSlug}="${slugEsc}", {Aktivan}=TRUE(), {Datum}>="${today}")`,
+      sort: [{ field: 'Datum', direction: 'asc' }],
+      pageSize: 50,
+    });
+
+    const events = recs.map(r => ({
+      id:          r.id,
+      name:        r.fields['Naziv']     || '',
+      date:        r.fields['Datum']     || '',
+      description: r.fields['Opis']      || '',
+      link:        r.fields['Link']      || '',
+    }));
+
+    return res.json({ ok: true, events });
+  } catch (e) {
+    console.error('pwa-events error:', e);
     res.status(500).json({ ok: false, error: 'Server error' });
   }
 });

@@ -107,7 +107,41 @@
           <span class="guide-card-label">Concierge</span>
         </div>
 
+        <div class="guide-card guide-card--events" onclick="openModule('events')">
+          <span class="guide-card-icon">🎭</span>
+          <span class="guide-card-label">Local Events</span>
+        </div>
+
       </div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Events list ───────────────────────────────────────────────── -->
+  <div id="screen-events" class="screen">
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title">Local Events</div>
+    </div>
+    <div class="screen-body">
+      <div id="events-loading" class="loading-hint">Loading events…</div>
+      <div id="events-list"></div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Event detail ──────────────────────────────────────────────── -->
+  <div id="screen-event-detail" class="screen">
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title">Event</div>
+    </div>
+    <div class="screen-body">
+      <div class="ev-hero" id="ev-detail-hero"></div>
+      <div class="ev-detail-name"  id="ev-detail-name"></div>
+      <div class="ev-detail-date"  id="ev-detail-date"></div>
+      <div class="ev-detail-desc"  id="ev-detail-desc"></div>
+      <a  class="ev-detail-link"   id="ev-detail-link" target="_blank" rel="noopener" hidden>
+        More info &rarr;
+      </a>
     </div>
   </div>
 

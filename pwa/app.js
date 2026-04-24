@@ -15,6 +15,8 @@ let servicesScrollY  = 0;    // saved scroll position for services list
 let poisData         = null; // loaded from /api/pwa-pois
 let routesData       = null; // loaded from /api/pwa-routes
 let partnersData     = null; // loaded from /api/pwa-partners (Concierge)
+let eventsData       = null; // loaded from /api/pwa-events
+let currentEvent     = null; // currently open event
 let currentService   = null;
 let currentPoi       = null;
 let currentRoute     = null;
@@ -81,6 +83,10 @@ function _activateScreen(name, direction = 'forward') {
   if (name === 'concierge') {
     if (!partnersData) loadPartners();
     else renderConciergeRestaurants();
+  }
+  if (name === 'events') {
+    if (!eventsData) loadEvents();
+    else renderEventsList();
   }
 }
 
@@ -1509,6 +1515,7 @@ function boot() {
     loadPois();
     loadRoutes();
     loadPartners();
+    loadEvents();
   }
 
   // Register push notifications (non-blocking)
@@ -1516,6 +1523,85 @@ function boot() {
 }
 
 document.addEventListener('DOMContentLoaded', boot);
+
+// ── Events ────────────────────────────────────────────────────────────────
+
+async function loadEvents() {
+  try {
+    const r = await fetch('/api/pwa-events', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ slug: SLUG || 'antique-split' }),
+    });
+    const data = await r.json();
+    if (data.ok) {
+      eventsData = data.events || [];
+      if (currentScreen === 'events') renderEventsList();
+    }
+  } catch (_) { /* silent */ }
+}
+
+function _formatEventDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function renderEventsList() {
+  const list    = document.getElementById('events-list');
+  const loading = document.getElementById('events-loading');
+  if (!list) return;
+
+  hide('events-loading');
+
+  if (!eventsData || eventsData.length === 0) {
+    list.innerHTML = '<p style="color:var(--text-secondary);font-size:14px;padding:8px 0">No upcoming events at the moment.</p>';
+    return;
+  }
+
+  list.innerHTML = eventsData.map((ev, i) => `
+    <div class="ev-card" onclick="openEventDetail(${i})">
+      <div class="ev-card-header">
+        <div class="ev-card-date">${_formatEventDate(ev.date)}</div>
+        <div class="ev-card-name">${escHtml(ev.name)}</div>
+      </div>
+      <div class="ev-card-body">
+        <div class="ev-card-desc">${escHtml(ev.description)}</div>
+        <div class="ev-card-arrow">Read more →</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openEventDetail(idx) {
+  currentEvent = eventsData[idx];
+  if (!currentEvent) return;
+
+  // Hero emoji based on keywords
+  const name = currentEvent.name.toLowerCase();
+  let emoji = '🎭';
+  if (name.includes('wine') || name.includes('tasting')) emoji = '🍷';
+  else if (name.includes('kayak') || name.includes('swim') || name.includes('sea')) emoji = '🚣';
+  else if (name.includes('music') || name.includes('concert') || name.includes('festival') || name.includes('singing')) emoji = '🎶';
+  else if (name.includes('food') || name.includes('market') || name.includes('beer')) emoji = '🍻';
+  else if (name.includes('tour') || name.includes('palace') || name.includes('history')) emoji = '🏛️';
+  else if (name.includes('night')) emoji = '🌙';
+
+  document.getElementById('ev-detail-hero').textContent = emoji;
+  setText('ev-detail-name', currentEvent.name);
+  setText('ev-detail-date', _formatEventDate(currentEvent.date));
+  setText('ev-detail-desc', currentEvent.description);
+
+  const linkEl = document.getElementById('ev-detail-link');
+  if (currentEvent.link) {
+    linkEl.href = currentEvent.link;
+    show('ev-detail-link');
+  } else {
+    hide('ev-detail-link');
+  }
+
+  pushScreen('event-detail');
+}
 
 // ── Concierge ─────────────────────────────────────────────────────────────
 
