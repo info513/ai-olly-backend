@@ -264,16 +264,20 @@ function openServiceDetail(idx) {
     }
   }
 
-  // Emergency call button — show for emergency/urgent services
+  // Emergency buttons — show 112, 194 and reception for emergency/urgent services
   const combined    = [currentService.naziv, ...(currentService.kategorija || [])].join(' ').toLowerCase();
-  const isEmergency = /emergency|hitno|urgent|sos/.test(combined);
+  const isEmergency = /emergency|hitno|urgent|sos|112|194/.test(combined);
+  const btn112 = document.getElementById('svc-112-btn');
+  const btn194 = document.getElementById('svc-194-btn');
   const emergencyBtn = document.getElementById('svc-emergency-btn');
+  if (btn112)      btn112.hidden      = !isEmergency;
+  if (btn194)      btn194.hidden      = !isEmergency;
   if (emergencyBtn) {
     emergencyBtn.hidden = !isEmergency;
     if (isEmergency) {
       const phone = CONFIG.phone || '';
-      emergencyBtn.href = phone ? 'tel:' + phone : '#';
-      emergencyBtn.textContent = '\uD83D\uDCDE\u2009Call Reception' + (phone ? ' \u00b7 ' + phone : '');
+      emergencyBtn.href        = phone ? 'tel:' + phone : '#';
+      emergencyBtn.textContent = '\uD83D\uDCDE\u2009Call Reception' + (phone ? '\u2009\u00b7\u2009' + phone : '');
     }
   }
 
@@ -652,16 +656,18 @@ function renderRoutesList() {
     container.innerHTML = '<p style="color:var(--text-muted);font-size:14px;padding:16px 0;">No routes available at this time.</p>';
     return;
   }
-  container.innerHTML = routesData.map((r, i) => `
-    <div class="route-card" onclick="openRouteDetail(${i})">
-      <div class="route-card-meta">
-        ${r.type     ? `<span>${escHtml(r.type)}</span><span>\u00b7</span>` : ''}
-        ${r.duration ? `<span>${escHtml(r.duration)}</span>` : ''}
-      </div>
-      <div class="route-card-title">${escHtml(r.name)}</div>
-      ${r.shortDesc ? `<div class="route-card-desc">${escHtml(r.shortDesc)}</div>` : ''}
-    </div>
-  `).join('');
+  container.innerHTML = routesData.map((r, i) => {
+    const meta = [r.type, r.duration].filter(Boolean).map(escHtml).join('<span class="route-dot">\u00b7</span>');
+    return `
+      <div class="route-card" onclick="openRouteDetail(${i})">
+        <div class="route-card-hero"></div>
+        <div class="route-card-body">
+          ${meta ? `<div class="route-card-meta">${meta}</div>` : ''}
+          <div class="route-card-title">${escHtml(r.name)}</div>
+          ${r.shortDesc ? `<div class="route-card-desc">${escHtml(r.shortDesc)}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
 }
 
 function openRouteDetail(idx) {

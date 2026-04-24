@@ -598,10 +598,17 @@ html, body {
 }
 
 .service-card-desc {
-  font-size: 13.5px;
+  font-size: 14.5px;
   color: var(--text-muted);
   line-height: 1.55;
   margin-top: 3px;
+}
+
+/* Gap between service cards */
+#services-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 /* ── Service detail hero ─────────────────────────────────────────────────── */
@@ -913,24 +920,43 @@ html, body {
 /* ── Route cards ─────────────────────────────────────────────────────────── */
 
 .route-card {
-  background: var(--surface-warm);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  overflow: hidden;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s;
+  transition: transform 0.12s, box-shadow 0.12s;
 }
 
-.route-card:active { background: var(--accent-light); }
+.route-card:active {
+  transform: scale(0.985);
+  box-shadow: none;
+}
+
+/* Placeholder hero — unique gradient per route via nth-child */
+.route-card-hero {
+  height: 130px;
+  background: linear-gradient(135deg, #1e3040 0%, #2c3e20 100%);
+}
+.route-card:nth-child(2) .route-card-hero { background: linear-gradient(135deg, #3e2a1a 0%, #1e3040 100%); }
+.route-card:nth-child(3) .route-card-hero { background: linear-gradient(135deg, #1a2e1e 0%, #2c1f14 100%); }
+.route-card:nth-child(4) .route-card-hero { background: linear-gradient(135deg, #2e1a2a 0%, #1e2e3e 100%); }
+.route-card:nth-child(5) .route-card-hero { background: linear-gradient(135deg, #1e2c1a 0%, #3e2a14 100%); }
+.route-card:nth-child(6) .route-card-hero { background: linear-gradient(135deg, #2a1e3e 0%, #1e3028 100%); }
+
+.route-card-body {
+  padding: 14px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
 
 .route-card-meta {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+  align-items: center;
   font-size: 11px;
   color: var(--gold);
   font-weight: 700;
@@ -940,15 +966,32 @@ html, body {
 
 .route-card-title {
   font-family: var(--font-serif);
-  font-size: 19px;
+  font-size: 21px;
   font-weight: 600;
   letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
 .route-card-desc {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
   line-height: 1.5;
+}
+
+/* Gap between route cards */
+#routes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.route-dot { margin: 0 4px; opacity: 0.5; }
+
+/* Route detail hero */
+.route-hero {
+  height: 200px;
+  background: linear-gradient(135deg, #1e3040 0%, #2c3e20 100%);
+  flex-shrink: 0;
 }
 
 /* ── Near Me grid ────────────────────────────────────────────────────────── */

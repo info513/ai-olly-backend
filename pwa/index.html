@@ -209,14 +209,12 @@
       <h2 id="svc-title" class="detail-title"></h2>
       <div id="svc-desc" class="detail-section-text"></div>
       <div class="detail-actions" id="svc-actions">
-        <!-- Emergency call — shown only for emergency services -->
-        <a id="svc-emergency-btn" class="action-btn action-btn--emergency" href="#" hidden>
-          📞 Call now
-        </a>
+        <!-- Emergency numbers — shown only for emergency services -->
+        <a id="svc-112-btn" class="action-btn action-btn--emergency" href="tel:112" hidden>🚨&ensp;112 — EU Emergency</a>
+        <a id="svc-194-btn" class="action-btn action-btn--emergency" href="tel:194" hidden>🚑&ensp;194 — Ambulance</a>
+        <a id="svc-emergency-btn" class="action-btn action-btn--emergency" href="#" hidden>📞&ensp;Call Reception</a>
         <!-- Booking link — shown when URL detected in description -->
-        <a id="svc-booking-btn" class="action-btn action-btn--primary" href="#" target="_blank" rel="noopener" hidden>
-          Book now →
-        </a>
+        <a id="svc-booking-btn" class="action-btn action-btn--primary" href="#" target="_blank" rel="noopener" hidden>Book now →</a>
         <button class="action-btn" onclick="pushScreen('contact')">Contact Reception</button>
       </div>
     </div>
@@ -334,6 +332,9 @@
       <button class="back-btn" onclick="popScreen()">&larr; Back</button>
       <div id="route-detail-title" class="screen-title"></div>
     </div>
+
+    <!-- Placeholder hero image -->
+    <div class="route-hero" id="route-detail-hero"></div>
 
     <div class="screen-body">
       <div class="detail-badges">
