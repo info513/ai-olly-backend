@@ -33,9 +33,11 @@ const {
   TABLE_REQUESTS   = 'REQUESTS',
   TABLE_POI        = 'POI',
   TABLE_ROUTES     = 'ROUTES',
-  TABLE_PARTNERS   = 'PARTNERS',
-  TABLE_EVENTS     = 'EVENTS',
-  TABLE_FEEDBACK   = 'FEEDBACK',
+  TABLE_PARTNERS        = 'PARTNERS',
+  TABLE_EVENTS          = 'EVENTS',
+  TABLE_FEEDBACK        = 'FEEDBACK',
+  TABLE_PUSH_SUBS       = 'PUSH_SUBSCRIPTIONS',
+  TABLE_NOVOSTI         = 'NOVOSTI',
 
   // Push notifications (VAPID)
   VAPID_PUBLIC_KEY,
@@ -55,7 +57,58 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 }
 
 // In-memory push subscriptions: key = `${slug}:${room}`
+// Backed by Airtable PUSH_SUBSCRIPTIONS — survives server restarts
 const pushSubscriptions = new Map();
+
+async function loadPushSubscriptionsFromAirtable() {
+  try {
+    const recs = await airtableSelectAll(TABLE_PUSH_SUBS, {
+      filterByFormula: `{Active}=TRUE()`,
+      pageSize: 100,
+    });
+    let loaded = 0;
+    for (const r of recs) {
+      const slug = r.fields['HotelSlug'] || '';
+      const room = r.fields['Room']      || '';
+      const raw  = r.fields['Subscription'] || '';
+      if (!slug || !room || !raw) continue;
+      try {
+        const sub = JSON.parse(raw);
+        pushSubscriptions.set(`${slug}:${room}`, { sub, airtableId: r.id });
+        loaded++;
+      } catch (_) { /* bad JSON, skip */ }
+    }
+    console.log(`[push] Loaded ${loaded} subscriptions from Airtable`);
+  } catch (e) {
+    console.warn('[push] Could not load subscriptions from Airtable:', e.message);
+  }
+}
+
+async function savePushSubscriptionToAirtable(hotelSlug, room, subscription) {
+  try {
+    // Check if record already exists (upsert)
+    const existing = pushSubscriptions.get(`${hotelSlug}:${room}`);
+    if (existing?.airtableId) {
+      await base(TABLE_PUSH_SUBS).update(existing.airtableId, {
+        'Subscription': JSON.stringify(subscription),
+        'Active': true,
+        'CreatedAt': new Date().toISOString(),
+      });
+      return existing.airtableId;
+    }
+    const created = await base(TABLE_PUSH_SUBS).create({
+      'HotelSlug':    hotelSlug,
+      'Room':         room,
+      'Subscription': JSON.stringify(subscription),
+      'Active':       true,
+      'CreatedAt':    new Date().toISOString(),
+    });
+    return created.id;
+  } catch (e) {
+    console.warn('[push] Could not save subscription to Airtable:', e.message);
+    return null;
+  }
+}
 
 if (!OPENAI_API_KEY || !AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
   console.error('❗ Missing env vars: OPENAI_API_KEY, AIRTABLE_API_KEY, AIRTABLE_BASE_ID');
@@ -3023,9 +3076,18 @@ app.post('/api/pwa-push-subscribe', async (req, res) => {
     if (!tokenValid) return res.status(403).json({ ok: false, error: 'Access denied' });
 
     const key = `${hotelSlug}:${roomNumber}`;
-    pushSubscriptions.set(key, subscription);
-    console.log(`[push] Subscription saved for ${key}`);
+    const existing = pushSubscriptions.get(key);
+    pushSubscriptions.set(key, { sub: subscription, airtableId: existing?.airtableId || null });
 
+    // Persist to Airtable (non-blocking — don't fail if Airtable is slow)
+    savePushSubscriptionToAirtable(hotelSlug, roomNumber, subscription).then(airtableId => {
+      if (airtableId) {
+        const entry = pushSubscriptions.get(key);
+        if (entry) entry.airtableId = airtableId;
+      }
+    });
+
+    console.log(`[push] Subscription saved for ${key}`);
     return res.json({ ok: true });
   } catch (e) {
     console.error('pwa-push-subscribe error:', e);
@@ -3080,14 +3142,14 @@ app.post('/api/webhook/request-status', async (req, res) => {
 
     // Find push subscription
     const key = `${hotelSlug}:${roomNumber}`;
-    const subscription = pushSubscriptions.get(key);
+    const entry = pushSubscriptions.get(key);
 
-    if (!subscription) {
+    if (!entry) {
       console.warn(`[webhook] No push subscription for ${key}`);
       return res.json({ ok: true, pushed: false, reason: 'No subscription on record' });
     }
 
-    await webpush.sendNotification(subscription, payload);
+    await webpush.sendNotification(entry.sub, payload);
     console.log(`[webhook] Push sent to ${key} — status: ${status}`);
 
     return res.json({ ok: true, pushed: true });
@@ -3211,15 +3273,15 @@ app.post('/api/webhook/checkout', async (req, res) => {
       url:   '/pwa/?feedback=1',
     });
 
-    const key          = `${hotelSlug}:${room}`;
-    const subscription = pushSubscriptions.get(key);
+    const key   = `${hotelSlug}:${room}`;
+    const entry = pushSubscriptions.get(key);
 
-    if (!subscription) {
+    if (!entry) {
       console.warn(`[webhook/checkout] No push subscription for ${key}`);
       return res.json({ ok: true, pushed: false, reason: 'No subscription on record' });
     }
 
-    await webpush.sendNotification(subscription, payload);
+    await webpush.sendNotification(entry.sub, payload);
     console.log(`[webhook/checkout] Checkout push sent to ${key}`);
     return res.json({ ok: true, pushed: true });
 
@@ -3229,6 +3291,70 @@ app.post('/api/webhook/checkout', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+// ── /api/webhook/novosti — Airtable fires when new NOVOSTI record created ────
+//
+// Input:  { secret, hotelSlug, naslov, poruka, recordId }
+// Action: sends push to ALL active subscribers of the hotel, marks record Sent
+// -------------------------
+app.post('/api/webhook/novosti', async (req, res) => {
+  try {
+    const secret    = pickFirstNonEmpty(req.body?.secret, req.headers['x-webhook-secret'], '');
+    const hotelSlug = pickFirstNonEmpty(req.body?.hotelSlug, HOTEL_SLUG_DEFAULT);
+    const naslov    = pickFirstNonEmpty(req.body?.naslov, 'Hotel Antique Split');
+    const poruka    = pickFirstNonEmpty(req.body?.poruka, '');
+    const recordId  = pickFirstNonEmpty(req.body?.recordId, '');
+
+    if (secret !== WEBHOOK_SECRET) {
+      console.warn('[webhook/novosti] Invalid secret');
+      return res.status(403).json({ ok: false, error: 'Forbidden' });
+    }
+
+    const payload = JSON.stringify({
+      title: naslov,
+      body:  poruka || 'News from Hotel Antique Split',
+      tag:   'hotel-news',
+      url:   '/pwa/',
+    });
+
+    // Send to all subscribers of this hotel
+    const hotelEntries = [...pushSubscriptions.entries()]
+      .filter(([key]) => key.startsWith(`${hotelSlug}:`));
+
+    let sent = 0, failed = 0;
+    await Promise.allSettled(
+      hotelEntries.map(async ([key, entry]) => {
+        try {
+          await webpush.sendNotification(entry.sub, payload);
+          sent++;
+        } catch (e) {
+          console.warn(`[webhook/novosti] Push failed for ${key}:`, e.message);
+          // If subscription expired/invalid, deactivate in Airtable
+          if (e.statusCode === 410 && entry.airtableId) {
+            base(TABLE_PUSH_SUBS).update(entry.airtableId, { 'Active': false }).catch(() => {});
+            pushSubscriptions.delete(key);
+          }
+          failed++;
+        }
+      })
+    );
+
+    console.log(`[webhook/novosti] Broadcast to ${hotelSlug}: ${sent} sent, ${failed} failed`);
+
+    // Mark NOVOSTI record as Sent
+    if (recordId) {
+      try {
+        await base(TABLE_NOVOSTI).update(recordId, { 'Status': 'Sent' });
+      } catch (_) { /* non-critical */ }
+    }
+
+    return res.json({ ok: true, sent, failed, total: hotelEntries.length });
+  } catch (e) {
+    console.error('webhook/novosti error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+app.listen(PORT, async () => {
   console.log(`✅ AI Olly HUB WEB server running on :${PORT} (build=${BUILD})`);
+  await loadPushSubscriptionsFromAirtable();
 });
