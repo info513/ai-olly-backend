@@ -108,22 +108,28 @@
         </div>
 
         <div class="guide-card guide-card--events" onclick="openModule('events')">
-          <span class="guide-card-icon">🎭</span>
-          <span class="guide-card-label">Local Events</span>
+          <span class="guide-card-icon">📍</span>
+          <span class="guide-card-label">Split Today</span>
         </div>
 
       </div>
     </div>
   </div>
 
-  <!-- ── Screen: Events list ───────────────────────────────────────────────── -->
+  <!-- ── Screen: Split Today ──────────────────────────────────────────────── -->
   <div id="screen-events" class="screen">
     <div class="screen-header">
       <button class="back-btn" onclick="popScreen()">&larr; Back</button>
-      <div class="screen-title">Local Events</div>
+      <div class="screen-title">Split Today</div>
     </div>
     <div class="screen-body">
-      <div id="events-loading" class="loading-hint">Loading events…</div>
+      <!-- Tab bar -->
+      <div class="st-tabs">
+        <button class="st-tab st-tab--active" onclick="switchEventsTab('today',this)">Today</button>
+        <button class="st-tab" onclick="switchEventsTab('upcoming',this)">Upcoming</button>
+        <button class="st-tab" onclick="switchEventsTab('alwayson',this)">Always on</button>
+      </div>
+      <div id="events-loading" class="loading-hint">Loading…</div>
       <div id="events-list"></div>
     </div>
   </div>

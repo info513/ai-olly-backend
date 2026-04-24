@@ -3107,10 +3107,11 @@ app.post('/api/pwa-events', async (req, res) => {
     const slugEsc   = escapeAirtableFormulaString(hotelSlug);
     const today     = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
+    // Fetch dated events (today + future) AND always-on entries together
     const recs = await airtableSelectAll(TABLE_EVENTS, {
-      filterByFormula: `AND({HotelSlug}="${slugEsc}", {Aktivan}=TRUE(), {Datum}>="${today}")`,
+      filterByFormula: `AND({HotelSlug}="${slugEsc}", {Aktivan}=TRUE(), OR({Tip}="Always on", {Datum}>="${today}"))`,
       sort: [{ field: 'Datum', direction: 'asc' }],
-      pageSize: 50,
+      pageSize: 100,
     });
 
     const events = recs.map(r => ({
@@ -3119,6 +3120,7 @@ app.post('/api/pwa-events', async (req, res) => {
       date:        r.fields['Datum']     || '',
       description: r.fields['Opis']      || '',
       link:        r.fields['Link']      || '',
+      tip:         r.fields['Tip']       || 'Event',
     }));
 
     return res.json({ ok: true, events });

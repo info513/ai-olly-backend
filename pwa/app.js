@@ -85,6 +85,9 @@ function _activateScreen(name, direction = 'forward') {
     else renderConciergeRestaurants();
   }
   if (name === 'events') {
+    // Reset to Today tab on each open
+    activeEventsTab = 'today';
+    document.querySelectorAll('.st-tab').forEach((b, i) => b.classList.toggle('st-tab--active', i === 0));
     if (!eventsData) loadEvents();
     else renderEventsList();
   }
@@ -1524,7 +1527,9 @@ function boot() {
 
 document.addEventListener('DOMContentLoaded', boot);
 
-// ── Events ────────────────────────────────────────────────────────────────
+// ── Split Today / Events ──────────────────────────────────────────────────
+
+let activeEventsTab = 'today'; // 'today' | 'upcoming' | 'alwayson'
 
 async function loadEvents() {
   try {
@@ -1541,6 +1546,14 @@ async function loadEvents() {
   } catch (_) { /* silent */ }
 }
 
+function switchEventsTab(tab, btn) {
+  activeEventsTab = tab;
+  // Update active tab styling
+  document.querySelectorAll('.st-tab').forEach(b => b.classList.remove('st-tab--active'));
+  if (btn) btn.classList.add('st-tab--active');
+  renderEventsList();
+}
+
 function _formatEventDate(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr + 'T12:00:00');
@@ -1554,23 +1567,49 @@ function renderEventsList() {
 
   hide('events-loading');
 
-  if (!eventsData || eventsData.length === 0) {
-    list.innerHTML = '<p style="color:var(--text-secondary);font-size:14px;padding:8px 0">No upcoming events at the moment.</p>';
+  if (!eventsData) {
+    list.innerHTML = '';
     return;
   }
 
-  list.innerHTML = eventsData.map((ev, i) => `
-    <div class="ev-card" onclick="openEventDetail(${i})">
-      <div class="ev-card-header">
-        <div class="ev-card-date">${_formatEventDate(ev.date)}</div>
-        <div class="ev-card-name">${escHtml(ev.name)}</div>
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  let filtered;
+  if (activeEventsTab === 'today') {
+    filtered = eventsData.filter(ev => ev.tip === 'Event' && ev.date === todayStr);
+  } else if (activeEventsTab === 'upcoming') {
+    filtered = eventsData.filter(ev => ev.tip === 'Event' && ev.date > todayStr);
+  } else {
+    filtered = eventsData.filter(ev => ev.tip === 'Always on');
+  }
+
+  if (filtered.length === 0) {
+    const msgs = {
+      today:    'No events scheduled for today.',
+      upcoming: 'No upcoming events at the moment.',
+      alwayson: 'No permanent attractions listed yet.',
+    };
+    list.innerHTML = `<p style="color:var(--text-secondary);font-size:14px;padding:8px 0">${msgs[activeEventsTab]}</p>`;
+    return;
+  }
+
+  // Map filtered items back to global eventsData indices for detail navigation
+  list.innerHTML = filtered.map(ev => {
+    const globalIdx = eventsData.indexOf(ev);
+    const showDate  = ev.tip === 'Event' && ev.date;
+    return `
+      <div class="ev-card" onclick="openEventDetail(${globalIdx})">
+        <div class="ev-card-header">
+          ${showDate ? `<div class="ev-card-date">${_formatEventDate(ev.date)}</div>` : ''}
+          <div class="ev-card-name">${escHtml(ev.name)}</div>
+        </div>
+        <div class="ev-card-body">
+          <div class="ev-card-desc">${escHtml(ev.description)}</div>
+          <div class="ev-card-arrow">Read more →</div>
+        </div>
       </div>
-      <div class="ev-card-body">
-        <div class="ev-card-desc">${escHtml(ev.description)}</div>
-        <div class="ev-card-arrow">Read more →</div>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 function openEventDetail(idx) {
@@ -1580,12 +1619,17 @@ function openEventDetail(idx) {
   // Hero emoji based on keywords
   const name = currentEvent.name.toLowerCase();
   let emoji = '🎭';
-  if (name.includes('wine') || name.includes('tasting')) emoji = '🍷';
-  else if (name.includes('kayak') || name.includes('swim') || name.includes('sea')) emoji = '🚣';
+  if (name.includes('wine') || name.includes('tasting'))                              emoji = '🍷';
+  else if (name.includes('kayak') || name.includes('swim') || name.includes('sea'))   emoji = '🚣';
   else if (name.includes('music') || name.includes('concert') || name.includes('festival') || name.includes('singing')) emoji = '🎶';
   else if (name.includes('food') || name.includes('market') || name.includes('beer')) emoji = '🍻';
-  else if (name.includes('tour') || name.includes('palace') || name.includes('history')) emoji = '🏛️';
-  else if (name.includes('night')) emoji = '🌙';
+  else if (name.includes('palace') || name.includes('diocletian') || name.includes('history')) emoji = '🏛️';
+  else if (name.includes('tour'))                                                      emoji = '🗺️';
+  else if (name.includes('beach') || name.includes('bačvice'))                        emoji = '🏖️';
+  else if (name.includes('marjan') || name.includes('hill') || name.includes('park')) emoji = '🌿';
+  else if (name.includes('market') || name.includes('pazar'))                         emoji = '🛒';
+  else if (name.includes('riva') || name.includes('promenade'))                       emoji = '🌊';
+  else if (name.includes('night'))                                                     emoji = '🌙';
 
   document.getElementById('ev-detail-hero').textContent = emoji;
   setText('ev-detail-name', currentEvent.name);
