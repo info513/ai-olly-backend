@@ -1400,17 +1400,64 @@ function getGreeting() {
   return 'Good evening';
 }
 
+function _wmoIcon(code) {
+  if (code === 0)               return '☀️';
+  if (code <= 2)                return '🌤️';
+  if (code <= 3)                return '☁️';
+  if (code <= 48)               return '🌫️';
+  if (code <= 57)               return '🌦️';
+  if (code <= 67)               return '🌧️';
+  if (code <= 77)               return '❄️';
+  if (code <= 82)               return '🌦️';
+  if (code <= 86)               return '🌨️';
+  return '⛈️';
+}
+
+function renderWeatherForecast(daily) {
+  const strip = document.getElementById('wf-strip');
+  if (!strip || !daily?.time?.length) return;
+
+  const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  strip.innerHTML = daily.time.map((dateStr, i) => {
+    const d        = new Date(dateStr + 'T12:00:00');
+    const label    = i === 0 ? 'Today' : DAY_NAMES[d.getDay()];
+    const icon     = _wmoIcon(daily.weathercode[i]);
+    const maxT     = Math.round(daily.temperature_2m_max[i]);
+    const minT     = Math.round(daily.temperature_2m_min[i]);
+    const todayCls = i === 0 ? ' wf-day--today' : '';
+    return `<div class="wf-day${todayCls}">
+      <div class="wf-label">${label}</div>
+      <div class="wf-icon">${icon}</div>
+      <div class="wf-max">${maxT}°</div>
+      <div class="wf-min">${minT}°</div>
+    </div>`;
+  }).join('');
+
+  show('wf-strip');
+}
+
 async function fetchSplitTemperature() {
   try {
     const res  = await fetch(
-      'https://api.open-meteo.com/v1/forecast?latitude=43.5081&longitude=16.4402&current=temperature_2m'
+      'https://api.open-meteo.com/v1/forecast' +
+      '?latitude=43.5081&longitude=16.4402' +
+      '&current=temperature_2m' +
+      '&daily=weathercode,temperature_2m_max,temperature_2m_min' +
+      '&timezone=Europe%2FZagreb&forecast_days=5'
     );
     const data = await res.json();
+
+    // Current temperature (top-right corner)
     const temp = Math.round(data?.current?.temperature_2m);
     if (!isNaN(temp)) {
       setText('wh-temp', temp + '°C');
       show('wh-weather');
     }
+
+    // 5-day forecast strip
+    if (data?.daily) renderWeatherForecast(data.daily);
+
   } catch (_) { /* silent */ }
 }
 
