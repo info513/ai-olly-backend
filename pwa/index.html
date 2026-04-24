@@ -14,6 +14,12 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
+  <script>
+    // Register service worker for push notifications
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/pwa/sw.js').catch(e => console.warn('SW reg failed', e));
+    }
+  </script>
 </head>
 <body>
 
@@ -91,6 +97,11 @@
         <div class="guide-card" onclick="openModule('help')">
           <span class="guide-card-icon">🔔</span>
           <span class="guide-card-label">Help &amp; Requests</span>
+        </div>
+
+        <div class="guide-card guide-card--concierge" onclick="openModule('concierge')">
+          <span class="guide-card-icon">🛎</span>
+          <span class="guide-card-label">Concierge</span>
         </div>
 
       </div>
@@ -681,6 +692,125 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- ── Screen: Concierge ────────────────────────────────────────────────── -->
+  <div id="screen-concierge" class="screen">
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title">Concierge</div>
+    </div>
+    <div class="screen-body">
+      <p class="screen-subtitle">Book a transfer, reserve a table, or make a special request.</p>
+
+      <div class="conc-section-label">Transport</div>
+      <div class="conc-menu">
+        <div class="conc-item" onclick="openConciergeForm('taxi')">
+          <span class="conc-item-icon">🚕</span>
+          <div class="conc-item-body">
+            <div class="conc-item-title">Taxi</div>
+            <div class="conc-item-sub">City transfer, arranged by reception</div>
+          </div>
+          <span class="section-arrow">›</span>
+        </div>
+        <div class="conc-item" onclick="openConciergeForm('boat')">
+          <span class="conc-item-icon">⛵</span>
+          <div class="conc-item-body">
+            <div class="conc-item-title">Boat Transfer</div>
+            <div class="conc-item-sub">Island transfers and sea excursions</div>
+          </div>
+          <span class="section-arrow">›</span>
+        </div>
+        <div class="conc-item" onclick="openConciergeForm('shuttle')">
+          <span class="conc-item-icon">🚐</span>
+          <div class="conc-item-body">
+            <div class="conc-item-title">Airport Shuttle</div>
+            <div class="conc-item-sub">Split Airport to/from hotel</div>
+          </div>
+          <span class="section-arrow">›</span>
+        </div>
+      </div>
+
+      <div class="conc-section-label" style="margin-top:24px;">Dining</div>
+      <div class="conc-menu" id="conc-restaurants-list">
+        <div style="padding:16px;color:var(--text-muted);font-size:14px;">Loading partner restaurants…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Concierge Transfer Form ───────────────────────────────────── -->
+  <div id="screen-concierge-form" class="screen">
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title" id="conc-form-title">Request</div>
+    </div>
+    <div class="screen-body">
+      <div id="conc-form-hero" class="conc-form-hero"></div>
+
+      <form id="conc-form" onsubmit="submitConciergeForm(event)">
+        <div id="conc-form-fields"></div>
+
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input type="date" id="conc-date" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Time</label>
+          <input type="time" id="conc-time" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Number of guests</label>
+          <input type="number" id="conc-guests" class="form-input" min="1" max="20" value="2" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Your name</label>
+          <input type="text" id="conc-name" class="form-input" placeholder="Name for the reservation">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Note <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+          <textarea id="conc-note" class="form-input form-textarea" placeholder="Any special requirements…" rows="3"></textarea>
+        </div>
+
+        <button type="submit" class="action-btn action-btn--primary action-btn--block" id="conc-submit-btn">
+          Send Request
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Screen: Restaurant Detail ─────────────────────────────────────────── -->
+  <div id="screen-restaurant-detail" class="screen">
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title" id="rest-detail-title"></div>
+    </div>
+    <div class="rest-hero" id="rest-detail-hero"></div>
+    <div class="screen-body">
+      <div id="rest-detail-category" class="detail-category"></div>
+      <div class="rest-detail-meta" id="rest-detail-meta"></div>
+      <div id="rest-detail-desc" class="detail-section-text detail-text--lead"></div>
+      <div class="detail-section">
+        <div class="detail-section-label">Details</div>
+        <div id="rest-detail-info" class="section-list"></div>
+      </div>
+      <div class="detail-actions">
+        <button class="action-btn action-btn--primary action-btn--block" onclick="openRestaurantForm()">
+          Reserve a Table
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Request Confirmed ─────────────────────────────────────────── -->
+  <div id="screen-request-sent" class="screen">
+    <div class="screen-body screen-body--centered">
+      <div class="req-sent-icon">✓</div>
+      <h2 class="req-sent-title">Request Sent</h2>
+      <p class="req-sent-body" id="req-sent-body">Your request has been sent to reception. We'll confirm shortly.</p>
+      <button class="action-btn action-btn--primary" style="margin-top:32px;" onclick="gotoRoot('home')">
+        Back to Home
+      </button>
     </div>
   </div>
 

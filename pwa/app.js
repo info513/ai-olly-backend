@@ -12,17 +12,20 @@ const TOKEN  = params.get('token') || '';
 let roomGuideData    = null;
 let servicesData     = null;
 let servicesScrollY  = 0;    // saved scroll position for services list
-let poisData       = null;   // loaded from /api/pwa-pois
-let routesData     = null;   // loaded from /api/pwa-routes
-let currentService = null;
-let currentPoi     = null;
-let currentRoute   = null;
-let currentNmCat   = null;
-let cityMapObj     = null;
-let cityMapInited  = false;
-let routeMapObj    = null;
-let poiMarkers          = [];   // { marker, poi, idx } — for category filtering
-let selectedPoiEntry   = null; // currently highlighted marker entry
+let poisData         = null; // loaded from /api/pwa-pois
+let routesData       = null; // loaded from /api/pwa-routes
+let partnersData     = null; // loaded from /api/pwa-partners (Concierge)
+let currentService   = null;
+let currentPoi       = null;
+let currentRoute     = null;
+let currentPartner   = null; // currently selected restaurant/partner
+let currentConciForm = null; // 'taxi' | 'boat' | 'shuttle' | 'restaurant'
+let currentNmCat     = null;
+let cityMapObj       = null;
+let cityMapInited    = false;
+let routeMapObj      = null;
+let poiMarkers       = [];   // { marker, poi, idx } — for category filtering
+let selectedPoiEntry = null; // currently highlighted marker entry
 
 // ── Navigation stack ──────────────────────────────────────────────────────
 const ROOT_SCREENS = new Set(['home', 'city-map', 'ask', 'info']);
@@ -74,7 +77,11 @@ function _activateScreen(name, direction = 'forward') {
       requestAnimationFrame(() => window.scrollTo(0, servicesScrollY));
     }
   }
-  if (name === 'routes') renderRoutesList();
+  if (name === 'routes')    renderRoutesList();
+  if (name === 'concierge') {
+    if (!partnersData) loadPartners();
+    else renderConciergeRestaurants();
+  }
 }
 
 function pushScreen(name) {
@@ -1454,7 +1461,252 @@ function boot() {
     loadServices();
     loadPois();
     loadRoutes();
+    loadPartners();
   }
+
+  // Register push notifications (non-blocking)
+  registerPush();
 }
 
 document.addEventListener('DOMContentLoaded', boot);
+
+// ── Concierge ─────────────────────────────────────────────────────────────
+
+async function loadPartners() {
+  if (partnersData) return;
+  try {
+    const r = await fetch('/api/pwa-partners', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: SLUG, room: ROOM, token: TOKEN }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      partnersData = d.partners || [];
+      renderConciergeRestaurants();
+    }
+  } catch (e) {
+    console.warn('loadPartners error', e);
+  }
+}
+
+function renderConciergeRestaurants() {
+  const el = document.getElementById('conc-restaurants-list');
+  if (!el) return;
+  if (!partnersData || !partnersData.length) {
+    el.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:14px;">No partner restaurants available at this time.</div>';
+    return;
+  }
+  el.innerHTML = partnersData.map((p, i) => `
+    <div class="conc-item" onclick="openRestaurantDetail(${i})">
+      <span class="conc-item-icon">🍽</span>
+      <div class="conc-item-body">
+        <div class="conc-item-title">${escHtml(p.name)}</div>
+        <div class="conc-item-sub">${[p.cuisine, p.price].filter(Boolean).map(escHtml).join(' · ')}</div>
+      </div>
+      <span class="section-arrow">›</span>
+    </div>
+  `).join('');
+}
+
+function openRestaurantDetail(idx) {
+  currentPartner = partnersData ? partnersData[idx] : null;
+  if (!currentPartner) return;
+  const p = currentPartner;
+
+  setText('rest-detail-title', p.name);
+  setText('rest-detail-category', p.cuisine || p.category);
+
+  // Meta badges
+  const badges = [];
+  if (p.price)      badges.push(`<span class="rest-badge">💰 ${escHtml(p.price)}</span>`);
+  if (p.atmosphere) badges.push(`<span class="rest-badge">✨ ${escHtml(p.atmosphere)}</span>`);
+  const metaEl = document.getElementById('rest-detail-meta');
+  if (metaEl) metaEl.innerHTML = badges.join('');
+
+  setText('rest-detail-desc', p.description);
+
+  // Detail info list
+  const infoEl = document.getElementById('rest-detail-info');
+  if (infoEl) {
+    const rows = [];
+    if (p.hours)   rows.push(`<div class="section-item" style="cursor:default;"><span>🕐 Hours</span><span style="color:var(--text-muted);font-size:14px;">${escHtml(p.hours)}</span></div>`);
+    if (p.address) rows.push(`<div class="section-item" style="cursor:default;"><span>📍 Address</span><span style="color:var(--text-muted);font-size:14px;">${escHtml(p.address)}</span></div>`);
+    if (p.mapsUrl) rows.push(`<div class="section-item" onclick="_openExternal('${escHtml(p.mapsUrl)}')"><span>🗺 Open in Maps</span><span class="section-arrow">›</span></div>`);
+    infoEl.innerHTML = rows.join('') || '<div style="padding:12px 0;color:var(--text-muted);font-size:14px;">Contact reception for details.</div>';
+  }
+
+  // Hero gradient
+  const hero = document.getElementById('rest-detail-hero');
+  if (hero) {
+    const grads = ['linear-gradient(135deg,#1a2a10 0%,#2d4a20 100%)', 'linear-gradient(135deg,#2a1010 0%,#4a2020 100%)', 'linear-gradient(135deg,#10102a 0%,#1a1a50 100%)'];
+    hero.style.background = grads[idx % grads.length];
+  }
+
+  pushScreen('restaurant-detail');
+}
+
+function openRestaurantForm() {
+  currentConciForm = 'restaurant';
+  _buildConciergeForm('restaurant');
+  pushScreen('concierge-form');
+}
+
+// type: 'taxi' | 'boat' | 'shuttle'
+function openConciergeForm(type) {
+  currentConciForm = type;
+  currentPartner = null;
+  _buildConciergeForm(type);
+  pushScreen('concierge-form');
+}
+
+function _buildConciergeForm(type) {
+  const titles = { taxi: 'Taxi Request', boat: 'Boat Transfer', shuttle: 'Airport Shuttle', restaurant: 'Reserve a Table' };
+  const icons  = { taxi: '🚕', boat: '⛵', shuttle: '🚐', restaurant: '🍽' };
+  const emojis = { taxi: '🚕', boat: '⛵', shuttle: '🚐', restaurant: '🍽' };
+
+  setText('conc-form-title', titles[type] || 'Request');
+
+  // Hero emoji
+  const hero = document.getElementById('conc-form-hero');
+  if (hero) hero.textContent = emojis[type] || '🛎';
+
+  // Extra fields depending on type
+  const fieldsEl = document.getElementById('conc-form-fields');
+  if (!fieldsEl) return;
+
+  if (type === 'restaurant') {
+    fieldsEl.innerHTML = `
+      <div class="form-group">
+        <label class="form-label">Restaurant</label>
+        <input type="text" id="conc-partner" class="form-input" value="${currentPartner ? escHtml(currentPartner.name) : ''}" readonly>
+      </div>`;
+  } else {
+    fieldsEl.innerHTML = `
+      <div class="form-group">
+        <label class="form-label">Pickup location</label>
+        <input type="text" id="conc-from" class="form-input" placeholder="${type === 'shuttle' ? 'e.g. Split Airport' : 'e.g. Hotel'}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Destination</label>
+        <input type="text" id="conc-to" class="form-input" placeholder="${type === 'shuttle' ? 'e.g. Hotel Antique Split' : 'e.g. Split Airport'}">
+      </div>`;
+  }
+
+  // Reset common fields
+  const dateEl = document.getElementById('conc-date');
+  const timeEl = document.getElementById('conc-time');
+  if (dateEl) { dateEl.value = ''; dateEl.required = true; }
+  if (timeEl) { timeEl.value = ''; timeEl.required = true; }
+  const noteEl = document.getElementById('conc-note');
+  if (noteEl) noteEl.value = '';
+  const nameEl = document.getElementById('conc-name');
+  if (nameEl) nameEl.value = '';
+  const guestsEl = document.getElementById('conc-guests');
+  if (guestsEl) guestsEl.value = '2';
+}
+
+async function submitConciergeForm(e) {
+  e.preventDefault();
+  const btn = document.getElementById('conc-submit-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+
+  const type      = currentConciForm;
+  const date      = document.getElementById('conc-date')?.value || '';
+  const time      = document.getElementById('conc-time')?.value || '';
+  const guests    = document.getElementById('conc-guests')?.value || '';
+  const guestName = document.getElementById('conc-name')?.value || '';
+  const note      = document.getElementById('conc-note')?.value || '';
+  const fromLoc   = document.getElementById('conc-from')?.value || '';
+  const toLoc     = document.getElementById('conc-to')?.value || '';
+  const partner   = currentPartner?.name || document.getElementById('conc-partner')?.value || '';
+
+  // Map type to Airtable Kategorija
+  const categoryMap = { taxi: 'Taxi', boat: 'Boat Transfer', shuttle: 'Airport Shuttle', restaurant: 'Restaurant' };
+  const category = categoryMap[type] || 'Guest Services';
+
+  // Build human-readable message summary
+  const lines = [];
+  if (type === 'restaurant' && partner) lines.push(`Restaurant: ${partner}`);
+  if (date)    lines.push(`Date: ${date}`);
+  if (time)    lines.push(`Time: ${time}`);
+  if (fromLoc) lines.push(`From: ${fromLoc}`);
+  if (toLoc)   lines.push(`To: ${toLoc}`);
+  if (guests)  lines.push(`Guests: ${guests}`);
+  if (note)    lines.push(`Note: ${note}`);
+  const message = lines.join('\n') || 'No details provided.';
+
+  try {
+    const r = await fetch('/api/pwa-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slug: SLUG, room: ROOM, token: TOKEN,
+        category,
+        message,
+        guestName: guestName || undefined,
+        date:    date     || undefined,
+        time:    time     || undefined,
+        from:    fromLoc  || undefined,
+        to:      toLoc    || undefined,
+        guests:  guests   || undefined,
+        partnerName: partner || undefined,
+      }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      // Show confirmation screen
+      const bodyEl = document.getElementById('req-sent-body');
+      if (bodyEl) {
+        const typeLabels = { taxi: 'taxi', boat: 'boat transfer', shuttle: 'airport shuttle', restaurant: 'table reservation' };
+        bodyEl.textContent = `Your ${typeLabels[type] || 'request'} has been sent to reception. We'll confirm shortly.`;
+      }
+      pushScreen('request-sent');
+    } else {
+      alert('Could not send request. Please try again or contact reception.');
+    }
+  } catch (err) {
+    alert('Network error. Please try again.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send Request'; }
+  }
+}
+
+// ── Push Notifications ────────────────────────────────────────────────────
+
+// VAPID public key (from server)
+const VAPID_PUBLIC_KEY = 'BOajhRLHtx_ppFqci-CIDwZfi28Kbc6Kj1Yk2kVlntrNzzCFwJUzjugzkFSkYX2PMeFxwfEwTGLg1QlIz6Y_LNM';
+
+function _urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+async function registerPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (!ROOM || !TOKEN) return;
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let subscription = await reg.pushManager.getSubscription();
+
+    if (!subscription) {
+      subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: _urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+
+    // Save to server
+    await fetch('/api/pwa-push-subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: SLUG, room: ROOM, token: TOKEN, subscription }),
+    });
+  } catch (e) {
+    // User denied or browser doesn't support — silent fail
+    console.info('[push] Not subscribed:', e.message);
+  }
+}

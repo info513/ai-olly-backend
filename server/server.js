@@ -1,12 +1,14 @@
 // server.js — AI OLLY HUB
 // Endpoints: /api/health, /api/debug, /api/web-ask,
 //            /api/pwa-ask, /api/pwa-request, /api/pwa-welcome,
-//            /api/pwa-room-guide, /api/pwa-services, /api/pwa-pois, /api/pwa-routes
+//            /api/pwa-room-guide, /api/pwa-services, /api/pwa-pois, /api/pwa-routes,
+//            /api/pwa-partners, /api/pwa-push-subscribe, /api/webhook/request-status
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import Airtable from 'airtable';
 import OpenAI from 'openai';
+import webpush from 'web-push';
 import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion } from './classify.js';
 import { timingSafeEqual } from 'node:crypto';
 import { asArray, isEmptyArray, fieldHasAny, valuesToStrings, matchesHotelSlug, allowForWeb, allowForPWA } from './filters.js';
@@ -31,10 +33,27 @@ const {
   TABLE_REQUESTS   = 'REQUESTS',
   TABLE_POI        = 'POI',
   TABLE_ROUTES     = 'ROUTES',
+  TABLE_PARTNERS   = 'PARTNERS',
+
+  // Push notifications (VAPID)
+  VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY,
+  WEBHOOK_SECRET = 'antique-split-webhook-2026',
 
   // CORS
   CORS_ORIGINS = '',
 } = process.env;
+
+// ── Web Push setup ───────────────────────────────────────────────────────────
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails('mailto:info@pressmax.net', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  console.log('✅ Web Push (VAPID) configured');
+} else {
+  console.warn('⚠️  VAPID keys missing — push notifications disabled');
+}
+
+// In-memory push subscriptions: key = `${slug}:${room}`
+const pushSubscriptions = new Map();
 
 if (!OPENAI_API_KEY || !AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
   console.error('❗ Missing env vars: OPENAI_API_KEY, AIRTABLE_API_KEY, AIRTABLE_BASE_ID');
@@ -2547,10 +2566,17 @@ app.post('/api/pwa-request', async (req, res) => {
     const hotelSlug  = pickFirstNonEmpty(req.body?.slug,  req.query?.slug, HOTEL_SLUG_DEFAULT);
     const roomNumber = pickFirstNonEmpty(req.body?.room,  req.query?.room, '');
     const token      = pickFirstNonEmpty(req.body?.token, req.query?.token, '');
-    const category   = pickFirstNonEmpty(req.body?.category, '');
-    const message    = pickFirstNonEmpty(req.body?.message, '');
-    const guestName  = pickFirstNonEmpty(req.body?.guestName, req.body?.guest_name, '');
-    const priority   = pickFirstNonEmpty(req.body?.priority, 'Normal');
+    const category    = pickFirstNonEmpty(req.body?.category, '');
+    const message     = pickFirstNonEmpty(req.body?.message, '');
+    const guestName   = pickFirstNonEmpty(req.body?.guestName, req.body?.guest_name, '');
+    const priority    = pickFirstNonEmpty(req.body?.priority, 'Normal');
+    // Concierge extra fields
+    const date        = pickFirstNonEmpty(req.body?.date, '');
+    const time        = pickFirstNonEmpty(req.body?.time, '');
+    const fromLoc     = pickFirstNonEmpty(req.body?.from, '');
+    const toLoc       = pickFirstNonEmpty(req.body?.to, '');
+    const guests      = req.body?.guests ? parseInt(req.body.guests, 10) : null;
+    const partnerName = pickFirstNonEmpty(req.body?.partnerName, '');
 
     // ── Input validation ────────────────────────────────────────────────────────
     if (!roomNumber) return res.status(400).json({ ok: false, error: 'Missing room' });
@@ -2578,8 +2604,14 @@ app.post('/api/pwa-request', async (req, res) => {
       'Poruka':      message,
       'Status':      'New',
     };
-    if (guestName) fields['Gost - ime'] = guestName;
-    if (priority)  fields['Prioritet']  = priority;
+    if (guestName)   fields['Gost - ime']    = guestName;
+    if (priority)    fields['Prioritet']     = priority;
+    if (date)        fields['Datum']         = date;
+    if (time)        fields['Vrijeme']       = time;
+    if (fromLoc)     fields['Odakle']        = fromLoc;
+    if (toLoc)       fields['Kamo']          = toLoc;
+    if (guests)      fields['Broj osoba']    = guests;
+    if (partnerName) fields['Partner naziv'] = partnerName;
 
     const created = await base(TABLE_REQUESTS).create(fields);
 
@@ -2906,6 +2938,158 @@ app.post('/api/pwa-routes', async (req, res) => {
 
   } catch (e) {
     console.error('pwa-routes error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// ── /api/pwa-partners — partner restaurants / experiences for Concierge ──────
+//
+// Input:  { slug, room, token }
+// Output: { ok, partners: [{ id, name, category, description, cuisine,
+//            atmosphere, address, mapsUrl, hours, price, phone }] }
+// -------------------------
+app.post('/api/pwa-partners', async (req, res) => {
+  const started = Date.now();
+  try {
+    const hotelSlug  = pickFirstNonEmpty(req.body?.slug, HOTEL_SLUG_DEFAULT);
+    const roomNumber = pickFirstNonEmpty(req.body?.room, '');
+    const token      = pickFirstNonEmpty(req.body?.token, '');
+
+    if (!roomNumber) return res.status(400).json({ ok: false, error: 'Missing room' });
+
+    const roomGuide   = await getRoomGuideRecord(hotelSlug, roomNumber);
+    const storedToken = roomGuide?.accessToken ?? '';
+    const tokenValid  = token.length > 0 && storedToken.length > 0 &&
+      token.length === storedToken.length &&
+      timingSafeEqual(Buffer.from(token), Buffer.from(storedToken));
+    if (!tokenValid) return res.status(403).json({ ok: false, error: 'Access denied' });
+
+    const allRecs = await airtableSelectAllSafe(
+      base(TABLE_PARTNERS),
+      `{Hotel Slug} = "${hotelSlug}"`,
+      `Hotel Slug`,
+      hotelSlug,
+      [{ pageSize: 100 }]
+    );
+
+    const partners = allRecs
+      .filter(r => r.fields['Aktivno'] === true)
+      .map(r => {
+        const f = r.fields;
+        return {
+          id:          r.id,
+          name:        f['Naziv']         || '',
+          category:    f['Kategorija']    || 'Restaurant',
+          description: f['Opis']          || '',
+          cuisine:     f['Kuhinja']       || '',
+          atmosphere:  f['Atmosfera']     || '',
+          address:     f['Adresa']        || '',
+          mapsUrl:     f['Google Maps']   || '',
+          hours:       f['Radno vrijeme'] || '',
+          price:       f['Cijena']        || '',
+          phone:       f['Telefon']       || '',
+        };
+      });
+
+    return res.json({ ok: true, partners, meta: { count: partners.length, ms: Date.now() - started } });
+  } catch (e) {
+    console.error('pwa-partners error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// ── /api/pwa-push-subscribe — save guest push subscription ───────────────────
+//
+// Input:  { slug, room, token, subscription }  (subscription = PushSubscription JSON)
+// Stores in memory: Map key `${slug}:${room}`
+// -------------------------
+app.post('/api/pwa-push-subscribe', async (req, res) => {
+  try {
+    const hotelSlug    = pickFirstNonEmpty(req.body?.slug, HOTEL_SLUG_DEFAULT);
+    const roomNumber   = pickFirstNonEmpty(req.body?.room, '');
+    const token        = pickFirstNonEmpty(req.body?.token, '');
+    const subscription = req.body?.subscription;
+
+    if (!roomNumber || !subscription) return res.status(400).json({ ok: false, error: 'Missing room or subscription' });
+
+    const roomGuide   = await getRoomGuideRecord(hotelSlug, roomNumber);
+    const storedToken = roomGuide?.accessToken ?? '';
+    const tokenValid  = token.length > 0 && storedToken.length > 0 &&
+      token.length === storedToken.length &&
+      timingSafeEqual(Buffer.from(token), Buffer.from(storedToken));
+    if (!tokenValid) return res.status(403).json({ ok: false, error: 'Access denied' });
+
+    const key = `${hotelSlug}:${roomNumber}`;
+    pushSubscriptions.set(key, subscription);
+    console.log(`[push] Subscription saved for ${key}`);
+
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('pwa-push-subscribe error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// ── /api/pwa-push-key — return VAPID public key to PWA ───────────────────────
+app.get('/api/pwa-push-key', (req, res) => {
+  if (!VAPID_PUBLIC_KEY) return res.status(503).json({ ok: false, error: 'Push not configured' });
+  res.json({ ok: true, publicKey: VAPID_PUBLIC_KEY });
+});
+
+// ── /api/webhook/request-status — Airtable Automation calls this when ────────
+//   a REQUESTS record Status changes → send push notification to guest
+//
+// Input (from Airtable Automation):
+//   { secret, hotelSlug, room, requestId, status, category }
+// -------------------------
+app.post('/api/webhook/request-status', async (req, res) => {
+  try {
+    const secret     = pickFirstNonEmpty(req.body?.secret, req.headers['x-webhook-secret'], '');
+    const hotelSlug  = pickFirstNonEmpty(req.body?.hotelSlug, req.body?.hotel_slug, '');
+    const roomNumber = pickFirstNonEmpty(req.body?.room, req.body?.nazivSobe, '');
+    const status     = pickFirstNonEmpty(req.body?.status, '');
+    const category   = pickFirstNonEmpty(req.body?.category, 'Request');
+
+    // Verify webhook secret
+    if (secret !== WEBHOOK_SECRET) {
+      console.warn('[webhook] Invalid secret');
+      return res.status(403).json({ ok: false, error: 'Forbidden' });
+    }
+
+    if (!hotelSlug || !roomNumber || !status) {
+      return res.status(400).json({ ok: false, error: 'Missing hotelSlug, room, or status' });
+    }
+
+    // Build notification payload
+    const statusMessages = {
+      'Acknowledged': { title: '✓ Request Received', body: `Your ${category} request has been acknowledged. We'll be in touch shortly.` },
+      'In Progress':  { title: '⚙ In Progress', body: `Your ${category} request is being processed by our team.` },
+      'Resolved':     { title: '✅ Confirmed', body: `Your ${category} request has been confirmed. Please contact reception for details.` },
+    };
+    const notif = statusMessages[status] || { title: 'Request Update', body: `Your request status: ${status}` };
+
+    const payload = JSON.stringify({
+      title: notif.title,
+      body:  notif.body,
+      tag:   'concierge-update',
+      url:   '/pwa/',
+    });
+
+    // Find push subscription
+    const key = `${hotelSlug}:${roomNumber}`;
+    const subscription = pushSubscriptions.get(key);
+
+    if (!subscription) {
+      console.warn(`[webhook] No push subscription for ${key}`);
+      return res.json({ ok: true, pushed: false, reason: 'No subscription on record' });
+    }
+
+    await webpush.sendNotification(subscription, payload);
+    console.log(`[webhook] Push sent to ${key} — status: ${status}`);
+
+    return res.json({ ok: true, pushed: true });
+  } catch (e) {
+    console.error('webhook/request-status error:', e);
     res.status(500).json({ ok: false, error: 'Server error' });
   }
 });
