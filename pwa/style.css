@@ -552,24 +552,74 @@ html, body {
 /* ── Service cards ───────────────────────────────────────────────────────── */
 
 .service-card {
-  background: var(--surface-warm);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  overflow: hidden;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s;
+  transition: transform 0.12s, box-shadow 0.12s;
 }
 
-.service-card:active { background: var(--accent-light); }
+.service-card:active {
+  transform: scale(0.985);
+  box-shadow: none;
+}
 
-.service-card-title { font-weight: 600; font-size: 16px; }
+/* Placeholder image area — replaced with real photo later */
+.service-card-hero {
+  height: 130px;
+  background: linear-gradient(135deg, #3e2a1a 0%, #2c1f14 55%, #1e3040 100%);
+  position: relative;
+}
 
-.service-card-meta { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+.service-card-body {
+  padding: 14px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.service-card-cat {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.service-card-title {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.service-card-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+/* ── Service detail hero ─────────────────────────────────────────────────── */
+
+.svc-hero {
+  height: 180px;
+  background: linear-gradient(135deg, #3e2a1a 0%, #2c1f14 55%, #1e3040 100%);
+  flex-shrink: 0;
+}
+
+/* Emergency call button */
+.action-btn--emergency {
+  background: #c0392b;
+  color: #fff;
+  border-color: #a93226;
+  font-weight: 700;
+  text-decoration: none;
+}
 
 /* ── Map screen — full bleed ─────────────────────────────────────────────── */
 

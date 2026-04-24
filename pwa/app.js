@@ -9,8 +9,9 @@ const ROOM   = params.get('room')  || '';
 const TOKEN  = params.get('token') || '';
 
 // ── Module state ──────────────────────────────────────────────────────────
-let roomGuideData  = null;
-let servicesData   = null;
+let roomGuideData    = null;
+let servicesData     = null;
+let servicesScrollY  = 0;    // saved scroll position for services list
 let poisData       = null;   // loaded from /api/pwa-pois
 let routesData     = null;   // loaded from /api/pwa-routes
 let currentService = null;
@@ -66,8 +67,14 @@ function _activateScreen(name, direction = 'forward') {
     if (!cityMapInited) initCityMap();
   }
   if (name === 'room-guide') renderRoomGuideSections();
-  if (name === 'services')   renderServicesList();
-  if (name === 'routes')     renderRoutesList();
+  if (name === 'services') {
+    renderServicesList();
+    // Restore scroll position when going back from a service detail
+    if (direction === 'back') {
+      requestAnimationFrame(() => window.scrollTo(0, servicesScrollY));
+    }
+  }
+  if (name === 'routes') renderRoutesList();
 }
 
 function pushScreen(name) {
@@ -209,23 +216,67 @@ function renderServicesList() {
     return;
   }
   hide('services-empty');
-  container.innerHTML = servicesData.map((s, i) => `
-    <div class="service-card" onclick="openServiceDetail(${i})">
-      <div class="service-card-title">${escHtml(s.naziv || '')}</div>
-      ${s.radnoVrijeme ? `<div class="service-card-meta">${escHtml(s.radnoVrijeme)}</div>` : ''}
-      ${s.opis ? `<div class="service-card-meta">${escHtml(s.opis.slice(0, 80))}${s.opis.length > 80 ? '\u2026' : ''}</div>` : ''}
-    </div>
-  `).join('');
+  container.innerHTML = servicesData.map((s, i) => {
+    const cat   = Array.isArray(s.kategorija) ? s.kategorija[0] || '' : '';
+    const desc  = _stripUrls(s.opis || '');
+    const snippet = desc.length > 90 ? desc.slice(0, 90).trimEnd() + '\u2026' : desc;
+    return `
+      <div class="service-card" onclick="openServiceDetail(${i})">
+        <div class="service-card-hero"></div>
+        <div class="service-card-body">
+          ${cat ? `<div class="service-card-cat">${escHtml(cat)}</div>` : ''}
+          <div class="service-card-title">${escHtml(s.naziv || '')}</div>
+          ${snippet ? `<div class="service-card-desc">${escHtml(snippet)}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
 }
 
 function openServiceDetail(idx) {
   currentService = servicesData ? servicesData[idx] : null;
   if (!currentService) return;
+
+  // Save scroll so we can restore it when going back
+  servicesScrollY = window.scrollY;
+
   const cats = Array.isArray(currentService.kategorija) ? currentService.kategorija.join(', ') : '';
   setText('svc-category', cats);
-  setText('svc-title', currentService.naziv || '');
-  setText('svc-hours', currentService.radnoVrijeme || '');
-  setText('svc-desc', currentService.opis || '');
+  setText('svc-title',        currentService.naziv || '');
+  setText('svc-screen-title', currentService.naziv || '');
+
+  // Description — strip URLs, render line breaks
+  const rawOpisDesc = currentService.opis || '';
+  const cleanDesc   = _stripUrls(rawOpisDesc).trim();
+  const descEl = document.getElementById('svc-desc');
+  if (descEl) descEl.innerHTML = escHtml(cleanDesc).replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>');
+
+  // Booking URL button — detect https link in opis (not wa.me)
+  const bookingUrl = _extractFirstUrl(rawOpisDesc, ['wa.me']);
+  const bookingBtn = document.getElementById('svc-booking-btn');
+  if (bookingBtn) {
+    bookingBtn.hidden = !bookingUrl;
+    if (bookingUrl) {
+      bookingBtn.href = bookingUrl;
+      try {
+        const domain = new URL(bookingUrl).hostname.replace(/^www\./, '');
+        bookingBtn.textContent = 'Book on ' + domain + ' \u2192';
+      } catch { bookingBtn.textContent = 'Book now \u2192'; }
+    }
+  }
+
+  // Emergency call button — show for emergency/urgent services
+  const combined    = [currentService.naziv, ...(currentService.kategorija || [])].join(' ').toLowerCase();
+  const isEmergency = /emergency|hitno|urgent|sos/.test(combined);
+  const emergencyBtn = document.getElementById('svc-emergency-btn');
+  if (emergencyBtn) {
+    emergencyBtn.hidden = !isEmergency;
+    if (isEmergency) {
+      const phone = CONFIG.phone || '';
+      emergencyBtn.href = phone ? 'tel:' + phone : '#';
+      emergencyBtn.textContent = '\uD83D\uDCDE\u2009Call Reception' + (phone ? ' \u00b7 ' + phone : '');
+    }
+  }
+
   pushScreen('service-detail');
 }
 
@@ -1244,6 +1295,17 @@ function hide(id)             { const el = document.getElementById(id); if (el) 
 function show(id)             { const el = document.getElementById(id); if (el) el.hidden = false; }
 function setHidden(id, state) { const el = document.getElementById(id); if (el) el.hidden = state; }
 function setText(id, text)    { const el = document.getElementById(id); if (el) el.textContent = text; }
+
+// Strip all URLs from a text string
+function _stripUrls(text) {
+  return (text || '').replace(/https?:\/\/[^\s]+/g, '').replace(/\s{2,}/g, ' ').trim();
+}
+
+// Extract first URL from text, optionally skipping domains in the exclude list
+function _extractFirstUrl(text, excludeDomains = []) {
+  const matches = (text || '').match(/https?:\/\/[^\s]+/g) || [];
+  return matches.find(u => !excludeDomains.some(d => u.includes(d))) || null;
+}
 
 function escHtml(str) {
   return String(str)

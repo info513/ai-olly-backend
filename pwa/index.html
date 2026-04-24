@@ -198,18 +198,26 @@
 
     <div class="screen-header">
       <button class="back-btn" onclick="popScreen()">&larr; Back</button>
-      <div class="screen-title">Service</div>
+      <div id="svc-screen-title" class="screen-title"></div>
     </div>
+
+    <!-- Placeholder image / hero -->
+    <div class="svc-hero" id="svc-hero"></div>
 
     <div class="screen-body">
       <div id="svc-category" class="detail-category"></div>
       <h2 id="svc-title" class="detail-title"></h2>
-      <div id="svc-hours" class="detail-meta"></div>
       <div id="svc-desc" class="detail-section-text"></div>
-      <div class="detail-actions">
-        <button class="action-btn" onclick="gotoRoot('ask')">Ask Dioclea</button>
+      <div class="detail-actions" id="svc-actions">
+        <!-- Emergency call — shown only for emergency services -->
+        <a id="svc-emergency-btn" class="action-btn action-btn--emergency" href="#" hidden>
+          📞 Call now
+        </a>
+        <!-- Booking link — shown when URL detected in description -->
+        <a id="svc-booking-btn" class="action-btn action-btn--primary" href="#" target="_blank" rel="noopener" hidden>
+          Book now →
+        </a>
         <button class="action-btn" onclick="pushScreen('contact')">Contact Reception</button>
-        <button class="action-btn action-btn--primary" onclick="pushScreen('request')">Send a Request</button>
       </div>
     </div>
   </div>

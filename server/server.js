@@ -756,21 +756,35 @@ async function getRoomsForHotelWeb(hotelSlug) {
   return webRows;
 }
 
-// Fetch ALL rooms for a hotel without any AI_SOURCE filter — for room type lookup
+// Fetch ALL rooms for a hotel without any AI_SOURCE filter — for room type lookup.
+// Uses three fallback levels: filtered by slug text field, filtered by linked slug,
+// then all records (filtered in JS). This handles both text and linked Hotel Slug fields.
 async function getRoomsRaw(hotelSlug) {
   const cacheKey = 'raw:' + hotelSlug;
   const cached   = CACHE.roomsByHotel.get(cacheKey);
   if (cached && cacheFresh(cached.ts) && Array.isArray(cached.rows)) return cached.rows;
 
   const slugEsc = escapeAirtableFormulaString(hotelSlug);
-  const recs    = await airtableSelectAllSafe(TABLE_ROOMS, [
-    { pageSize: 100, filterByFormula: `{Hotel Slug (text)}='${slugEsc}'` },
-    { pageSize: 100, filterByFormula: `{Hotel Slug}='${slugEsc}'`        },
-  ]);
 
-  const rows = recs.map(mapRoomRecord);
-  if (rows.length > 0) CACHE.roomsByHotel.set(cacheKey, { ts: Date.now(), rows });
-  return rows;
+  // Try filtered queries first; fall back to fetching all (filter in JS)
+  const recs = await airtableSelectAllSafe(
+    TABLE_ROOMS,
+    [
+      { pageSize: 100, filterByFormula: `{Hotel Slug (text)}='${slugEsc}'` },
+      { pageSize: 100, filterByFormula: `{Hotel Slug}='${slugEsc}'`        },
+    ],
+    { pageSize: 100 } // fallback: all rooms — filter in JS below
+  );
+
+  const allRows  = recs.map(mapRoomRecord);
+  // If we used the fallback (no slug filter), narrow by hotelSlug in JS
+  const rows     = allRows.filter(r =>
+    !r.hotelSlugRaw?.length || matchesHotelSlug(r.hotelSlugRaw, hotelSlug)
+  );
+
+  const result = rows.length ? rows : allRows; // last resort: return all if nothing matched
+  if (result.length > 0) CACHE.roomsByHotel.set(cacheKey, { ts: Date.now(), rows: result });
+  return result;
 }
 
 // -------------------------
