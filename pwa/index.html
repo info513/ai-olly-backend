@@ -44,7 +44,7 @@
           <span class="guide-card-label">Hotel Services</span>
         </div>
 
-        <div class="guide-card" onclick="gotoRoot('city-map')">
+        <div class="guide-card" onclick="openCityMapWelcome()">
           <span class="guide-card-icon">🗺</span>
           <span class="guide-card-label">City Map</span>
         </div>
@@ -194,6 +194,38 @@
         <button class="action-btn action-btn--primary" onclick="pushScreen('request')">Send a Request</button>
       </div>
     </div>
+  </div>
+
+  <!-- ── Screen: City Map Welcome ─────────────────────────────────────── -->
+  <div id="screen-city-map-welcome" class="screen screen--map-welcome">
+
+    <!-- Slideshow background images -->
+    <div class="map-welcome-slides" id="map-welcome-slides">
+      <div class="map-welcome-slide active" id="map-welcome-slide-0"></div>
+      <div class="map-welcome-slide"        id="map-welcome-slide-1"></div>
+      <div class="map-welcome-slide"        id="map-welcome-slide-2"></div>
+    </div>
+
+    <!-- Gradient overlays -->
+    <div class="map-welcome-gradient-top"></div>
+    <div class="map-welcome-gradient-bottom"></div>
+
+    <!-- Back button -->
+    <button class="map-welcome-back" onclick="popScreen()">&larr;</button>
+
+    <!-- Slideshow dots -->
+    <div class="map-welcome-dots" id="map-welcome-dots"></div>
+
+    <!-- Content -->
+    <div class="map-welcome-content">
+      <p class="map-welcome-label">Explore</p>
+      <h1 class="map-welcome-city" id="map-welcome-city">Split</h1>
+      <p class="map-welcome-meta" id="map-welcome-meta">Points of interest &amp; walking routes</p>
+      <button class="map-welcome-btn" onclick="gotoRoot('city-map')">
+        Let's explore&ensp;→
+      </button>
+    </div>
+
   </div>
 
   <!-- ── Screen: City Map ───────────────────────────────────────────────── -->
@@ -628,7 +660,7 @@
       <span class="bottom-nav-icon">⌂</span>
       <span>Home</span>
     </button>
-    <button class="bottom-nav-item" data-screen="city-map" onclick="gotoRoot('city-map')">
+    <button class="bottom-nav-item" data-screen="city-map" onclick="openCityMapWelcome()">
       <span class="bottom-nav-icon">◎</span>
       <span>Map</span>
     </button>

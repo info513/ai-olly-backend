@@ -1426,3 +1426,175 @@ html, body {
 
 .chat-send-btn:active    { background: #3d2a1a; transform: scale(0.90); }
 .chat-send-btn:disabled  { opacity: 0.35; cursor: default; transform: none; box-shadow: none; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CITY MAP WELCOME SCREEN
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.screen--map-welcome {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  background: #1a1208;
+  /* No min-height override needed — inherits 100dvh from .screen */
+}
+
+/* ── Slideshow ── */
+
+.map-welcome-slides {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.map-welcome-slide {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 1.2s ease-in-out;
+}
+
+.map-welcome-slide.active {
+  opacity: 1;
+}
+
+/* Placeholder gradient shown before images load */
+.map-welcome-slide:nth-child(1) {
+  background-image: linear-gradient(160deg, #2e1f0e 0%, #1a3040 50%, #0d1f2d 100%);
+}
+.map-welcome-slide:nth-child(2) {
+  background-image: linear-gradient(160deg, #1f2e0e 0%, #0d2d1a 100%);
+}
+.map-welcome-slide:nth-child(3) {
+  background-image: linear-gradient(160deg, #2e0e1f 0%, #1a0d2d 100%);
+}
+
+/* ── Gradient overlays ── */
+
+.map-welcome-gradient-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 35%;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.map-welcome-gradient-bottom {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 70%;
+  background: linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.5) 45%, transparent 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ── Back button ── */
+
+.map-welcome-back {
+  position: absolute;
+  top: calc(18px + env(safe-area-inset-top, 0px));
+  left: 20px;
+  z-index: 10;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: var(--radius-pill);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  padding: 8px 18px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Slideshow dots ── */
+
+.map-welcome-dots {
+  position: absolute;
+  top: calc(22px + env(safe-area-inset-top, 0px));
+  left: 0; right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  z-index: 10;
+}
+
+.map-welcome-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.4);
+  transition: background 0.3s, transform 0.3s;
+}
+
+.map-welcome-dot.active {
+  background: #fff;
+  transform: scale(1.3);
+}
+
+/* ── Content ── */
+
+.map-welcome-content {
+  position: absolute;
+  bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+  left: 0; right: 0;
+  z-index: 5;
+  padding: 0 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.map-welcome-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 10px;
+}
+
+.map-welcome-city {
+  font-family: var(--font-serif);
+  font-size: 58px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.0;
+  letter-spacing: -0.02em;
+  margin-bottom: 10px;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+}
+
+.map-welcome-meta {
+  font-size: 14px;
+  color: rgba(255,255,255,0.65);
+  margin-bottom: 32px;
+  line-height: 1.5;
+}
+
+.map-welcome-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  color: var(--accent);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 16px 32px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.map-welcome-btn:active {
+  transform: scale(0.96);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+}

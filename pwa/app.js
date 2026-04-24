@@ -53,7 +53,12 @@ function _activateScreen(name, direction = 'forward') {
   }
 
   // Screen-specific init / render
+  if (name === 'city-map-welcome') {
+    _startWelcomeSlideshow();
+    _updateWelcomeMeta();
+  }
   if (name === 'city-map') {
+    _stopWelcomeSlideshow();
     // Use class-based visibility (CSS transform), not hidden attribute
     const mc = document.getElementById('poi-mini-card');
     if (mc) mc.classList.remove('visible');
@@ -222,6 +227,83 @@ function openServiceDetail(idx) {
   setText('svc-hours', currentService.radnoVrijeme || '');
   setText('svc-desc', currentService.opis || '');
   pushScreen('service-detail');
+}
+
+// ── City Map Welcome ──────────────────────────────────────────────────────
+
+// Images to cycle in the welcome slideshow.
+// Drop 1080×1920 JPG/WebP files into /pwa/img/ and list them here.
+const MAP_WELCOME_IMAGES = [
+  // 'img/split-1.jpg',
+  // 'img/split-2.jpg',
+  // 'img/split-3.jpg',
+];
+
+let _welcomeSlideIdx     = 0;
+let _welcomeSlideTimer   = null;
+const SLIDE_DURATION_MS  = 5000;
+
+function openCityMapWelcome() {
+  // If already on the actual map, just show it (no double welcome)
+  if (currentScreen === 'city-map') return;
+  pushScreen('city-map-welcome');
+}
+
+function _startWelcomeSlideshow() {
+  const slides = document.querySelectorAll('.map-welcome-slide');
+  const dotsEl = document.getElementById('map-welcome-dots');
+
+  // Apply image backgrounds if provided
+  slides.forEach((el, i) => {
+    if (MAP_WELCOME_IMAGES[i]) {
+      el.style.backgroundImage = `url('${MAP_WELCOME_IMAGES[i]}')`;
+    }
+  });
+
+  // Build dots (only if > 1 image)
+  const total = Math.max(slides.length, 1);
+  if (dotsEl) {
+    dotsEl.innerHTML = Array.from({ length: total }, (_, i) =>
+      `<div class="map-welcome-dot${i === 0 ? ' active' : ''}"></div>`
+    ).join('');
+  }
+
+  _welcomeSlideIdx = 0;
+  _activateWelcomeSlide(0);
+
+  clearInterval(_welcomeSlideTimer);
+  _welcomeSlideTimer = setInterval(() => {
+    _welcomeSlideIdx = (_welcomeSlideIdx + 1) % slides.length;
+    _activateWelcomeSlide(_welcomeSlideIdx);
+  }, SLIDE_DURATION_MS);
+}
+
+function _activateWelcomeSlide(idx) {
+  document.querySelectorAll('.map-welcome-slide').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+  document.querySelectorAll('.map-welcome-dot').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+}
+
+function _stopWelcomeSlideshow() {
+  clearInterval(_welcomeSlideTimer);
+  _welcomeSlideTimer = null;
+}
+
+// Update meta line with live POI/route counts once data loads
+function _updateWelcomeMeta() {
+  const el = document.getElementById('map-welcome-meta');
+  if (!el) return;
+  const poiCount   = poisData   ? poisData.filter(p => p.coords).length : null;
+  const routeCount = routesData ? routesData.length : null;
+  if (poiCount !== null || routeCount !== null) {
+    const parts = [];
+    if (poiCount   !== null) parts.push(`${poiCount} points of interest`);
+    if (routeCount !== null) parts.push(`${routeCount} walking route${routeCount !== 1 ? 's' : ''}`);
+    el.textContent = parts.join(' · ');
+  }
 }
 
 // ── City Map ──────────────────────────────────────────────────────────────
