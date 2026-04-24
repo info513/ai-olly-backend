@@ -244,11 +244,11 @@ function openServiceDetail(idx) {
   setText('svc-title',        currentService.naziv || '');
   setText('svc-screen-title', currentService.naziv || '');
 
-  // Description — strip URLs, render line breaks
+  // Description — strip URLs then render as markdown
   const rawOpisDesc = currentService.opis || '';
   const cleanDesc   = _stripUrls(rawOpisDesc).trim();
   const descEl = document.getElementById('svc-desc');
-  if (descEl) descEl.innerHTML = escHtml(cleanDesc).replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>');
+  if (descEl) descEl.innerHTML = _renderMarkdown(cleanDesc);
 
   // Booking URL button — detect https link in opis (not wa.me)
   const bookingUrl = _extractFirstUrl(rawOpisDesc, ['wa.me']);
@@ -1305,6 +1305,42 @@ function _stripUrls(text) {
 function _extractFirstUrl(text, excludeDomains = []) {
   const matches = (text || '').match(/https?:\/\/[^\s]+/g) || [];
   return matches.find(u => !excludeDomains.some(d => u.includes(d))) || null;
+}
+
+// Lightweight markdown → HTML renderer for service descriptions.
+// Supports: **bold**, *italic*, - bullet lists, --- separator, paragraphs.
+function _renderMarkdown(text) {
+  if (!text) return '';
+
+  // Split into blocks by double newline (paragraphs / list groups)
+  const blocks = text.split(/\n{2,}/);
+
+  return blocks.map(block => {
+    const lines = block.split('\n');
+
+    // Bullet list block — lines starting with - • * or digits
+    const isList = lines.every(l => /^\s*([-•*]|\d+\.)\s/.test(l.trim()) || l.trim() === '');
+    if (isList && lines.some(l => l.trim())) {
+      const items = lines
+        .filter(l => l.trim())
+        .map(l => `<li>${_inlineMarkdown(l.replace(/^\s*([-•*]|\d+\.)\s*/, ''))}</li>`)
+        .join('');
+      return `<ul>${items}</ul>`;
+    }
+
+    // Horizontal rule
+    if (/^-{3,}$/.test(block.trim())) return '<hr>';
+
+    // Regular paragraph — join lines with <br> for single newlines
+    const html = lines.map(l => _inlineMarkdown(l)).join('<br>');
+    return `<p>${html}</p>`;
+  }).join('');
+}
+
+function _inlineMarkdown(text) {
+  return escHtml(text)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,     '<em>$1</em>');
 }
 
 function escHtml(str) {

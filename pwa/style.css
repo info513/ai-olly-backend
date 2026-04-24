@@ -592,16 +592,16 @@ html, body {
 .service-card-title {
   font-family: var(--font-serif);
   font-weight: 600;
-  font-size: 18px;
+  font-size: 21px;
   color: var(--text);
   line-height: 1.2;
 }
 
 .service-card-desc {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--text-muted);
-  line-height: 1.5;
-  margin-top: 2px;
+  line-height: 1.55;
+  margin-top: 3px;
 }
 
 /* ── Service detail hero ─────────────────────────────────────────────────── */
@@ -1323,9 +1323,45 @@ html, body {
 
 .detail-section-text {
   font-size: 15px;
-  line-height: 1.65;
+  line-height: 1.7;
   color: var(--text);
-  white-space: pre-line;
+}
+
+/* Markdown-rendered content inside detail text */
+.detail-section-text p {
+  margin-bottom: 12px;
+}
+.detail-section-text p:last-child { margin-bottom: 0; }
+
+.detail-section-text strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.detail-section-text em {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.detail-section-text ul {
+  padding-left: 0;
+  margin: 8px 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-section-text ul li::before {
+  content: '–\00a0';
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.detail-section-text hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
 }
 
 .detail-text--lead { margin-bottom: 12px; }
