@@ -17,19 +17,48 @@
 </head>
 <body>
 
+  <!-- ── Screen: App Splash ─────────────────────────────────────────────── -->
+  <div id="screen-app-splash" class="screen screen--splash">
+
+    <div class="splash-room-badge">
+      Room <span id="splash-room-number">—</span>
+    </div>
+    <div class="splash-room-type" id="splash-room-type"></div>
+
+    <div class="splash-center">
+      <div class="splash-star">✦</div>
+      <h1 class="splash-title">AI Dioclea</h1>
+      <p class="splash-subtitle">Hotel Intelligence</p>
+      <p class="splash-tagline">Your personal assistant</p>
+    </div>
+
+    <button class="splash-enter-btn" onclick="enterApp()">
+      Enter&ensp;→
+    </button>
+
+  </div>
+
   <!-- ── Screen: Home Dashboard ─────────────────────────────────────────── -->
   <div id="screen-home" class="screen screen--root">
 
     <div class="welcome-header">
-      <div class="hotel-name" id="hotel-name">Hotel Antique Split</div>
-      <div class="room-badge">Room <span id="room-number">—</span></div>
+      <div class="wh-top-row">
+        <div class="wh-greeting" id="wh-greeting">Good morning</div>
+        <div class="wh-weather" id="wh-weather" hidden>
+          <span id="wh-temp"></span>
+          <span class="wh-city">Split</span>
+        </div>
+      </div>
+      <div class="wh-room-row">
+        <span class="wh-room" id="room-number">—</span>
+        <span class="wh-sep" id="wh-sep" hidden>&thinsp;·&thinsp;</span>
+        <span class="wh-room-type" id="wh-room-type"></span>
+      </div>
     </div>
 
     <div id="param-warning" class="param-warning" hidden>
       This link appears to be incomplete. Please scan the QR code in your room again.
     </div>
-
-    <p id="welcome-text" class="welcome-text" hidden></p>
 
     <div class="screen-body">
       <div class="guide-grid">
@@ -64,18 +93,7 @@
           <span class="guide-card-label">Help &amp; Requests</span>
         </div>
 
-        <div class="guide-card guide-card--wide" onclick="gotoRoot('ask')">
-          <span class="guide-card-icon">✦</span>
-          <span class="guide-card-label">Ask Dioclea</span>
-        </div>
-
       </div>
-
-      <div class="guide-card guide-card--secondary" onclick="openModule('info')">
-        <span class="guide-card-icon">ⓘ</span>
-        <span class="guide-card-label">Hotel Info &amp; Contacts</span>
-      </div>
-
     </div>
   </div>
 

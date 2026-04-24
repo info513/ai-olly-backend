@@ -94,42 +94,174 @@ html, body {
   letter-spacing: -0.01em;
 }
 
-/* ── Welcome header ──────────────────────────────────────────────────────── */
+/* ── App Splash Screen ───────────────────────────────────────────────────── */
+
+.screen--splash {
+  background: linear-gradient(155deg, #3e2a1a 0%, #2c1f14 60%, #1a1208 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 32px;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 48px);
+  position: relative;
+  min-height: 100dvh;
+}
+
+.splash-room-badge {
+  position: absolute;
+  top: calc(28px + env(safe-area-inset-top, 0px));
+  left: 0; right: 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.06em;
+}
+
+.splash-room-type {
+  position: absolute;
+  top: calc(50px + env(safe-area-inset-top, 0px));
+  left: 0; right: 0;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0.08em;
+}
+
+.splash-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.splash-star {
+  font-size: 32px;
+  color: var(--gold);
+  margin-bottom: 6px;
+  opacity: 0.9;
+}
+
+.splash-title {
+  font-family: var(--font-serif);
+  font-size: 52px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.02em;
+  line-height: 1.0;
+}
+
+.splash-subtitle {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-top: 4px;
+}
+
+.splash-tagline {
+  font-size: 14px;
+  color: rgba(255,255,255,0.45);
+  margin-top: 2px;
+}
+
+.splash-enter-btn {
+  position: absolute;
+  bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+  left: 32px; right: 32px;
+  background: #fff;
+  color: var(--accent);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 17px 32px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.splash-enter-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+}
+
+/* ── Welcome header (home screen) ────────────────────────────────────────── */
 
 .welcome-header {
-  padding: 52px 28px 34px;
+  padding: 48px 28px 28px;
   background: linear-gradient(155deg, #3e2a1a 0%, #2c1f14 60%, #261a10 100%);
   color: #fff;
   border-radius: 0 0 26px 26px;
 }
 
-.hotel-name {
-  font-family: var(--font-serif);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,0.55);
-  margin-bottom: 16px;
+.wh-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 10px;
 }
 
-.room-badge {
-  font-size: 38px;
+.wh-greeting {
+  font-family: var(--font-serif);
+  font-size: 30px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.wh-weather {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+#wh-temp {
+  font-size: 22px;
   font-weight: 700;
   color: #fff;
-  letter-spacing: -0.03em;
-  line-height: 1.08;
+  letter-spacing: -0.02em;
+  line-height: 1;
 }
 
-.room-badge span { color: #e0bc6a; }
+.wh-city {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
 
-/* ── Welcome text ────────────────────────────────────────────────────────── */
+.wh-room-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+}
 
-.welcome-text {
+.wh-room {
   font-size: 15px;
-  line-height: 1.65;
-  color: var(--text-muted);
-  padding: 12px 28px 2px;
+  font-weight: 600;
+  color: var(--gold);
+  letter-spacing: 0.04em;
+}
+
+.wh-room::before { content: 'Room '; }
+
+.wh-sep {
+  font-size: 14px;
+  color: rgba(255,255,255,0.3);
+}
+
+.wh-room-type {
+  font-size: 14px;
+  color: rgba(255,255,255,0.55);
 }
 
 /* ── Screen body ─────────────────────────────────────────────────────────── */

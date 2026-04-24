@@ -1151,14 +1151,11 @@ async function fetchWelcomeData() {
     if (!res.ok) return;
     const data = await res.json();
     if (!data.ok) return;
-    if (data.hotelName) setText('hotel-name', data.hotelName);
-    if (data.aiWelcome) {
-      // Show only the first sentence — keeps the welcome elegant and concise
-      const full  = data.aiWelcome.trim();
-      const match = full.match(/^[^.!?]+[.!?]/);
-      const welcome = match ? match[0].trim() : (full.length > 120 ? full.slice(0, 120).trimEnd() + '.' : full);
-      setText('welcome-text', welcome);
-      show('welcome-text');
+    // Room type — show on splash + home header
+    if (data.roomType) {
+      setText('splash-room-type', data.roomType);
+      setText('wh-room-type', data.roomType);
+      show('wh-sep');
     }
   } catch (_) {
     // Silent fallback
@@ -1258,13 +1255,42 @@ function escHtml(str) {
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────
-function boot() {
-  // Room display
-  const roomEl  = document.getElementById('room-number');
-  if (roomEl) roomEl.textContent = ROOM || '—';
 
-  const hotelEl = document.getElementById('hotel-name');
-  if (hotelEl) hotelEl.textContent = CONFIG.hotelName;
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h >= 5  && h < 12) return 'Good morning';
+  if (h >= 12 && h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+async function fetchSplitTemperature() {
+  try {
+    const res  = await fetch(
+      'https://api.open-meteo.com/v1/forecast?latitude=43.5081&longitude=16.4402&current=temperature_2m'
+    );
+    const data = await res.json();
+    const temp = Math.round(data?.current?.temperature_2m);
+    if (!isNaN(temp)) {
+      setText('wh-temp', temp + '°C');
+      show('wh-weather');
+    }
+  } catch (_) { /* silent */ }
+}
+
+function enterApp() {
+  gotoRoot('home');
+}
+
+function boot() {
+  // Splash room display
+  setText('splash-room-number', ROOM || '—');
+  setText('room-number',        ROOM || '—');
+
+  // Home greeting
+  setText('wh-greeting', getGreeting());
+
+  // Fetch temperature in background
+  fetchSplitTemperature();
 
   // Contact screen
   const phoneLink = document.getElementById('contact-phone');
@@ -1288,7 +1314,8 @@ function boot() {
 
   if (!ROOM || !TOKEN) show('param-warning');
 
-  gotoRoot('home');
+  // Show splash screen first; guest taps "Enter" to proceed to home
+  _activateScreen('app-splash');
 
   // Load per-room data in background
   if (ROOM && TOKEN) {

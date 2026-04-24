@@ -2602,6 +2602,7 @@ app.post('/api/pwa-welcome', async (req, res) => {
     return res.json({
       ok:        true,
       hotelName: hotelRec?.hotelNaziv ?? '',
+      roomType:  roomGuide?.tipSobe   ?? '',
       aiWelcome: roomGuide?.aiWelcome ?? '',
     });
 
