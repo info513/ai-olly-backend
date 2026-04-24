@@ -591,6 +591,18 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ── Selected POI marker ─────────────────────────────────────────────────── */
+
+@keyframes markerPulse {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(201,162,39,0.4)); }
+  50%       { filter: drop-shadow(0 0 10px rgba(201,162,39,0.85)); }
+}
+
+.poi-marker-selected {
+  animation: markerPulse 1.8s ease-in-out infinite;
+  z-index: 800 !important;
+}
+
 /* ── Category list panel ─────────────────────────────────────────────────── */
 
 .map-category-panel {

@@ -20,7 +20,8 @@ let currentNmCat   = null;
 let cityMapObj     = null;
 let cityMapInited  = false;
 let routeMapObj    = null;
-let poiMarkers     = [];   // { marker, poi, idx } — for category filtering
+let poiMarkers          = [];   // { marker, poi, idx } — for category filtering
+let selectedPoiEntry   = null; // currently highlighted marker entry
 
 // ── Navigation stack ──────────────────────────────────────────────────────
 const ROOT_SCREENS = new Set(['home', 'city-map', 'ask', 'info']);
@@ -256,6 +257,32 @@ function createPoiIcon(category) {
   });
 }
 
+// Selected state — larger, dark background, gold ring, pulse animation via CSS class
+function createPoiIconSelected(category) {
+  const emoji = categoryToEmoji(category);
+  return L.divIcon({
+    className: 'poi-marker-selected',
+    html: `<div style="width:42px;height:42px;background:#2c1f14;border:3px solid #c9a227;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 0 0 6px rgba(201,162,39,0.25),0 4px 16px rgba(0,0,0,0.4);cursor:pointer;">${emoji}</div>`,
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
+  });
+}
+
+// Set a marker as selected (highlights it); resets the previous one
+function setSelectedPoiMarker(idx) {
+  // Reset previous selection
+  if (selectedPoiEntry) {
+    selectedPoiEntry.marker.setIcon(createPoiIcon(selectedPoiEntry.poi.category));
+    selectedPoiEntry = null;
+  }
+  if (idx == null) return;
+  const entry = poiMarkers.find(m => m.idx === idx);
+  if (entry) {
+    entry.marker.setIcon(createPoiIconSelected(entry.poi.category));
+    selectedPoiEntry = entry;
+  }
+}
+
 function initCityMap() {
   if (cityMapInited) return;
   const el = document.getElementById('city-map-leaflet');
@@ -424,6 +451,8 @@ function showPoiMiniCard(idx) {
   setText('poi-mini-name', poi.name);
   const meta = [poi.dist, poi.visit].filter(Boolean).join(' \u00b7 ');
   setText('poi-mini-info', meta);
+  // Highlight the tapped marker
+  setSelectedPoiMarker(idx);
   // Ensure category panel is hidden so cards don't overlap
   closeMapCategoryPanel();
   const el = document.getElementById('poi-mini-card');
@@ -433,6 +462,8 @@ function showPoiMiniCard(idx) {
 function closePoisMiniCard() {
   const el = document.getElementById('poi-mini-card');
   if (el) el.classList.remove('visible');
+  // Reset marker highlight
+  setSelectedPoiMarker(null);
   currentPoi = null;
 }
 
