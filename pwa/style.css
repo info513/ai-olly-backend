@@ -440,40 +440,121 @@ html, body {
 
 .service-card-meta { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
 
-/* ── Map screen ──────────────────────────────────────────────────────────── */
+/* ── Map screen — full bleed ─────────────────────────────────────────────── */
 
-.map-screen-body {
-  padding: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+.screen--map-full {
   position: relative;
+  padding: 0;
+  overflow: hidden;
 }
 
-#city-map-leaflet,
-#route-map-leaflet {
-  z-index: 1;
+/* City map fills screen minus bottom nav */
+#city-map-leaflet {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  height: auto;
   width: 100%;
+  z-index: 1;
 }
 
-#city-map-leaflet  { height: 55vh; }
-#route-map-leaflet { height: 60vh; }
+/* Route map — inline inside a screen with header */
+#route-map-leaflet {
+  width: 100%;
+  height: 60vh;
+  z-index: 1;
+}
 
 .leaflet-container { font-family: inherit; }
 
-/* ── POI mini card ───────────────────────────────────────────────────────── */
+/* Floating top gradient + title */
+.map-overlay-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 400;
+  padding: 22px 24px 52px;
+  background: linear-gradient(to bottom, rgba(15,10,5,0.72) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.map-overlay-title {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+}
+
+.map-overlay-hint {
+  font-size: 12px;
+  color: rgba(255,255,255,0.65);
+  margin-top: 4px;
+}
+
+/* Category filter bar — floats over map below title */
+.map-filter-bar {
+  position: absolute;
+  top: 64px; left: 0; right: 0;
+  z-index: 400;
+  padding: 0 16px 6px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.map-filter-bar::-webkit-scrollbar { display: none; }
+
+.map-filter-chip {
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.90);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 7px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.map-filter-chip.active {
+  background: var(--accent);
+  color: var(--gold-light);
+}
+
+/* ── POI mini card — animated slide-up bottom sheet ─────────────────────── */
 
 .poi-mini-card {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  left: 0; right: 0;
+  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
   background: var(--surface);
-  border-top: 1px solid var(--border);
-  padding: 20px 24px;
-  z-index: 500;
   border-radius: 22px 22px 0 0;
-  box-shadow: 0 -6px 30px rgba(44,31,20,0.12);
+  padding: 8px 24px 24px;
+  z-index: 500;
+  box-shadow: 0 -6px 32px rgba(44,31,20,0.18);
+  transform: translateY(110%);
+  transition: transform 0.35s cubic-bezier(0.34, 1.15, 0.64, 1);
+}
+
+.poi-mini-card.visible {
+  transform: translateY(0);
+}
+
+.poi-mini-drag-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto 16px;
 }
 
 .poi-mini-name { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
@@ -510,11 +591,11 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ── Map footer ──────────────────────────────────────────────────────────── */
+/* ── Map footer (route map only) ─────────────────────────────────────────── */
 
 .map-footer {
   flex: none;
-  padding: 16px 24px 4px;
+  padding: 12px 24px 4px;
   background: var(--bg);
 }
 

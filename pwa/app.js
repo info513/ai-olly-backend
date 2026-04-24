@@ -20,6 +20,7 @@ let currentNmCat   = null;
 let cityMapObj     = null;
 let cityMapInited  = false;
 let routeMapObj    = null;
+let poiMarkers     = [];   // { marker, poi, idx } — for category filtering
 
 // ── Navigation stack ──────────────────────────────────────────────────────
 const ROOT_SCREENS = new Set(['home', 'city-map', 'ask', 'info']);
@@ -52,7 +53,9 @@ function _activateScreen(name, direction = 'forward') {
 
   // Screen-specific init / render
   if (name === 'city-map') {
-    hide('poi-mini-card');
+    // Use class-based visibility (CSS transform), not hidden attribute
+    const mc = document.getElementById('poi-mini-card');
+    if (mc) mc.classList.remove('visible');
     setHidden('poi-loading-hint', !!poisData);
     if (!cityMapInited) initCityMap();
   }
@@ -221,58 +224,143 @@ function openServiceDetail(idx) {
 }
 
 // ── City Map ──────────────────────────────────────────────────────────────
+
+// Map each POI category string to an emoji for the marker
+function categoryToEmoji(cat) {
+  const c = (cat || '').toLowerCase();
+  if (c.includes('plaža') || c.includes('beach') || c.includes('kupanje')) return '🏖';
+  if (c.includes('restoran') || c.includes('restaurant'))                   return '🍽';
+  if (c.includes('kafić') || c.includes('kava') || c.includes('cafe') ||
+      c.includes('bar') || c.includes('lounge'))                            return '☕';
+  if (c.includes('crkva') || c.includes('palača') || c.includes('muzej') ||
+      c.includes('kulturno') || c.includes('landmark') ||
+      c.includes('history') || c.includes('museum'))                        return '🏛';
+  if (c.includes('park') || c.includes('priroda') || c.includes('garden')) return '🌿';
+  if (c.includes('kupovina') || c.includes('shop') ||
+      c.includes('market') || c.includes('tržnica'))                        return '🛍';
+  if (c.includes('trajekt') || c.includes('ferry') ||
+      c.includes('prijevoz') || c.includes('transport'))                    return '⛴';
+  if (c.includes('noćni') || c.includes('night') || c.includes('club'))    return '🎵';
+  if (c.includes('atm') || c.includes('bankomat'))                         return '🏧';
+  if (c.includes('ljekarna') || c.includes('pharmacy'))                    return '💊';
+  return '📍';
+}
+
+function createPoiIcon(category) {
+  const emoji = categoryToEmoji(category);
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:34px;height:34px;background:#fff;border:2.5px solid #c9a227;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 2px 10px rgba(0,0,0,0.22);cursor:pointer;">${emoji}</div>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+  });
+}
+
 function initCityMap() {
   if (cityMapInited) return;
   const el = document.getElementById('city-map-leaflet');
   if (!el || typeof L === 'undefined') {
-    // Leaflet not yet loaded — retry
     setTimeout(initCityMap, 300);
     return;
   }
 
-  cityMapObj = L.map('city-map-leaflet', { zoomControl: true }).setView(
+  cityMapObj = L.map('city-map-leaflet', { zoomControl: false }).setView(
     [CONFIG.hotelCoords.lat, CONFIG.hotelCoords.lng], 16
   );
 
-  // CartoDB Voyager — cleaner, more minimal look than default OSM tiles
+  // CartoDB Voyager — clean, minimal tiles
   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     attribution: '\u00a9 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> \u00a9 <a href="https://carto.com/attributions">CARTO</a>',
     subdomains: 'abcd',
     maxZoom: 20,
   }).addTo(cityMapObj);
 
-  // Hotel marker — larger, more distinctive
+  // Hotel marker — distinctive star in dark circle
   const hotelIcon = L.divIcon({
     className: '',
-    html: '<div style="width:20px;height:20px;background:#2c1f14;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div>',
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
+    html: '<div style="width:38px;height:38px;background:#2c1f14;border:3px solid #f5edd8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 3px 12px rgba(0,0,0,0.45);">⭐</div>',
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
   });
   L.marker([CONFIG.hotelCoords.lat, CONFIG.hotelCoords.lng], { icon: hotelIcon, zIndexOffset: 1000 })
     .addTo(cityMapObj)
-    .bindTooltip('Hotel Antique Split', { permanent: false });
+    .bindTooltip(CONFIG.hotelName || 'Hotel', { permanent: false });
 
-  // POI markers — added now if data is ready, otherwise added by loadPois() callback
+  // Move zoom control to bottom-right, away from overlays
+  L.control.zoom({ position: 'bottomright' }).addTo(cityMapObj);
+
   if (poisData) addPoiMarkersToMap();
 
   cityMapInited = true;
+
+  // Ensure correct size after CSS has rendered
+  setTimeout(() => cityMapObj.invalidateSize(), 80);
 }
 
 function addPoiMarkersToMap() {
   if (!cityMapObj || !poisData) return;
-  hide('poi-loading-hint');
-  const poiIcon = L.divIcon({
-    className: '',
-    html: '<div style="width:16px;height:16px;background:#c9a227;border:2.5px solid #fff;border-radius:50%;box-shadow:0 1px 6px rgba(0,0,0,0.35);"></div>',
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-  });
+  setHidden('poi-loading-hint', true);
+
+  poiMarkers = []; // reset
+
   poisData.forEach((poi, idx) => {
-    if (!poi.coords) return; // skip POIs without coordinates in Airtable
-    L.marker([poi.coords.lat, poi.coords.lng], { icon: poiIcon })
+    if (!poi.coords) return;
+    const icon = createPoiIcon(poi.category);
+    const marker = L.marker([poi.coords.lat, poi.coords.lng], { icon })
       .addTo(cityMapObj)
       .on('click', () => showPoiMiniCard(idx));
+    poiMarkers.push({ marker, poi, idx });
   });
+
+  buildMapFilterChips();
+}
+
+// Build category filter chips from loaded POI data
+function buildMapFilterChips() {
+  const bar = document.getElementById('map-filter-bar');
+  if (!bar || !poisData) return;
+
+  const cats = [...new Set(
+    poisData.filter(p => p.category).map(p => p.category)
+  )].sort();
+
+  bar.innerHTML = '';
+
+  const allChip = document.createElement('button');
+  allChip.className = 'map-filter-chip active';
+  allChip.textContent = '✦ All';
+  allChip.onclick = () => filterMapPois(null);
+  bar.appendChild(allChip);
+
+  cats.forEach(cat => {
+    const chip = document.createElement('button');
+    chip.className = 'map-filter-chip';
+    chip.textContent = categoryToEmoji(cat) + '\u2009' + cat;
+    chip.dataset.cat = cat;
+    chip.onclick = () => filterMapPois(cat);
+    bar.appendChild(chip);
+  });
+}
+
+// Show/hide POI markers by category
+function filterMapPois(category) {
+  // Update chip active state
+  document.querySelectorAll('.map-filter-chip').forEach(chip => {
+    const isAll = !chip.dataset.cat;
+    chip.classList.toggle('active', category ? chip.dataset.cat === category : isAll);
+  });
+
+  // Show/hide markers
+  poiMarkers.forEach(({ marker, poi }) => {
+    const show = !category || poi.category === category;
+    if (show && !cityMapObj.hasLayer(marker)) cityMapObj.addLayer(marker);
+    if (!show && cityMapObj.hasLayer(marker)) cityMapObj.removeLayer(marker);
+  });
+
+  // Close any open mini-card
+  const mc = document.getElementById('poi-mini-card');
+  if (mc) mc.classList.remove('visible');
+  currentPoi = null;
 }
 
 function showPoiMiniCard(idx) {
@@ -283,11 +371,13 @@ function showPoiMiniCard(idx) {
   setText('poi-mini-name', poi.name);
   const meta = [poi.dist, poi.visit].filter(Boolean).join(' \u00b7 ');
   setText('poi-mini-info', meta);
-  show('poi-mini-card');
+  const el = document.getElementById('poi-mini-card');
+  if (el) requestAnimationFrame(() => el.classList.add('visible'));
 }
 
 function closePoisMiniCard() {
-  hide('poi-mini-card');
+  const el = document.getElementById('poi-mini-card');
+  if (el) el.classList.remove('visible');
   currentPoi = null;
 }
 
@@ -419,17 +509,19 @@ function initRouteMap() {
   const startCoords = currentRoute.startPointCoords || CONFIG.hotelCoords;
   routeMapObj = L.map('route-map-leaflet').setView([startCoords.lat, startCoords.lng], 14);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '\u00a9 OpenStreetMap contributors',
-    maxZoom: 19,
+  // CartoDB Voyager — consistent with city map
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '\u00a9 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> \u00a9 <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 20,
   }).addTo(routeMapObj);
 
-  // Start marker
+  // Start marker — hotel star
   const startIcon = L.divIcon({
     className: '',
-    html: '<div style="width:14px;height:14px;background:#2c1f14;border:2px solid #fff;border-radius:50%;"></div>',
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
+    html: '<div style="width:32px;height:32px;background:#2c1f14;border:2.5px solid #f5edd8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.35);">⭐</div>',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
   });
   L.marker([startCoords.lat, startCoords.lng], { icon: startIcon })
     .addTo(routeMapObj)

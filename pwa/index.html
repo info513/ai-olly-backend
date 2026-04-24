@@ -197,34 +197,31 @@
   </div>
 
   <!-- ── Screen: City Map ───────────────────────────────────────────────── -->
-  <div id="screen-city-map" class="screen screen--root">
+  <div id="screen-city-map" class="screen screen--root screen--map-full">
 
-    <div class="screen-header">
-      <div class="screen-title">City Map</div>
+    <!-- Full-bleed map -->
+    <div id="city-map-leaflet"></div>
+
+    <!-- Floating top gradient + title -->
+    <div class="map-overlay-top" aria-hidden="true">
+      <div class="map-overlay-title">City Map</div>
+      <p id="poi-loading-hint" class="map-overlay-hint" hidden>Loading points of interest&hellip;</p>
     </div>
 
-    <div class="map-screen-body">
-      <div id="city-map-leaflet"></div>
+    <!-- Category filter chips — float below title -->
+    <div id="map-filter-bar" class="map-filter-bar"></div>
 
-      <div id="poi-mini-card" class="poi-mini-card" hidden>
-        <button class="poi-mini-close" onclick="closePoisMiniCard()">&#x2715;</button>
-        <div id="poi-mini-category" class="poi-mini-category"></div>
-        <div id="poi-mini-name" class="poi-mini-name"></div>
-        <div id="poi-mini-info" class="poi-mini-info"></div>
-        <div class="poi-mini-actions">
-          <button class="action-btn" onclick="openPoiDetail()">Details</button>
-          <button class="action-btn action-btn--primary" onclick="navigateToPoi()">Navigate</button>
-        </div>
+    <!-- POI mini card — animated slide-up -->
+    <div id="poi-mini-card" class="poi-mini-card">
+      <div class="poi-mini-drag-handle"></div>
+      <button class="poi-mini-close" onclick="closePoisMiniCard()">&#x2715;</button>
+      <div id="poi-mini-category" class="poi-mini-category"></div>
+      <div id="poi-mini-name" class="poi-mini-name"></div>
+      <div id="poi-mini-info" class="poi-mini-info"></div>
+      <div class="poi-mini-actions">
+        <button class="action-btn" onclick="openPoiDetail()">Details</button>
+        <button class="action-btn action-btn--primary" onclick="navigateToPoi()">Navigate</button>
       </div>
-    </div>
-
-    <div class="map-footer">
-      <p id="poi-loading-hint" class="screen-subtitle" hidden>Loading points of interest&hellip;</p>
-      <div class="map-legend">
-        <span class="map-legend-item"><span class="map-legend-dot map-legend-dot--hotel"></span>Hotel</span>
-        <span class="map-legend-item"><span class="map-legend-dot map-legend-dot--poi"></span>Points of interest</span>
-      </div>
-      <p class="screen-subtitle">Tap a marker to explore. Distances from the hotel.</p>
     </div>
 
   </div>
