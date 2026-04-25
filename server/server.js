@@ -2,7 +2,8 @@
 // Endpoints: /api/health, /api/debug, /api/web-ask,
 //            /api/pwa-ask, /api/pwa-request, /api/pwa-welcome,
 //            /api/pwa-room-guide, /api/pwa-services, /api/pwa-pois, /api/pwa-routes,
-//            /api/pwa-partners, /api/pwa-push-subscribe, /api/webhook/request-status
+//            /api/pwa-partners, /api/pwa-push-subscribe, /api/webhook/request-status,
+//            /api/reception/save-guest, /api/reception/save-consent
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -39,6 +40,8 @@ const {
   TABLE_PUSH_SUBS       = 'PUSH_SUBSCRIPTIONS',
   TABLE_NOVOSTI         = 'NOVOSTI',
   TABLE_PRIVOLE         = 'PRIVOLE',
+  TABLE_GUESTS          = 'GUESTS',
+  TABLE_STAYS           = 'STAYS',
 
   // Push notifications (VAPID)
   VAPID_PUBLIC_KEY,
@@ -3356,11 +3359,79 @@ app.post('/api/webhook/novosti', async (req, res) => {
   }
 });
 
+// ── /api/reception/save-guest — upsert a GUESTS record ────────────────────────
+//
+// Input:  { secret, slug, ime, prezime, email, telefon, drzava, napomene }
+// Action: finds existing GUESTS record by email (if provided) or creates new one.
+//         Returns { ok, guestId, created }.
+// -------------------------
+app.post('/api/reception/save-guest', async (req, res) => {
+  try {
+    const {
+      secret    = '',
+      slug      = HOTEL_SLUG_DEFAULT,
+      ime       = '',
+      prezime   = '',
+      email     = '',
+      telefon   = '',
+      drzava    = '',
+      napomene  = '',
+    } = req.body || {};
+
+    if (secret !== WEBHOOK_SECRET) {
+      console.warn('[reception/save-guest] Invalid secret');
+      return res.status(403).json({ ok: false, error: 'Forbidden' });
+    }
+
+    if (!ime && !prezime && !email) {
+      return res.status(400).json({ ok: false, error: 'Missing guest data' });
+    }
+
+    // Try to find existing guest by email
+    let guestId = null;
+    let created = false;
+    if (email) {
+      const existing = await airtableSelectAll(TABLE_GUESTS, {
+        filterByFormula: `AND({Email}="${email}", {HotelSlug}="${slug}")`,
+        maxRecords: 1,
+      });
+      if (existing.length > 0) {
+        guestId = existing[0].id;
+      }
+    }
+
+    if (!guestId) {
+      const imePrezime = [ime, prezime].filter(Boolean).join(' ');
+      const rec = await base(TABLE_GUESTS).create({
+        'Ime Prezime': imePrezime,
+        'Ime':         ime,
+        'Prezime':     prezime,
+        'Email':       email || '',
+        'Telefon':     telefon || '',
+        'Država':      drzava || '',
+        'HotelSlug':   slug,
+        'Napomene':    napomene || '',
+      });
+      guestId = rec.id;
+      created = true;
+    }
+
+    console.log(`[reception/save-guest] ${created ? 'Created' : 'Found'} guest ${guestId} (${email || ime})`);
+    return res.json({ ok: true, guestId, created });
+
+  } catch (e) {
+    console.error('reception/save-guest error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
 // ── /api/reception/save-consent — save guest GDPR consent + signature ─────────
 //
-// Input:  { secret, slug, room, name, email, gdpr, marketing, newsletter, signature }
+// Input:  { secret, slug, room, name, email, gdpr, marketing, newsletter, signature, guestId? }
 //         signature = data:image/png;base64,...
-// Action: creates PRIVOLE record, uploads PNG as Airtable attachment
+//         guestId   = optional Airtable GUESTS record ID to link
+// Action: creates PRIVOLE record, uploads PNG as Airtable attachment,
+//         optionally links to GUESTS record
 // -------------------------
 app.post('/api/reception/save-consent', async (req, res) => {
   try {
@@ -3374,6 +3445,7 @@ app.post('/api/reception/save-consent', async (req, res) => {
       marketing  = false,
       newsletter = false,
       signature  = '',
+      guestId    = '',
     } = req.body || {};
 
     // Auth — re-use WEBHOOK_SECRET for reception
@@ -3386,8 +3458,8 @@ app.post('/api/reception/save-consent', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Missing required fields' });
     }
 
-    // 1. Create PRIVOLE record (without attachment first)
-    const record = await base(TABLE_PRIVOLE).create({
+    // 1. Build PRIVOLE fields — link to GUESTS if guestId provided
+    const privoleFields = {
       'Ime gosta':  name,
       'Email':      email || '',
       'Soba':       room,
@@ -3396,7 +3468,11 @@ app.post('/api/reception/save-consent', async (req, res) => {
       'Marketing':  !!marketing,
       'Newsletter': !!newsletter,
       'Datum':      new Date().toISOString(),
-    });
+    };
+    if (guestId) privoleFields['Gost'] = [guestId];
+
+    // 2. Create PRIVOLE record (without attachment first)
+    const record = await base(TABLE_PRIVOLE).create(privoleFields);
 
     const recordId = record.id;
 
