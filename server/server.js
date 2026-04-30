@@ -3,6 +3,7 @@
 //            /api/pwa-ask, /api/pwa-request, /api/pwa-welcome,
 //            /api/pwa-room-guide, /api/pwa-services, /api/pwa-pois, /api/pwa-routes,
 //            /api/pwa-partners, /api/pwa-push-subscribe, /api/webhook/request-status,
+//            /api/reception/create-consent-session, /api/reception/consent-context,
 //            /api/reception/save-guest, /api/reception/save-consent
 import 'dotenv/config';
 import express from 'express';
@@ -11,7 +12,7 @@ import Airtable from 'airtable';
 import OpenAI from 'openai';
 import webpush from 'web-push';
 import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion } from './classify.js';
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual, randomBytes } from 'node:crypto';
 import { asArray, isEmptyArray, fieldHasAny, valuesToStrings, matchesHotelSlug, allowForWeb, allowForPWA } from './filters.js';
 
 const {
@@ -63,6 +64,25 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 // In-memory push subscriptions: key = `${slug}:${room}`
 // Backed by Airtable PUSH_SUBSCRIPTIONS — survives server restarts
 const pushSubscriptions = new Map();
+
+// ── Consent sessions ──────────────────────────────────────────────────────────
+// Short-lived tokens so WEBHOOK_SECRET never appears in a browser URL.
+// key = token (64-char hex), value = { slug, room, name, email, guestId, stayId, expires, used }
+const consentSessions = new Map();
+
+const CONSENT_TOKEN_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+function generateConsentToken() {
+  return randomBytes(32).toString('hex'); // 64-char hex string
+}
+
+// Purge expired sessions (called on each create-consent-session request)
+function purgeExpiredConsentSessions() {
+  const now = Date.now();
+  for (const [token, session] of consentSessions) {
+    if (session.expires < now) consentSessions.delete(token);
+  }
+}
 
 async function loadPushSubscriptionsFromAirtable() {
   try {
@@ -3359,6 +3379,94 @@ app.post('/api/webhook/novosti', async (req, res) => {
   }
 });
 
+// ── /api/reception/create-consent-session ────────────────────────────────────
+//
+// Called by reception tablet/software to generate a short-lived consent URL.
+// WEBHOOK_SECRET stays in the POST body — never in a browser URL.
+//
+// Input:  { secret, slug, room, name?, email?, guestId?, stayId? }
+// Output: { ok, token, consentUrl, expires }
+//         consentUrl = /reception/consent.html?token=<64-char-hex>
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/reception/create-consent-session', async (req, res) => {
+  try {
+    const {
+      secret  = '',
+      slug    = HOTEL_SLUG_DEFAULT,
+      room    = '',
+      name    = '',
+      email   = '',
+      guestId = '',
+      stayId  = '',
+    } = req.body || {};
+
+    if (secret !== WEBHOOK_SECRET) {
+      console.warn('[consent-session] Invalid secret');
+      return res.status(403).json({ ok: false, error: 'Forbidden' });
+    }
+    if (!room) {
+      return res.status(400).json({ ok: false, error: 'Missing room' });
+    }
+
+    purgeExpiredConsentSessions();
+
+    const token   = generateConsentToken();
+    const expires = Date.now() + CONSENT_TOKEN_TTL_MS;
+
+    consentSessions.set(token, {
+      slug,
+      room,
+      name:    name.trim(),
+      email:   email.trim(),
+      guestId: guestId.trim(),
+      stayId:  stayId.trim(),
+      expires,
+      used: false,
+    });
+
+    const consentUrl = `/reception/consent.html?token=${token}`;
+
+    console.log(`[consent-session] Created token for ${slug}:${room} (guestId=${guestId || '—'} stayId=${stayId || '—'}) expires=${new Date(expires).toISOString()}`);
+    return res.json({ ok: true, token, consentUrl, expires });
+  } catch (e) {
+    console.error('create-consent-session error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// ── /api/reception/consent-context ────────────────────────────────────────────
+//
+// Called by consent.html on load to retrieve session context for a token.
+// No secret required — token itself is the credential.
+//
+// Input:  GET ?token=...  (or POST { token })
+// Output: { ok, slug, room, name, email, guestId, stayId } | { ok:false, error, expired? }
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/reception/consent-context', (req, res) => {
+  const token = (req.query.token || '').trim();
+  if (!token) return res.status(400).json({ ok: false, error: 'Missing token' });
+
+  const session = consentSessions.get(token);
+  if (!session) return res.status(404).json({ ok: false, error: 'Token not found or already expired' });
+  if (Date.now() > session.expires) {
+    consentSessions.delete(token);
+    return res.status(410).json({ ok: false, error: 'Token expired', expired: true });
+  }
+  if (session.used) {
+    return res.status(409).json({ ok: false, error: 'Token already used', used: true });
+  }
+
+  return res.json({
+    ok:      true,
+    slug:    session.slug,
+    room:    session.room,
+    name:    session.name,
+    email:   session.email,
+    guestId: session.guestId,
+    stayId:  session.stayId,
+  });
+});
+
 // ── /api/reception/save-guest — upsert a GUESTS record ────────────────────────
 //
 // Input:  { secret, slug, ime, prezime, email, telefon, drzava, napomene }
@@ -3427,38 +3535,69 @@ app.post('/api/reception/save-guest', async (req, res) => {
 
 // ── /api/reception/save-consent — save guest GDPR consent + signature ─────────
 //
-// Input:  { secret, slug, room, name, email, gdpr, marketing, newsletter, signature, guestId? }
-//         signature = data:image/png;base64,...
-//         guestId   = optional Airtable GUESTS record ID to link
+// Accepts TWO auth modes:
+//   A) token-based (preferred): { token, gdpr, marketing, newsletter, signature, name?, email? }
+//      token is resolved against consentSessions — single-use, expires in 2h.
+//      slug/room/guestId/stayId come from the session; name/email can be overridden.
+//   B) legacy secret-based (kept for backward compat):
+//      { secret, slug, room, name, email, gdpr, marketing, newsletter, signature, guestId? }
+//
+// signature = data:image/png;base64,...
 // Action: creates PRIVOLE record, uploads PNG as Airtable attachment,
-//         optionally links to GUESTS record
-// -------------------------
+//         optionally links to GUESTS and/or STAYS record, marks token used.
+// ─────────────────────────────────────────────────────────────────────────────
 app.post('/api/reception/save-consent', async (req, res) => {
   try {
-    const {
-      secret     = '',
-      slug       = HOTEL_SLUG_DEFAULT,
-      room       = '',
-      name       = '',
-      email      = '',
-      gdpr       = false,
-      marketing  = false,
-      newsletter = false,
-      signature  = '',
-      guestId    = '',
-    } = req.body || {};
+    const body = req.body || {};
 
-    // Auth — re-use WEBHOOK_SECRET for reception
-    if (secret !== WEBHOOK_SECRET) {
-      console.warn('[reception] Invalid secret');
-      return res.status(403).json({ ok: false, error: 'Forbidden' });
+    let slug, room, name, email, guestId, stayId, resolvedToken;
+
+    if (body.token) {
+      // ── Mode A: token-based ───────────────────────────────────────────────
+      resolvedToken = (body.token || '').trim();
+      const session = consentSessions.get(resolvedToken);
+      if (!session) {
+        return res.status(404).json({ ok: false, error: 'Token not found or already expired' });
+      }
+      if (Date.now() > session.expires) {
+        consentSessions.delete(resolvedToken);
+        return res.status(410).json({ ok: false, error: 'Token expired', expired: true });
+      }
+      if (session.used) {
+        return res.status(409).json({ ok: false, error: 'Token already used. Generate a new consent session.', used: true });
+      }
+      slug    = session.slug;
+      room    = session.room;
+      // name/email: use body override if provided (guest may correct prefill), else session value
+      name    = (body.name  || '').trim() || session.name;
+      email   = (body.email || '').trim() || session.email;
+      guestId = session.guestId;
+      stayId  = session.stayId;
+    } else {
+      // ── Mode B: legacy secret-based ──────────────────────────────────────
+      const secret = body.secret || '';
+      if (secret !== WEBHOOK_SECRET) {
+        console.warn('[reception/save-consent] Invalid secret');
+        return res.status(403).json({ ok: false, error: 'Forbidden' });
+      }
+      slug    = body.slug    || HOTEL_SLUG_DEFAULT;
+      room    = body.room    || '';
+      name    = (body.name   || '').trim();
+      email   = (body.email  || '').trim();
+      guestId = body.guestId || '';
+      stayId  = '';
     }
+
+    const gdpr       = body.gdpr       ?? false;
+    const marketing  = body.marketing  ?? false;
+    const newsletter = body.newsletter ?? false;
+    const signature  = body.signature  || '';
 
     if (!room || !name || !gdpr) {
-      return res.status(400).json({ ok: false, error: 'Missing required fields' });
+      return res.status(400).json({ ok: false, error: 'Missing required fields: room, name, gdpr' });
     }
 
-    // 1. Build PRIVOLE fields — link to GUESTS if guestId provided
+    // 1. Build PRIVOLE fields — link to GUESTS and/or STAYS if IDs provided
     const privoleFields = {
       'Ime gosta':  name,
       'Email':      email || '',
@@ -3469,7 +3608,8 @@ app.post('/api/reception/save-consent', async (req, res) => {
       'Newsletter': !!newsletter,
       'Datum':      new Date().toISOString(),
     };
-    if (guestId) privoleFields['Gost'] = [guestId];
+    if (guestId) privoleFields['Gost']    = [guestId];
+    if (stayId)  privoleFields['Boravak'] = [stayId];
 
     // 2. Create PRIVOLE record (without attachment first)
     const record = await base(TABLE_PRIVOLE).create(privoleFields);
@@ -3522,8 +3662,14 @@ app.post('/api/reception/save-consent', async (req, res) => {
       }
     }
 
-    console.log(`[reception] Consent saved: ${slug}:${room} — ${name} | GDPR=${gdpr} mkt=${marketing} nl=${newsletter}`);
-    return res.json({ ok: true, recordId });
+    // Mark token as used (single-use enforcement)
+    if (resolvedToken) {
+      const session = consentSessions.get(resolvedToken);
+      if (session) session.used = true;
+    }
+
+    console.log(`[reception] Consent saved: ${slug}:${room} — ${name} | GDPR=${gdpr} mkt=${marketing} nl=${newsletter} | guest=${guestId || '—'} stay=${stayId || '—'}`);
+    return res.json({ ok: true, recordId, room, name });
 
   } catch (e) {
     console.error('reception/save-consent error:', e);

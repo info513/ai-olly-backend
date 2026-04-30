@@ -312,6 +312,7 @@
     </div>
   </div>
 
+  <div id="msg-loading" class="msg" style="display:block;background:#f2ece0;color:#6a6258;">Učitavanje…</div>
   <div id="msg-error" class="msg msg-error"></div>
 
   <!-- ── Podaci gosta ─────────────────────────────────────────── -->
@@ -407,14 +408,70 @@
 </div>
 
 <script>
-// ── URL params ────────────────────────────────────────────────
-const params    = new URLSearchParams(window.location.search);
-const ROOM      = params.get('room')   || '';
-const SLUG      = params.get('slug')   || 'antique-split';
-const SECRET    = params.get('secret') || '';
+// ── Token-based session ───────────────────────────────────────
+// URL: /reception/consent.html?token=<64-char-hex>
+// On load: fetch /api/reception/consent-context?token=...
+// This replaces the old ?room=&slug=&secret= pattern.
+const params = new URLSearchParams(window.location.search);
+const TOKEN  = params.get('token') || '';
 
-// ── Pre-fill room ─────────────────────────────────────────────
-document.getElementById('f-room').value = ROOM;
+// Session context populated by loadConsentContext()
+let SESSION = { slug: 'antique-split', room: '', name: '', email: '', guestId: '', stayId: '' };
+
+async function loadConsentContext() {
+  const loadingEl = document.getElementById('msg-loading');
+
+  if (!TOKEN) {
+    loadingEl.style.display = 'none';
+    showError('Nedostaje token. Molimo generirajte novi link za privolu iz recepcijskog sustava.');
+    document.getElementById('btn-submit').disabled = true;
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/api/reception/consent-context?token=${encodeURIComponent(TOKEN)}`);
+    const data = await resp.json();
+
+    loadingEl.style.display = 'none';
+
+    if (!data.ok) {
+      const msg = data.expired ? 'Link za privolu je istekao. Molimo generirajte novi.' :
+                  data.used    ? 'Privola je već zabilježena ovim linkom. Generirajte novi.' :
+                                 'Nevaljan token. Molimo generirajte novi link za privolu.';
+      showError(msg);
+      document.getElementById('btn-submit').disabled = true;
+      return;
+    }
+
+    SESSION = {
+      slug:    data.slug    || 'antique-split',
+      room:    data.room    || '',
+      name:    data.name    || '',
+      email:   data.email   || '',
+      guestId: data.guestId || '',
+      stayId:  data.stayId  || '',
+    };
+
+    // Pre-fill form fields
+    document.getElementById('f-room').value  = SESSION.room;
+    if (SESSION.name)  {
+      document.getElementById('f-name').value  = SESSION.name;
+      document.getElementById('f-name').classList.add('prefilled');
+    }
+    if (SESSION.email) {
+      document.getElementById('f-email').value = SESSION.email;
+      document.getElementById('f-email').classList.add('prefilled');
+    }
+
+  } catch (e) {
+    loadingEl.style.display = 'none';
+    showError('Greška pri spajanju na server. Provjerite internet vezu i pokušajte ponovo.');
+    document.getElementById('btn-submit').disabled = true;
+  }
+}
+
+// Load context immediately
+loadConsentContext();
 
 // ── Checkbox visual toggle ────────────────────────────────────
 ['gdpr', 'marketing', 'newsletter'].forEach(key => {
@@ -514,24 +571,24 @@ function hideError() {
 async function submitConsent() {
   hideError();
 
-  const room      = document.getElementById('f-room').value.trim();
-  const name      = document.getElementById('f-name').value.trim();
-  const email     = document.getElementById('f-email').value.trim();
-  const gdpr      = document.getElementById('cb-gdpr').checked;
-  const marketing = document.getElementById('cb-marketing').checked;
-  const newsletter= document.getElementById('cb-newsletter').checked;
+  const name       = document.getElementById('f-name').value.trim();
+  const email      = document.getElementById('f-email').value.trim();
+  const gdpr       = document.getElementById('cb-gdpr').checked;
+  const marketing  = document.getElementById('cb-marketing').checked;
+  const newsletter = document.getElementById('cb-newsletter').checked;
+  const room       = SESSION.room || document.getElementById('f-room').value.trim();
 
   // Validation
-  if (!room)  return showError('Soba je obavezna.');
-  if (!name)  return showError('Unesite ime i prezime gosta.');
-  if (!gdpr)  return showError('GDPR privola je obavezna za nastavak.');
+  if (!room)   return showError('Soba nije učitana. Osvježite stranicu ili generirajte novi link.');
+  if (!name)   return showError('Unesite ime i prezime gosta.');
+  if (!gdpr)   return showError('GDPR privola je obavezna za nastavak.');
   if (!hasSig) return showError('Gost mora potpisati privolu.');
 
   // Get signature as PNG (full resolution)
   const sigDataUrl = canvas.toDataURL('image/png');
 
   const btn = document.getElementById('btn-submit');
-  btn.disabled   = true;
+  btn.disabled    = true;
   btn.textContent = 'Spremanje...';
 
   try {
@@ -539,9 +596,8 @@ async function submitConsent() {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        secret: SECRET,
-        slug:   SLUG,
-        room, name, email,
+        token: TOKEN,
+        name, email,
         gdpr, marketing, newsletter,
         signature: sigDataUrl,
       }),
@@ -550,7 +606,10 @@ async function submitConsent() {
     const data = await resp.json();
 
     if (!data.ok) {
-      showError(data.error || 'Greška pri spremanju. Pokušajte ponovo.');
+      const msg = data.expired ? 'Link je istekao. Generirajte novi.' :
+                  data.used    ? 'Privola je već zabilježena ovim linkom.' :
+                                 (data.error || 'Greška pri spremanju. Pokušajte ponovo.');
+      showError(msg);
       btn.disabled    = false;
       btn.textContent = 'Potvrdi i spremi privolu';
       return;
