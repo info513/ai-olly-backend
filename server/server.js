@@ -698,7 +698,9 @@ async function getHotelRecord(hotelSlug) {
       f['Telefon (recepcija)'],
       f['Telefon recepcija'],
       f.Telefon,
-      f.telefon
+      f.telefon,
+      f.Phone,
+      f['Phone Number']
     ),
     email: pickFirstNonEmpty(
       f['Email (recepcija)'],
@@ -1239,8 +1241,8 @@ function renderFocusedHotelCoreAnswer(hotelRec, question, lang = 'HR') {
     const email = hotelRec.email;
     if (!email) return renderNoInfo(lang);
     return lang === 'EN'
-      ? `Email: ${email}`
-      : `Email: ${email}`;
+      ? `You can contact us at ${email}`
+      : `Možete nas kontaktirati na ${email}`;
   }
 
   // Phone / contact
@@ -1252,8 +1254,8 @@ function renderFocusedHotelCoreAnswer(hotelRec, question, lang = 'HR') {
     const phone = hotelRec.telefon;
     if (!phone) return renderNoInfo(lang);
     return lang === 'EN'
-      ? `Reception phone: ${phone}`
-      : `Telefon (recepcija): ${phone}`;
+      ? `You can reach us at ${phone}`
+      : `Možete nas dosegnuti na ${phone}`;
   }
 
   // Address / location / map
@@ -1302,8 +1304,8 @@ function renderWhatsAppAnswer(hotelRec, services, lang) {
   if (waFromHotel) {
     const url = waFromHotel.startsWith('http') ? waFromHotel : `https://wa.me/${waFromHotel}`;
     return lang === 'EN'
-      ? `Yes, you can contact us on WhatsApp: ${url}`
-      : `Da, možete nas kontaktirati putem WhatsAppa: ${url}`;
+      ? `Feel free to contact us on WhatsApp: ${url}`
+      : `Slobodno nas kontaktirajte putem WhatsAppa: ${url}`;
   }
 
   // Priority 2: wa.me URL embedded in any active service record Opis
@@ -1311,8 +1313,8 @@ function renderWhatsAppAnswer(hotelRec, services, lang) {
     const match = (r.opis || '').match(/https?:\/\/wa\.me\/\S+/);
     if (match) {
       return lang === 'EN'
-        ? `Yes, you can contact us on WhatsApp: ${match[0]}`
-        : `Da, možete nas kontaktirati putem WhatsAppa: ${match[0]}`;
+        ? `Feel free to contact us on WhatsApp: ${match[0]}`
+        : `Slobodno nas kontaktirajte putem WhatsAppa: ${match[0]}`;
     }
   }
 
@@ -2053,6 +2055,15 @@ app.post('/api/web-ask', async (req, res) => {
       return res.json({ ok: true, answer, meta: { hotelSlug, deterministic: 'maintenance_report', ms } });
     }
 
+    // ✅ 0.08) Deterministički: WhatsApp — must fire BEFORE isContactCoreQuestion
+    // "How to contact you on WhatsApp?" contains 'contact' → isContactCoreQuestion
+    // would intercept it and return the phone number instead of the WA link.
+    if (isWhatsAppQuestion(question)) {
+      const answer = renderWhatsAppAnswer(hotelRec, services, lang);
+      const ms = Date.now() - started;
+      return res.json({ ok: true, answer, meta: { hotelSlug, deterministic: 'whatsapp', ms } });
+    }
+
     // ✅ 0.1) Deterministički: HOTEL core (kontakt / maps / check-in-out)
     if (isContactCoreQuestion(question)) {
       const answer = renderFocusedHotelCoreAnswer(hotelRec, question, lang);
@@ -2138,24 +2149,6 @@ app.post('/api/web-ask', async (req, res) => {
         });
       }
       // answer is null (no pet policy record found) — fall through to GPT
-    }
-
-    // ✅ 0.9) Deterministički: WhatsApp contact
-    // Hard guard — fires before intent routing; returns WA link directly.
-    // Prevents GPT from hallucinating “we don't have WhatsApp” when no WA
-    // data was in the linked service record's Opis.
-    if (isWhatsAppQuestion(question)) {
-      const answer = renderWhatsAppAnswer(hotelRec, services, lang);
-      const ms = Date.now() - started;
-      return res.json({
-        ok: true,
-        answer,
-        meta: {
-          hotelSlug,
-          deterministic: 'whatsapp',
-          ms,
-        },
-      });
     }
 
     // 4) Deterministički: “vrste soba”
@@ -2516,6 +2509,17 @@ app.post('/api/pwa-ask', async (req, res) => {
       });
     }
 
+    // ✅ 0.08) Deterministic: WhatsApp — must fire BEFORE isContactCoreQuestion
+    // "How to contact you on WhatsApp?" contains 'contact' → isContactCoreQuestion
+    // would intercept it and return the phone number instead of the WA link.
+    if (isWhatsAppQuestion(question)) {
+      return res.json({
+        ok: true,
+        answer: renderWhatsAppAnswer(hotelRec, pwaServices, lang),
+        meta: { hotelSlug, roomNumber, deterministic: 'whatsapp', ms: Date.now() - started },
+      });
+    }
+
     // ✅ 0.1) Deterministic: hotel core (contact / address / check-in-out)
     if (isContactCoreQuestion(question)) {
       return res.json({
@@ -2614,15 +2618,6 @@ app.post('/api/pwa-ask', async (req, res) => {
           meta: { hotelSlug, roomNumber, deterministic: 'safe_instructions', ms: Date.now() - started },
         });
       }
-    }
-
-    // ✅ 0.9) Deterministic: WhatsApp contact — same guard as web-ask
-    if (isWhatsAppQuestion(question)) {
-      return res.json({
-        ok: true,
-        answer: renderWhatsAppAnswer(hotelRec, pwaServices, lang),
-        meta: { hotelSlug, roomNumber, deterministic: 'whatsapp', ms: Date.now() - started },
-      });
     }
 
     // ✅ 1.3) Deterministic (PWA only): city / sightseeing / excursion questions
