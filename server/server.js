@@ -923,6 +923,7 @@ function mapRoomGuideRecord(rec) {
     id: rec.id,
     type: 'ROOM_GUIDE',
     naziv: pickFirstNonEmpty(f['Naziv sobe'], ''),
+    tipSobe: pickFirstNonEmpty(f['Room Type'], ''),
     wifi: pickFirstNonEmpty(f.WiFi, ''),
     klimaUpute: pickFirstNonEmpty(f['Upute Klima'], ''),
     tvUpute: pickFirstNonEmpty(f['Upute TV'], ''),
@@ -2860,15 +2861,10 @@ app.post('/api/pwa-welcome', async (req, res) => {
     );
     if (!tokenValid) return res.status(403).json({ ok: false, error: 'Access denied' });
 
-    // Room type — fetch all rooms for hotel (no AI_SOURCE filter), find by number in JS
-    let roomType = '';
-    try {
-      const allRoomsRaw = await getRoomsRaw(hotelSlug);
-      const roomRec     = allRoomsRaw.find(r =>
-        String(r.naziv || '').trim() === String(roomNumber).trim()
-      );
-      roomType = roomRec?.tipSobe || '';
-    } catch (_) { /* silent — room type is optional */ }
+    // Room type — read directly from the ROOM GUIDE record's 'Room Type' field.
+    // Previously used a SOBE table lookup (getRoomsRaw), which always returned empty
+    // because SOBE records are named by type ("Deluxe room"), not by number ("101").
+    const roomType = roomGuide?.tipSobe || '';
 
     return res.json({
       ok:             true,
