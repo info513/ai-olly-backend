@@ -11,7 +11,7 @@ import cors from 'cors';
 import Airtable from 'airtable';
 import OpenAI from 'openai';
 import webpush from 'web-push';
-import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion } from './classify.js';
+import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion, isMaintenanceReportQuestion } from './classify.js';
 import { timingSafeEqual, randomBytes } from 'node:crypto';
 import { asArray, isEmptyArray, fieldHasAny, valuesToStrings, matchesHotelSlug, allowForWeb, allowForPWA } from './filters.js';
 
@@ -1216,6 +1216,79 @@ function renderHotelCoreAnswer(hotelRec, lang = 'HR') {
   return parts.join('\n');
 }
 
+// ✅ deterministički: focused hotel info — picks only the field the guest asked about
+// Replaces full renderHotelCoreAnswer for contact/address/social questions so the
+// guest gets a one-liner instead of a 8-line card dump.
+//
+// Signal priority (first match wins):
+//   phone / call / contact  → phone number only
+//   email                   → email only
+//   address / where / map   → address + Google Maps
+//   instagram               → Instagram link
+//   website / web           → website link
+//   (no focused signal)     → fall back to full renderHotelCoreAnswer
+function renderFocusedHotelCoreAnswer(hotelRec, question, lang = 'HR') {
+  if (!hotelRec) return renderNoInfo(lang);
+
+  const q = normalizeText(question);
+
+  // Phone / contact
+  if (
+    q.includes('phone')    || q.includes('call')    || q.includes('telefon') ||
+    q.includes('nazovit')  || q.includes('broj')    || q.includes('contact') ||
+    q.includes('kontakt')  || q.includes('reach')   || q.includes('reception phone')
+  ) {
+    const phone = hotelRec.telefon;
+    if (!phone) return renderNoInfo(lang);
+    return lang === 'EN'
+      ? `Reception phone: ${phone}`
+      : `Telefon (recepcija): ${phone}`;
+  }
+
+  // Email
+  if (q.includes('email') || q.includes('e mail') || q.includes('mail')) {
+    const email = hotelRec.email;
+    if (!email) return renderNoInfo(lang);
+    return lang === 'EN'
+      ? `Email: ${email}`
+      : `Email: ${email}`;
+  }
+
+  // Address / location / map
+  if (
+    q.includes('address')  || q.includes('adresa')  || q.includes('located') ||
+    q.includes('location') || q.includes('where is') || q.includes('gdje je') ||
+    q.includes('map')      || q.includes('karta')    || q.includes('how to get') ||
+    q.includes('directions')
+  ) {
+    const parts = [];
+    if (hotelRec.adresa)      parts.push(lang === 'EN' ? `Address: ${hotelRec.adresa}` : `Adresa: ${hotelRec.adresa}`);
+    if (hotelRec.googleMaps)  parts.push(lang === 'EN' ? `Google Maps: ${hotelRec.googleMaps}` : `Google Maps: ${hotelRec.googleMaps}`);
+    return parts.length ? parts.join('\n') : renderNoInfo(lang);
+  }
+
+  // Instagram
+  if (q.includes('instagram') || q.includes('social media') || q.includes('follow')) {
+    const ig = hotelRec.instagram;
+    if (!ig) return renderNoInfo(lang);
+    return lang === 'EN'
+      ? `Instagram: ${ig}`
+      : `Instagram: ${ig}`;
+  }
+
+  // Website
+  if (q.includes('website') || q.includes('web stranica') || q.includes(' web ') || q.includes('homepage') || q.includes('url')) {
+    const web = hotelRec.web;
+    if (!web) return renderNoInfo(lang);
+    return lang === 'EN'
+      ? `Website: ${web}`
+      : `Web: ${web}`;
+  }
+
+  // No focused signal — return full card
+  return renderHotelCoreAnswer(hotelRec, lang);
+}
+
 // ✅ deterministički: WhatsApp kontakt
 // Hard guard — always returns WA link when available, never lets GPT say “no WhatsApp”.
 // Priority: 1) hotelRec.whatsapp field, 2) wa.me URL found in any service Opis,
@@ -1950,9 +2023,25 @@ app.post('/api/web-ask', async (req, res) => {
       question,
     });
 
-    // ✅ 0) Deterministički: HOTEL core (kontakt / maps / check-in-out)
+    // ✅ 0) Deterministički: check-in/out TIME only — concise, no social links
+    // Must fire BEFORE isContactCoreQuestion to avoid full hotel card for simple timing questions.
+    if (isCheckinTimeOnlyQuestion(question)) {
+      const answer = renderCheckinTimeAnswer(hotelRec, lang);
+      const ms = Date.now() - started;
+      return res.json({
+        ok: true,
+        answer,
+        meta: {
+          hotelSlug,
+          deterministic: 'checkin_time',
+          ms,
+        },
+      });
+    }
+
+    // ✅ 0.1) Deterministički: HOTEL core (kontakt / maps / check-in-out)
     if (isContactCoreQuestion(question)) {
-      const answer = renderHotelCoreAnswer(hotelRec, lang);
+      const answer = renderFocusedHotelCoreAnswer(hotelRec, question, lang);
       const ms = Date.now() - started;
       return res.json({
         ok: true,
@@ -2401,7 +2490,7 @@ app.post('/api/pwa-ask', async (req, res) => {
     if (isContactCoreQuestion(question)) {
       return res.json({
         ok: true,
-        answer: renderHotelCoreAnswer(hotelRec, lang),
+        answer: renderFocusedHotelCoreAnswer(hotelRec, question, lang),
         meta: { hotelSlug, roomNumber, deterministic: 'hotel_core', ms: Date.now() - started },
       });
     }
@@ -2513,6 +2602,22 @@ app.post('/api/pwa-ask', async (req, res) => {
         ok: true,
         answer: renderCityActivityHint(lang),
         meta: { hotelSlug, roomNumber, deterministic: 'city_activity', ms: Date.now() - started },
+      });
+    }
+
+    // ✅ 1.35) Deterministic (PWA only): maintenance report — broken device in room
+    // "The AC is not working", "shower is broken", "light not working" etc.
+    // Returns reception phone number immediately — GPT has no maintenance data.
+    // Must fire BEFORE chooseIntent() to prevent GPT hallucination.
+    if (isMaintenanceReportQuestion(question)) {
+      const phone = hotelRec?.telefon;
+      const answer = lang === 'EN'
+        ? `Please contact Reception immediately${phone ? ` at ${phone}` : ''}. Our team is available 24/7 and will arrange the right solution for you.`
+        : `Molimo odmah kontaktirajte recepciju${phone ? ` na broju ${phone}` : ''}. Tim je dostupan 24/7 i riješit će problem za vas.`;
+      return res.json({
+        ok: true,
+        answer,
+        meta: { hotelSlug, roomNumber, deterministic: 'maintenance_report', ms: Date.now() - started },
       });
     }
 

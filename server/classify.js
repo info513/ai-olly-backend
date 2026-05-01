@@ -76,8 +76,23 @@ export function isContactCoreQuestion(question) {
     q.includes('postupak')  ||   // HR: "procedure" — "postupak prijave/odjave"
     q.includes('how do i')  ||   // Fix #8a: "how do I check out" — procedure question
     q.includes('how to')    ||   // Fix #8a: "how to check out"
+    q.includes('what should i') || // "what should I do at check-out" — procedure question
+    q.includes('what do i')  ||   // "what do I do with my key at check-out"
+    q.includes(' key ')     ||   // bare "key" — "my key at check-out", "return the key"
     q.includes('key card')  ||   // Fix #8a: "return the key card" — checkout detail
     q.includes('key fob')        // Fix #8a: alternative key term
+  );
+
+  // Guard: "What are the reception hours?", "Is reception open 24h?", "When does
+  // reception close?" — these are schedule/availability questions that should route
+  // to the "Reception 24/7" service record via intent matching, NOT dump the full
+  // hotel-core card. Both a reception keyword AND a time/hours signal are required.
+  const isReceptionHoursQuery = (
+    (q.includes('reception') || q.includes('recepc')) &&
+    (q.includes('hour')  || q.includes('open')   || q.includes('clos')  ||
+     q.includes('sati')  || q.includes('radno')  || q.includes('when')  ||
+     q.includes('time')  || q.includes('24')     || q.includes('avail') ||
+     q.includes('night') || q.includes('nocu')   || q.includes('schedule'))
   );
 
   // Fix #8b: local-guide context — questions about nearby places that happen
@@ -123,8 +138,8 @@ export function isContactCoreQuestion(question) {
     q.includes('email') ||
     q.includes('e mail') ||
     q.includes('reach') ||
-    q.includes('reception') ||
-    q.includes('recepc') ||
+    (q.includes('reception') && !isReceptionHoursQuery) ||   // guard: reception hours → service record
+    (q.includes('recepc')    && !isReceptionHoursQuery) ||
     q.includes('address') ||
     q.includes('adresa') ||
     (q.includes('google maps') && !isLocalGuideContext) ||   // Fix #8b: not for nearby-place questions
@@ -408,7 +423,18 @@ export function isCityActivityQuestion(question) {
     q.includes('izlet')           ||  // HR: izlet (excursion/day trip)
     // HR: "što posjetiti / što vidjeti" + location word
     (q.includes('posjetit') && (q.includes('blizin') || q.includes('grad') || q.includes('split'))) ||
-    (q.includes('vidjeti')  && (q.includes('blizin') || q.includes('grad') || q.includes('split')))
+    (q.includes('vidjeti')  && (q.includes('blizin') || q.includes('grad') || q.includes('split'))) ||
+    // Car rental — no service record exists; reception handles all transport recommendations
+    q.includes('rent a car')  ||
+    q.includes('car rental')  ||
+    q.includes('car hire')    ||
+    q.includes('hire a car')  ||
+    q.includes('rent car')    ||
+    q.includes('iznajmiti auto') ||   // HR: rent a car
+    q.includes('rent a bike') ||
+    q.includes('bike rental') ||
+    q.includes('rent a scooter') ||
+    q.includes('scooter rental')
   );
 }
 
@@ -518,4 +544,68 @@ export function isParkingAvailabilityQuery(question) {
     q.includes('parking near')       || // "Is parking available near …?"
     q.includes('park near')             // "Can I park near the hotel?"
   );
+}
+
+// ── isMaintenanceReportQuestion ───────────────────────────────────────────────
+// Fires when a guest reports a broken or non-working in-room device/facility.
+//
+// Pattern: breakdown signal (not working, broken, …) AND device reference.
+// Returns a deterministic "contact Reception" answer with the hotel phone
+// instead of routing through GPT which has no maintenance data.
+//
+// Must fire BEFORE chooseIntent() so GPT never handles maintenance reports.
+// Safe to be broad — returning the reception phone is always the right answer.
+export function isMaintenanceReportQuestion(question) {
+  const q = normalizeText(question);
+
+  const hasBreakdown = (
+    q.includes('not working')      ||   // EN: "the AC is not working"
+    q.includes('not work')         ||   // EN: partial match
+    q.includes('doesnt work')      ||   // EN: "it doesn't work"
+    q.includes('doesn t work')     ||   // EN: normalised apostrophe
+    q.includes('stopped working')  ||   // EN: "it stopped working"
+    q.includes('out of order')     ||   // EN: "the shower is out of order"
+    q.includes('broken')           ||   // EN: "the door lock is broken"
+    q.includes('faulty')           ||   // EN: "faulty socket"
+    q.includes('malfunction')      ||   // EN: "malfunction in the bathroom"
+    q.includes('ne radi')          ||   // HR: "klima ne radi"
+    q.includes('pokvar')           ||   // HR: pokvareno / pokvario (stem)
+    q.includes('ne funkcionira')        // HR: "ne funkcionira"
+  );
+
+  const hasDevice = (
+    q.includes('ac')           ||   // air conditioning shorthand
+    q.includes('air con')      ||   // EN: air conditioning
+    q.includes('air condition') ||  // EN: air conditioner / air conditioning
+    q.includes('klima')        ||   // HR: klima uređaj
+    q.includes('heating')      ||   // EN: heating
+    q.includes('grijanje')     ||   // HR: heating
+    q.includes('hot water')    ||   // EN: "no hot water"
+    q.includes('water')        ||   // EN: water (tap, shower, toilet)
+    q.includes('voda')         ||   // HR: water
+    q.includes('tv')           ||   // EN/HR: TV
+    q.includes('television')   ||   // EN: television
+    q.includes('toilet')       ||   // EN: toilet
+    q.includes('wc')           ||   // EN/HR: WC
+    q.includes('shower')       ||   // EN: shower
+    q.includes('tuš')          ||   // HR: tuš (shower)
+    q.includes('tus')          ||   // HR: normalised
+    q.includes('light')        ||   // EN: light
+    q.includes('svjetlo')      ||   // HR: light
+    q.includes('door')         ||   // EN: door
+    q.includes('lock')         ||   // EN: lock
+    q.includes('window')       ||   // EN: window
+    q.includes('prozor')       ||   // HR: window
+    q.includes('socket')       ||   // EN: electric socket
+    q.includes('power')        ||   // EN: power
+    q.includes('wifi')         ||   // EN: wifi
+    q.includes('wi fi')        ||   // EN: wi-fi
+    q.includes('drain')        ||   // EN: drain
+    q.includes('odtok')        ||   // HR: drain
+    q.includes('leak')         ||   // EN: water leak
+    q.includes('ceiling')      ||   // EN: ceiling
+    q.includes('strop')             // HR: ceiling
+  );
+
+  return hasBreakdown && hasDevice;
 }
