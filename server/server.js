@@ -1232,6 +1232,16 @@ function renderFocusedHotelCoreAnswer(hotelRec, question, lang = 'HR') {
 
   const q = normalizeText(question);
 
+  // Email — checked FIRST because "contact by email" contains 'contact' which would
+  // otherwise match the phone/contact block below, returning the wrong field.
+  if (q.includes('email') || q.includes('e mail') || q.includes('mail')) {
+    const email = hotelRec.email;
+    if (!email) return renderNoInfo(lang);
+    return lang === 'EN'
+      ? `Email: ${email}`
+      : `Email: ${email}`;
+  }
+
   // Phone / contact
   if (
     q.includes('phone')    || q.includes('call')    || q.includes('telefon') ||
@@ -1243,15 +1253,6 @@ function renderFocusedHotelCoreAnswer(hotelRec, question, lang = 'HR') {
     return lang === 'EN'
       ? `Reception phone: ${phone}`
       : `Telefon (recepcija): ${phone}`;
-  }
-
-  // Email
-  if (q.includes('email') || q.includes('e mail') || q.includes('mail')) {
-    const email = hotelRec.email;
-    if (!email) return renderNoInfo(lang);
-    return lang === 'EN'
-      ? `Email: ${email}`
-      : `Email: ${email}`;
   }
 
   // Address / location / map
@@ -2039,6 +2040,18 @@ app.post('/api/web-ask', async (req, res) => {
       });
     }
 
+    // ✅ 0.05) Deterministički: maintenance report — broken device
+    // Must fire BEFORE isContactCoreQuestion — "who do I call?" contains 'call' which
+    // bleeds into hotel_core.
+    if (isMaintenanceReportQuestion(question)) {
+      const phone = hotelRec?.telefon;
+      const answer = lang === 'EN'
+        ? `Please contact Reception immediately${phone ? ` at ${phone}` : ''}. Our team is available 24/7 and will arrange the right solution for you.`
+        : `Molimo odmah kontaktirajte recepciju${phone ? ` na broju ${phone}` : ''}. Tim je dostupan 24/7 i riješit će problem za vas.`;
+      const ms = Date.now() - started;
+      return res.json({ ok: true, answer, meta: { hotelSlug, deterministic: 'maintenance_report', ms } });
+    }
+
     // ✅ 0.1) Deterministički: HOTEL core (kontakt / maps / check-in-out)
     if (isContactCoreQuestion(question)) {
       const answer = renderFocusedHotelCoreAnswer(hotelRec, question, lang);
@@ -2486,7 +2499,23 @@ app.post('/api/pwa-ask', async (req, res) => {
       });
     }
 
-    // ✅ 0) Deterministic: hotel core (contact / address / check-in-out)
+    // ✅ 0) Deterministic (PWA only): maintenance report — broken device in room
+    // "The AC is not working", "shower is broken", "light not working" etc.
+    // Must fire BEFORE isContactCoreQuestion — "who do I call?" contains 'call' which
+    // would otherwise bleed into hotel_core and return the hotel card instead.
+    if (isMaintenanceReportQuestion(question)) {
+      const phone = hotelRec?.telefon;
+      const answer = lang === 'EN'
+        ? `Please contact Reception immediately${phone ? ` at ${phone}` : ''}. Our team is available 24/7 and will arrange the right solution for you.`
+        : `Molimo odmah kontaktirajte recepciju${phone ? ` na broju ${phone}` : ''}. Tim je dostupan 24/7 i riješit će problem za vas.`;
+      return res.json({
+        ok: true,
+        answer,
+        meta: { hotelSlug, roomNumber, deterministic: 'maintenance_report', ms: Date.now() - started },
+      });
+    }
+
+    // ✅ 0.1) Deterministic: hotel core (contact / address / check-in-out)
     if (isContactCoreQuestion(question)) {
       return res.json({
         ok: true,
@@ -2602,22 +2631,6 @@ app.post('/api/pwa-ask', async (req, res) => {
         ok: true,
         answer: renderCityActivityHint(lang),
         meta: { hotelSlug, roomNumber, deterministic: 'city_activity', ms: Date.now() - started },
-      });
-    }
-
-    // ✅ 1.35) Deterministic (PWA only): maintenance report — broken device in room
-    // "The AC is not working", "shower is broken", "light not working" etc.
-    // Returns reception phone number immediately — GPT has no maintenance data.
-    // Must fire BEFORE chooseIntent() to prevent GPT hallucination.
-    if (isMaintenanceReportQuestion(question)) {
-      const phone = hotelRec?.telefon;
-      const answer = lang === 'EN'
-        ? `Please contact Reception immediately${phone ? ` at ${phone}` : ''}. Our team is available 24/7 and will arrange the right solution for you.`
-        : `Molimo odmah kontaktirajte recepciju${phone ? ` na broju ${phone}` : ''}. Tim je dostupan 24/7 i riješit će problem za vas.`;
-      return res.json({
-        ok: true,
-        answer,
-        meta: { hotelSlug, roomNumber, deterministic: 'maintenance_report', ms: Date.now() - started },
       });
     }
 
