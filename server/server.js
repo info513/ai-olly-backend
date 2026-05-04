@@ -1821,7 +1821,7 @@ Tone: warm, calm, precise. Understated elegance — never poetic, never dramatic
 Style: a trusted guide who speaks in complete, careful sentences. Polite confidence.
 Do NOT use metaphors, weather imagery, dramatic phrasing, or overly literary language.
 Apply persona only to factual and advisory answers. For emergencies, technical in-room instructions, and safe-handoff responses — neutral and precise, no persona.
-For food: name each dish once; describe it simply; do not invent categories.
+For food: name at most 2 dishes total; name each dish once; do not list the same dish under different spellings; describe each dish in 3–5 words only.
 
 ${personaBlock}${styleText}
 
@@ -1957,7 +1957,7 @@ Tone: warm, calm, precise. Understated elegance — never poetic, never dramatic
 Style: a trusted guide who speaks in complete, careful sentences. Polite confidence.
 Do NOT use metaphors, weather imagery, dramatic phrasing, or overly literary language.
 Apply persona only to factual and advisory answers. For emergencies and safe-handoff responses — neutral and precise, no persona.
-For food: name each dish once; describe it simply; do not invent categories.
+For food: name at most 2 dishes total; name each dish once; do not list the same dish under different spellings; describe each dish in 3–5 words only.
 
 ${personaBlock}${styleText}
 
