@@ -734,6 +734,11 @@ async function getHotelRecord(hotelSlug) {
     // Returns '' if field not yet populated; generateAnswer gracefully skips it.
     personaVoice: pickFirstNonEmpty(f['Persona Voice'], f.personaVoice, ''),
 
+    // Notification email — recipient for AI OLLY guest request alert emails.
+    // Set per-hotel in the HOTELI table "Notification Email" field.
+    // Returns '' if not set; notification is silently skipped.
+    notificationEmail: pickFirstNonEmpty(f['Notification Email'], f.notificationEmail, ''),
+
     active: (f.Active ?? true) === true,
   } : null;
 
@@ -2991,6 +2996,126 @@ app.post('/api/pwa-ask', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Notification helpers — guest request email alerts
+// Provider: Brevo transactional email REST API (https://api.brevo.com/v3/smtp/email)
+// Required env vars: BREVO_API_KEY, NOTIFICATION_FROM_EMAIL, NOTIFICATION_FROM_NAME
+// If BREVO_API_KEY is absent the function skips silently and logs a warning.
+// TODO: to switch provider replace the fetch() block inside _sendRequestNotification()
+//       while keeping the _updateNotifStatus() calls intact.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Write Notification Status / Sent At / Error back to a REQUESTS record.
+ * Always called via .catch(() => {}) — never allowed to crash the caller.
+ */
+async function _updateNotifStatus(requestRecId, status, sentAt = null, errorMsg = '') {
+  const fields = { 'Notification Status': status };
+  if (sentAt)   fields['Notification Sent At'] = sentAt;
+  if (errorMsg) fields['Notification Error']   = String(errorMsg).slice(0, 500);
+  await base(TABLE_REQUESTS).update(requestRecId, fields);
+}
+
+/**
+ * Build the plain-text email body for a guest request notification.
+ * Message text is truncated to 1 500 characters; line breaks are preserved.
+ */
+function _buildRequestEmailBody({ hotelSlug, hotelName, roomNumber, category,
+                                   message, guestName, priority, requestId }) {
+  const ts      = new Date().toLocaleString('en-GB', { timeZone: 'Europe/Zagreb' });
+  const safeMsg = String(message || '').replace(/\r/g, '').slice(0, 1500);
+  const sep     = '─'.repeat(44);
+  const lines   = [
+    'AI OLLY — Guest Request Notification',
+    sep,
+    `Hotel     : ${hotelName || hotelSlug}`,
+    `Room      : ${roomNumber}`,
+    `Category  : ${category}`,
+    `Priority  : ${priority || 'Normal'}`,
+    '',
+    'Message:',
+    safeMsg,
+    '',
+    sep,
+  ];
+  if (guestName)  lines.push(`Guest Name: ${guestName}`);
+  lines.push(`Timestamp : ${ts}`);
+  if (requestId) {
+    lines.push(`Record ID : ${requestId}`);
+    lines.push(`Airtable  : https://airtable.com/appon9UYjX6KU9cr1/tblYdzb9pRBFTRKFL/${requestId}`);
+  }
+  lines.push('', '— Sent by AI OLLY Notification Layer');
+  return lines.join('\n');
+}
+
+/**
+ * Send a guest request notification email via Brevo.
+ * NEVER throws — all errors are caught, logged, and written back to Airtable.
+ * Must be called fire-and-forget (.catch()) so the guest response is not blocked.
+ *
+ * Status outcomes written to REQUESTS:
+ *   Sent                — Brevo accepted the message (2xx)
+ *   Skipped - No Recipient — hotel has no Notification Email set
+ *   Skipped - No Provider  — BREVO_API_KEY env var not configured
+ *   Failed              — Brevo returned an error or fetch threw
+ */
+async function _sendRequestNotification({
+  hotelSlug, hotelRec, roomNumber, category,
+  message, guestName, priority, requestRecId,
+}) {
+  const recipientEmail = hotelRec?.notificationEmail || '';
+  if (!recipientEmail) {
+    console.log(`[notif] skipped — no recipient configured for "${hotelSlug}"`);
+    return _updateNotifStatus(requestRecId, 'Skipped - No Recipient').catch(() => {});
+  }
+
+  const brevoKey  = process.env.BREVO_API_KEY          || '';
+  const fromEmail = process.env.NOTIFICATION_FROM_EMAIL || 'noreply@aiolly.pressmax.net';
+  const fromName  = process.env.NOTIFICATION_FROM_NAME  || 'AI OLLY';
+
+  if (!brevoKey) {
+    console.log(`[notif] skipped — BREVO_API_KEY not set (hotel: "${hotelSlug}")`);
+    return _updateNotifStatus(requestRecId, 'Skipped - No Provider').catch(() => {});
+  }
+
+  const subject  = `AI OLLY Guest Request — Room ${roomNumber}`;
+  const textBody = _buildRequestEmailBody({
+    hotelSlug,
+    hotelName:  hotelRec?.hotelNaziv || hotelSlug,
+    roomNumber, category, message, guestName, priority,
+    requestId:  requestRecId,
+  });
+
+  try {
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+      body:    JSON.stringify({
+        sender:      { name: fromName, email: fromEmail },
+        to:          [{ email: recipientEmail }],
+        subject,
+        textContent: textBody,
+      }),
+      signal: AbortSignal.timeout(8_000),
+    });
+
+    if (resp.ok) {
+      console.log(`[notif] sent → ${recipientEmail} | ${hotelSlug} room ${roomNumber}`);
+      return _updateNotifStatus(requestRecId, 'Sent', new Date().toISOString()).catch(() => {});
+    }
+
+    const errBody = await resp.text().catch(() => `HTTP ${resp.status}`);
+    const errMsg  = `HTTP ${resp.status}: ${errBody}`.slice(0, 500);
+    console.warn(`[notif] send failed for "${hotelSlug}": ${errMsg}`);
+    return _updateNotifStatus(requestRecId, 'Failed', null, errMsg).catch(() => {});
+
+  } catch (e) {
+    const errMsg = String(e?.message || e).slice(0, 500);
+    console.warn(`[notif] send error for "${hotelSlug}": ${errMsg}`);
+    return _updateNotifStatus(requestRecId, 'Failed', null, errMsg).catch(() => {});
+  }
+}
+
 // -------------------------
 // /api/pwa-request — guest submits a service request from the PWA
 //
@@ -3053,6 +3178,16 @@ app.post('/api/pwa-request', async (req, res) => {
     if (partnerName) fields['Partner naziv'] = partnerName;
 
     const created = await base(TABLE_REQUESTS).create(fields);
+
+    // ── Fire-and-forget notification ─────────────────────────────────────────
+    // Loads hotel record (cached) and sends email alert. Never blocks the guest
+    // response — errors are swallowed here and written back to the REQUESTS record.
+    getHotelRecord(hotelSlug)
+      .then(hotelRec => _sendRequestNotification({
+        hotelSlug, hotelRec, roomNumber, category,
+        message, guestName, priority, requestRecId: created.id,
+      }))
+      .catch(e => console.error('[notif] fire-and-forget error:', e.message));
 
     return res.status(201).json({
       ok:        true,
