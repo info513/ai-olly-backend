@@ -43,6 +43,8 @@ const {
   TABLE_PRIVOLE         = 'PRIVOLE',
   TABLE_GUESTS          = 'GUESTS',
   TABLE_STAYS           = 'STAYS',
+  TABLE_RESPONSE_LOGS   = 'AI_RESPONSE_LOGS',
+  TABLE_UNANSWERED      = 'UNANSWERED_QUESTIONS',
 
   // Push notifications (VAPID)
   VAPID_PUBLIC_KEY,
@@ -2035,6 +2037,131 @@ app.get('/api/debug', async (req, res) => {
   }
 });
 
+// ── AI Response Logging helpers ───────────────────────────────────────────────
+//
+// isSafeHandoffAnswer  — detects safe-handoff / no-info answers
+// classifyConfidence   — HIGH / MEDIUM / LOW from response path
+// classifyUnansweredReason — keyword for why the answer was a handoff
+// _writeResponseLog    — fire-and-forget: write one AI_RESPONSE_LOGS record
+// _writeUnansweredLog  — fire-and-forget: write one UNANSWERED_QUESTIONS record
+//
+// Safety: never awaited on the critical path; errors surface as console.error only.
+// Privacy: question/answer capped at 2 000/3 000 chars; tokens and secrets never logged.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function isSafeHandoffAnswer(answer) {
+  if (!answer) return false;
+  const a = answer.toLowerCase();
+  return (
+    a.includes("don't have that information in the system")  ||
+    a.includes("don't have confirmed information about that") ||
+    a.includes("please contact reception for exact details")  ||
+    a.includes("please contact reception for a quote")        ||
+    a.includes("price is not available in the system")        ||
+    a.includes("nemam taj podatak u sustavu")                  ||
+    a.includes("kontaktirajte recepciju za točne informacije")
+  );
+}
+
+function classifyConfidence(payload) {
+  const meta   = payload?.meta  || {};
+  const answer = payload?.answer || '';
+
+  if (meta.rate_limited || meta.openai_rate_limited) return 'LOW';
+  if (!answer) return 'LOW';
+  if (isSafeHandoffAnswer(answer)) return 'LOW';
+
+  // Named deterministic handler = HIGH
+  const det = meta.deterministic;
+  if (det && det !== false && typeof det === 'string') return 'HIGH';
+
+  // web-ask: intent-linked records used = HIGH
+  if (meta.usedLinked === true) return 'HIGH';
+
+  // Both endpoints: intent matched AND records provided = HIGH
+  if (meta.intent && Array.isArray(meta.usedRecords) && meta.usedRecords.length > 0) return 'HIGH';
+
+  // Records available but no strong intent match = MEDIUM
+  if (Array.isArray(meta.usedRecords) && meta.usedRecords.length > 0) return 'MEDIUM';
+  if (meta.usedFallback) return 'MEDIUM';
+
+  return 'LOW';
+}
+
+function classifyUnansweredReason(question) {
+  const q = (question || '').toLowerCase();
+  if (/\bpric(e|ing)\b|how much|\bcost\b|\brate\b|\bfee\b/.test(q)) return 'missing_price';
+  if (/\bpay(ment)?\b|\bcard\b|\bcash\b|\binvoice\b/.test(q))       return 'missing_payment_policy';
+  if (/\bcctv\b|\bcamera\b|\bsurveillance\b/.test(q))               return 'missing_security_policy';
+  if (/\bpark(ing)?\b/.test(q))                                      return 'missing_hotel_fact';
+  return 'missing_hotel_fact';
+}
+
+function classifyUnansweredPriority(reason) {
+  if (reason === 'missing_price' || reason === 'missing_payment_policy') return 'High';
+  return 'Medium';
+}
+
+async function _writeUnansweredLog(ctx, meta, answer) {
+  const reason = classifyUnansweredReason(ctx.question);
+  await base(TABLE_UNANSWERED).create({
+    'Question':        String(ctx.question || '').slice(0, 2000),
+    'Timestamp':       new Date().toISOString(),
+    'Hotel Slug':      String(ctx.slug     || ''),
+    'Endpoint':        String(ctx.endpoint || ''),
+    'Room':            String(ctx.room     || ''),
+    'Detected Intent': String(meta.intent  || ''),
+    'Answer Given':    String(answer       || '').slice(0, 3000),
+    'Language':        String(ctx.lang     || ''),
+    'Reason':          reason,
+    'Status':          'New',
+    'Priority':        classifyUnansweredPriority(reason),
+  });
+}
+
+async function _writeResponseLog(payload, ctx, started) {
+  const ms     = Date.now() - started;
+  const meta   = payload.meta  || {};
+  const answer = payload.answer || '';
+
+  const det    = meta.deterministic;
+  const isDet  = det && det !== false && typeof det === 'string';
+  const safeHO = isSafeHandoffAnswer(answer);
+  const confidence = classifyConfidence(payload);
+
+  const srcRecs = Array.isArray(meta.usedRecords)
+    ? meta.usedRecords.map(r => r.id || r.naziv).filter(Boolean).join(', ')
+    : '';
+  const srcType = isDet              ? 'deterministic'
+                : srcRecs            ? 'airtable'
+                : meta.usedFallback  ? 'fallback'
+                : 'unknown';
+
+  await base(TABLE_RESPONSE_LOGS).create({
+    'Question':       String(ctx.question || '').slice(0, 2000),
+    'Timestamp':      new Date().toISOString(),
+    'Hotel Slug':     String(ctx.slug     || ''),
+    'Endpoint':       String(ctx.endpoint || ''),
+    'Room':           String(ctx.room     || ''),
+    'Answer':         String(answer       || '').slice(0, 3000),
+    'Language':       String(ctx.lang     || ''),
+    'Intent':         String(meta.intent  || ''),
+    'Deterministic':  isDet ? String(det) : '',
+    'Source Type':    srcType,
+    'Source Records': srcRecs,
+    'Confidence':     confidence,
+    'Latency ms':     ms,
+    'Safe Handoff':   safeHO,
+    'Build Hash':     BUILD,
+  });
+
+  if (safeHO) {
+    await _writeUnansweredLog(ctx, meta, answer);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 app.post('/api/web-ask', async (req, res) => {
   const started = Date.now();
 
@@ -2042,6 +2169,20 @@ app.post('/api/web-ask', async (req, res) => {
     const question = pickFirstNonEmpty(req.body?.question, req.body?.q);
     const hotelSlug = pickFirstNonEmpty(req.query?.slug, req.body?.slug, HOTEL_SLUG_DEFAULT);
     const lang = detectLang(question);
+
+    // ── Logging intercept ─────────────────────────────────────────────────────
+    // Captures every successful res.json() call for AI_RESPONSE_LOGS.
+    // res.status(N).json() is NOT intercepted (400/403/500 are not logged).
+    const _wLogCtx   = { endpoint: 'web-ask', slug: hotelSlug, room: '', lang, question: question || '' };
+    const _wOrigJson = res.json.bind(res);
+    res.json = (payload) => {
+      if (payload?.ok && payload?.answer) {
+        _writeResponseLog(payload, _wLogCtx, started)
+          .catch(e => console.error('[log] web-ask:', e?.message));
+      }
+      return _wOrigJson(payload);
+    };
+    // ─────────────────────────────────────────────────────────────────────────
 
     if (!question) return res.status(400).json({ ok: false, error: 'Missing question' });
 
@@ -2469,6 +2610,20 @@ app.post('/api/pwa-ask', async (req, res) => {
     const roomNumber = pickFirstNonEmpty(req.body?.room, req.query?.room, '');
     const token      = pickFirstNonEmpty(req.body?.token, req.query?.token, '');
     const lang       = detectLang(question);
+
+    // ── Logging intercept ─────────────────────────────────────────────────────
+    // Captures every successful res.json() call for AI_RESPONSE_LOGS.
+    // res.status(N).json() is NOT intercepted (400/403/500 are not logged).
+    const _pLogCtx   = { endpoint: 'pwa-ask', slug: hotelSlug, room: roomNumber, lang, question: question || '' };
+    const _pOrigJson = res.json.bind(res);
+    res.json = (payload) => {
+      if (payload?.ok && payload?.answer) {
+        _writeResponseLog(payload, _pLogCtx, started)
+          .catch(e => console.error('[log] pwa-ask:', e?.message));
+      }
+      return _pOrigJson(payload);
+    };
+    // ─────────────────────────────────────────────────────────────────────────
 
     if (!question)   return res.status(400).json({ ok: false, error: 'Missing question' });
     if (!roomNumber) return res.status(400).json({ ok: false, error: 'Missing room number' });
