@@ -18,6 +18,7 @@ const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || 'appon9UYjX6KU9cr1';
 const BASE_URL         = process.env.EVAL_BASE_URL    || 'https://app.aiolly.pressmax.net';
 const REQUEST_TIMEOUT  = 20_000; // ms
+const INTER_REQUEST_DELAY_MS = 2_100; // stay under server rate limit (12 req / 20 s)
 
 const TABLE_EVAL_TESTS = 'AI_EVAL_TESTS';
 const TABLE_ROOM_GUIDE = 'ROOM GUIDE';
@@ -140,6 +141,11 @@ async function runTest(test, tokensBySlug) {
   const answer      = data.answer || '';
   const answerLower = answer.toLowerCase();
 
+  // Detect server-side rate limit response
+  if (answerLower.includes('too many requests') || answerLower.includes('previše upita')) {
+    return { result: 'ERROR', answer, error: 'Rate limited by server — increase INTER_REQUEST_DELAY_MS', latencyMs };
+  }
+
   // Must-contain assertions
   for (const term of mustContain) {
     if (!answerLower.includes(term.toLowerCase())) {
@@ -234,6 +240,9 @@ async function main() {
     }
 
     updates.push({ id: test.id, lastRun: runTs, result: r.result, answer: r.answer, error: r.error });
+
+    // Pace requests to stay under server rate limit (12 req / 20 s)
+    await new Promise(res => setTimeout(res, INTER_REQUEST_DELAY_MS));
   }
 
   // 4. Write results back
