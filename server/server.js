@@ -739,6 +739,10 @@ async function getHotelRecord(hotelSlug) {
     // Returns '' if not set; notification is silently skipped.
     notificationEmail: pickFirstNonEmpty(f['Notification Email'], f.notificationEmail, ''),
 
+    // Emergency numbers — tenant-configurable. Fallback to EU standard (112/194) if not set.
+    emergencyNumber:        pickFirstNonEmpty(f['Emergency Number'],        f.emergencyNumber,        '112'),
+    medicalEmergencyNumber: pickFirstNonEmpty(f['Medical Emergency Number'], f.medicalEmergencyNumber, '194'),
+
     active: (f.Active ?? true) === true,
   } : null;
 
@@ -1345,10 +1349,14 @@ function renderCheckinTimeAnswer(hotelRec, lang = 'HR') {
 }
 
 // ✅ deterministički (PWA only): emergency / medical / fire
-// Returns reception phone + Croatian emergency numbers (112, 194) immediately.
-// Avoids routing medical or fire queries through hotel-card dump or GPT.
+// Returns reception phone + tenant emergency numbers immediately.
+// Numbers come from HOTELI Emergency Number / Medical Emergency Number fields.
+// Fallback: 112 (general) / 194 (ambulance) — EU/Croatia standard.
 function renderEmergencyAnswer(hotelRec, lang = 'HR', question = '') {
-  const phone = hotelRec?.telefon;
+  const phone  = hotelRec?.telefon;
+  const emNum  = (hotelRec?.emergencyNumber        || '112').trim();
+  const medNum = (hotelRec?.medicalEmergencyNumber || '194').trim();
+
   const phoneLine = phone
     ? (lang === 'EN' ? ` Reception: ${phone}.` : ` Recepcija: ${phone}.`)
     : '';
@@ -1368,13 +1376,13 @@ function renderEmergencyAnswer(hotelRec, lang = 'HR', question = '') {
 
   if (isFireRelated) {
     return lang === 'EN'
-      ? `If there is a fire or immediate danger, stay calm and leave the building immediately using the nearest safe exit. Follow any instructions from hotel staff.${phoneLine} Call 112 for all emergencies, or 194 for ambulance assistance. Contact Reception for guidance if it is safe to do so.`
-      : `U slučaju požara ili neposredne opasnosti, ostanite mirni i napustite zgradu odmah koristeći najbliži siguran izlaz. Slijedite upute hotelskog osoblja.${phoneLine} Nazovite 112 za sve hitne slučajeve, ili 194 za hitnu medicinsku pomoć. Ako je sigurno, kontaktirajte recepciju za smjernice.`;
+      ? `If there is a fire or immediate danger, stay calm and leave the building immediately using the nearest safe exit. Follow any instructions from hotel staff.${phoneLine} Call ${emNum} for all emergencies, or ${medNum} for ambulance assistance. Contact Reception for guidance if it is safe to do so.`
+      : `U slučaju požara ili neposredne opasnosti, ostanite mirni i napustite zgradu odmah koristeći najbliži siguran izlaz. Slijedite upute hotelskog osoblja.${phoneLine} Nazovite ${emNum} za sve hitne slučajeve, ili ${medNum} za hitnu medicinsku pomoć. Ako je sigurno, kontaktirajte recepciju za smjernice.`;
   }
 
   return lang === 'EN'
-    ? `Please contact Reception immediately for urgent assistance.${phoneLine} For medical emergencies call 194 (ambulance). For all emergencies call 112.`
-    : `Molimo odmah kontaktirajte recepciju za hitnu pomoć.${phoneLine} Za hitnu medicinsku pomoć nazovite 194. Za sve hitne slučajeve nazovite 112.`;
+    ? `Please contact Reception immediately for urgent assistance.${phoneLine} For medical emergencies call ${medNum} (ambulance). For all emergencies call ${emNum}.`
+    : `Molimo odmah kontaktirajte recepciju za hitnu pomoć.${phoneLine} Za hitnu medicinsku pomoć nazovite ${medNum}. Za sve hitne slučajeve nazovite ${emNum}.`;
 }
 
 // ✅ deterministički (PWA only): city/activity hint — points guest to app features
@@ -1791,9 +1799,11 @@ function buildRoomContext(roomGuide) {
 //  • Persona voice injected when available
 // -------------------------
 async function generateAnswerPwa({ question, hotelSlug, lang, hotelRec, intentPick, recordsToUse, roomGuide, outputRule }) {
-  const personaBlock = hotelRec?.personaVoice
-    ? `PERSONA:\n${hotelRec.personaVoice}\n\n`
-    : '';
+  // Persona: use hotel-specific voice when configured in HOTELI.Persona Voice;
+  // otherwise fall back to neutral AI Olly concierge — never hardcode a hotel-specific name.
+  const personaSection = hotelRec?.personaVoice
+    ? `PERSONA:\n${hotelRec.personaVoice}\nTone: warm, calm, precise. Apply persona only to factual and advisory answers. For emergencies, technical in-room instructions, and safe-handoff responses — neutral and precise, no persona.\nFor food: name at most 2 dishes total; name each dish once; do not list the same dish under different spellings; describe each dish in 3–5 words only.`
+    : `PERSONA:\nYou are AI Olly, a professional digital concierge for this hotel.\nTone: warm, calm, precise. Apply persona only to factual and advisory answers. For emergencies, technical in-room instructions, and safe-handoff responses — neutral and precise, no persona.\nFor food: name at most 2 dishes total; name each dish once; describe each dish in 3–5 words only.`;
 
   const styleText = outputRule
     ? `OUTPUT RULE (Scope=${outputRule.scope}, Format=${outputRule.format}):
@@ -1846,15 +1856,9 @@ TIER 2 — General city and travel advice (local attractions, Split history, res
 - NEVER state specific opening hours, prices, exact distances, or partner/business names unless they appear in the provided data.
 - Where appropriate, mention that Reception or the City Map and Routes sections in the guide app can offer more tailored suggestions.
 
-PERSONA — DIOCLEA:
-You are "Dioclea" — a refined, composed concierge at a historic boutique hotel.
-Tone: warm, calm, precise. Understated elegance — never poetic, never dramatic.
-Style: a trusted guide who speaks in complete, careful sentences. Polite confidence.
-Do NOT use metaphors, weather imagery, dramatic phrasing, or overly literary language.
-Apply persona only to factual and advisory answers. For emergencies, technical in-room instructions, and safe-handoff responses — neutral and precise, no persona.
-For food: name at most 2 dishes total; name each dish once; do not list the same dish under different spellings; describe each dish in 3–5 words only.
+${personaSection}
 
-${personaBlock}${styleText}
+${styleText}
 
 OUTPUT FORMAT:
 - Write in flowing prose. Do NOT use bullet points (•, -, *) or numbered lists unless the guest explicitly asks "list" or "what are all".
@@ -1903,11 +1907,11 @@ Data usage:
 // GPT answer generation (STRICT)
 // -------------------------
 async function generateAnswer({ question, hotelSlug, lang, hotelRec, intentPick, recordsToUse, outputRule }) {
-  // Persona voice: hotel-specific character injected before output rules.
-  // Empty string when field is not yet populated — no effect on prompt.
-  const personaBlock = hotelRec?.personaVoice
-    ? `PERSONA:\n${hotelRec.personaVoice}\n\n`
-    : '';
+  // Persona: use hotel-specific voice when configured in HOTELI.Persona Voice;
+  // otherwise fall back to neutral AI Olly concierge — never hardcode a hotel-specific name.
+  const personaSection = hotelRec?.personaVoice
+    ? `PERSONA:\n${hotelRec.personaVoice}\nTone: warm, calm, precise. Apply persona only to factual and advisory answers. For emergencies and safe-handoff responses — neutral and precise, no persona.\nFor food: name at most 2 dishes total; name each dish once; do not list the same dish under different spellings; describe each dish in 3–5 words only.`
+    : `PERSONA:\nYou are AI Olly, a professional digital concierge for this hotel.\nTone: warm, calm, precise. Apply persona only to factual answers; for emergencies and safe-handoff responses — neutral and precise, no persona.\nFor food: name at most 2 dishes total; name each dish once; describe each dish in 3–5 words only.`;
 
   const styleText = outputRule
     ? `OUTPUT RULE (Scope=${outputRule.scope}, Format=${outputRule.format}):
@@ -1982,15 +1986,9 @@ TIER 2 — General city and travel advice (local attractions, Split history, res
 - NEVER state specific opening hours, prices, exact distances, or partner/business names unless they appear in the provided data.
 - Where appropriate, mention that Reception can offer more tailored suggestions.
 
-PERSONA — DIOCLEA:
-You are "Dioclea" — a refined, composed concierge at a historic boutique hotel.
-Tone: warm, calm, precise. Understated elegance — never poetic, never dramatic.
-Style: a trusted guide who speaks in complete, careful sentences. Polite confidence.
-Do NOT use metaphors, weather imagery, dramatic phrasing, or overly literary language.
-Apply persona only to factual and advisory answers. For emergencies and safe-handoff responses — neutral and precise, no persona.
-For food: name at most 2 dishes total; name each dish once; do not list the same dish under different spellings; describe each dish in 3–5 words only.
+${personaSection}
 
-${personaBlock}${styleText}
+${styleText}
 
 Language:
 - If lang=HR respond in Croatian.
@@ -3814,7 +3812,7 @@ app.post('/api/webhook/novosti', async (req, res) => {
   try {
     const secret    = pickFirstNonEmpty(req.body?.secret, req.headers['x-webhook-secret'], '');
     const hotelSlug = pickFirstNonEmpty(req.body?.hotelSlug, HOTEL_SLUG_DEFAULT);
-    const naslov    = pickFirstNonEmpty(req.body?.naslov, 'Hotel Antique Split');
+    const naslov    = pickFirstNonEmpty(req.body?.naslov, '');
     const poruka    = pickFirstNonEmpty(req.body?.poruka, '');
     const recordId  = pickFirstNonEmpty(req.body?.recordId, '');
 
@@ -3823,9 +3821,14 @@ app.post('/api/webhook/novosti', async (req, res) => {
       return res.status(403).json({ ok: false, error: 'Forbidden' });
     }
 
+    // Resolve hotel display name for push notification title/body fallbacks.
+    // Fallback order: HOTELI.Hotel naziv → slug → 'AI OLLY'
+    const _hotelRecNotif = await getHotelRecord(hotelSlug).catch(() => null);
+    const _hotelDisplay  = _hotelRecNotif?.hotelNaziv || hotelSlug || 'AI OLLY';
+
     const payload = JSON.stringify({
-      title: naslov,
-      body:  poruka || 'News from Hotel Antique Split',
+      title: naslov || _hotelDisplay,
+      body:  poruka || `News from ${_hotelDisplay}`,
       tag:   'hotel-news',
       url:   '/pwa/',
     });

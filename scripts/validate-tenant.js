@@ -173,7 +173,10 @@ function runChecks(hotel, rooms, services, intents, evalTests, criticalLint) {
   const roomsMissingToken   = rooms.filter(r => !String(r.fields['Access Token'] || '').trim());
   const roomsMissingType    = rooms.filter(r => !String(r.fields['Room Type']    || '').trim());
   const roomsMissingWelcome = rooms.filter(r => !String(r.fields['AI WELCOME']   || '').trim());
-  const roomsMissingNotes   = rooms.filter(r => !String(r.fields['Room Notes']   || '').trim());
+  // ROOM GUIDE uses "Napomene" in Croatian deployments; also accept "Room Notes" for future tenants
+  const roomsMissingNotes   = rooms.filter(r =>
+    !String(r.fields['Napomene'] || r.fields['Room Notes'] || r.fields['Notes'] || '').trim()
+  );
   const roomNames = rooms.map(r => String(r.fields['Naziv sobe'] || r.id));
 
   const results = {};
