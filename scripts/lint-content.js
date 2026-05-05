@@ -536,7 +536,7 @@ async function loadExistingOpenIssues() {
     const status = typeof rec.fields['Status'] === 'object'
       ? rec.fields['Status'].name
       : String(rec.fields['Status'] || '');
-    if (status === 'New' || status === 'Reviewed') {
+    if (status === 'New' || status === 'Reviewed' || status === 'Ignored') {
       const key = [
         rec.fields['Record ID'] || '',
         typeof rec.fields['Issue Type'] === 'object' ? rec.fields['Issue Type'].name : String(rec.fields['Issue Type'] || ''),
