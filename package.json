@@ -7,7 +7,8 @@
     "start": "node server/server.js",
     "test": "node --test tests/fix-01-02.test.js tests/fix-03-filters.test.js tests/fix-04-routing.test.js",
     "eval:prod": "node scripts/run-evals.js",
-    "lint:content": "node scripts/lint-content.js"
+    "lint:content": "node scripts/lint-content.js",
+    "validate:tenant": "node scripts/validate-tenant.js"
   },
   "keywords": [],
   "author": "",
