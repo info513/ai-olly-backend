@@ -258,8 +258,18 @@ export function isHousekeepingHoursQuestion(question) {
 //
 //   'connect' intentionally included — in a hotel widget context this almost
 //   always means WiFi connectivity, not room connections or comparisons.
+//
+//   Fix #12 — 'connecting room' exception: "connecting rooms" / "connected rooms"
+//   are room-layout questions (family rooms), NOT WiFi questions. Guard them out.
 export function isWifiQuestion(question) {
   const q = normalizeText(question);
+  // Guard: "connecting rooms", "connected rooms", "connecting room" = room layout, not WiFi.
+  const isConnectingRoomQuestion = (
+    q.includes('connecting room') ||
+    q.includes('connected room')  ||
+    q.includes('adjacent room')
+  );
+  if (isConnectingRoomQuestion) return false;
   return (
     q.includes('wifi')      ||
     q.includes('wi fi')     ||
@@ -369,7 +379,13 @@ export function isSafeQuestion(question) {
     q.includes('safe at')      ||   // "safe at night"
     q.includes('safe walk')    ||   // "safe walking"
     q.includes('safe around')  ||   // "safe around the hotel"
-    q.includes('safe outside')      // "safe outside at night"
+    q.includes('safe outside') ||   // "safe outside at night"
+    q.includes('safe for')     ||   // "safe for tourists", "safe for families"
+    q.includes('is split safe') ||  // "is Split safe"
+    q.includes('is the city safe') || // "is the city safe"
+    q.includes('city safe')    ||   // "is the old city safe"
+    q.includes('town safe')    ||   // "is the old town safe"
+    q.includes('area safe')         // "is this area safe"
   );
   return !isPersonalSafety && (
     q.includes('safe')         ||   // EN: safe / safe box / safe deposit
