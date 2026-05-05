@@ -11,7 +11,7 @@ import cors from 'cors';
 import Airtable from 'airtable';
 import OpenAI from 'openai';
 import webpush from 'web-push';
-import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion, isMaintenanceReportQuestion } from './classify.js';
+import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion, isMaintenanceReportQuestion, isRoomNumberQuestion, isExtraTowelsQuestion } from './classify.js';
 import { timingSafeEqual, randomBytes } from 'node:crypto';
 import { asArray, isEmptyArray, fieldHasAny, valuesToStrings, matchesHotelSlug, allowForWeb, allowForPWA } from './filters.js';
 
@@ -1739,6 +1739,30 @@ function renderSafeAnswer(roomGuide) {
 // Fields included: name, features, WiFi, AC, TV, safe, notes, AI master prompt.
 // AI Master prompt is appended last so hotel-specific overrides take precedence.
 // Returns '' when roomGuide is null — callers should handle gracefully.
+// ✅ PWA only: room number / identity answer
+// Renders a concise answer from the room context already available in pwa-ask.
+// No Airtable lookups needed — roomNumber comes from the validated request token.
+function renderRoomNumberAnswer(roomNumber, roomGuide, lang = 'EN') {
+  const tipSobe = roomGuide?.tipSobe || '';
+  if (lang === 'HR') {
+    return tipSobe
+      ? `Nalazite se u sobi ${roomNumber} — ${tipSobe}.`
+      : `Nalazite se u sobi ${roomNumber}.`;
+  }
+  return tipSobe
+    ? `You are in Room ${roomNumber} — ${tipSobe}.`
+    : `You are in Room ${roomNumber}.`;
+}
+
+// ✅ PWA only: extra towels / housekeeping request answer
+// Directs guest to Reception or Help & Requests section without inventing a request.
+function renderExtraTowelsAnswer(lang = 'EN') {
+  if (lang === 'HR') {
+    return 'Naravno. Molimo kontaktirajte recepciju ili pošaljite zahtjev putem odjeljka Zahtjevi u aplikaciji, i tim će vam urediti dodatne ručnike za sobu.';
+  }
+  return 'Of course. Please contact Reception or send a request through the Help & Requests section, and the team will arrange extra towels for your room.';
+}
+
 function buildRoomContext(roomGuide) {
   if (!roomGuide) return '';
   const parts = [];
@@ -2688,6 +2712,21 @@ app.post('/api/pwa-ask', async (req, res) => {
       });
     }
 
+    // ✅ -0.5) Deterministic (PWA only): room number / room identity
+    // Guest asks "what is my room?" / "which room am I in?" — answer directly
+    // from the already-validated room context. No Airtable lookup needed.
+    // Guard: only fires if roomNumber is present (it always is post-auth, but be safe).
+    if (isRoomNumberQuestion(question)) {
+      if (roomNumber) {
+        return res.json({
+          ok: true,
+          answer: renderRoomNumberAnswer(roomNumber, roomGuide, lang),
+          meta: { hotelSlug, roomNumber, deterministic: 'room_number', ms: Date.now() - started },
+        });
+      }
+      // roomNumber missing — fall through to safe handoff via GPT
+    }
+
     // ✅ 0) Deterministic (PWA only): maintenance report — broken device in room
     // "The AC is not working", "shower is broken", "light not working" etc.
     // Must fire BEFORE isContactCoreQuestion — "who do I call?" contains 'call' which
@@ -2746,6 +2785,17 @@ app.post('/api/pwa-ask', async (req, res) => {
           meta: { hotelSlug, roomNumber, deterministic: 'housekeeping_hours', ms: Date.now() - started },
         });
       }
+    }
+
+    // ✅ 0.65) Deterministic (PWA only): extra towels / housekeeping request
+    // Guest asks for extra towels — direct operational answer, no GPT needed.
+    // Does NOT auto-create a request; directs to Reception or Help & Requests.
+    if (isExtraTowelsQuestion(question)) {
+      return res.json({
+        ok: true,
+        answer: renderExtraTowelsAnswer(lang),
+        meta: { hotelSlug, roomNumber, deterministic: 'extra_towels', ms: Date.now() - started },
+      });
     }
 
     // ✅ 0.7) Deterministic: WiFi — ROOM GUIDE takes priority over SERVICES in PWA

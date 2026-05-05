@@ -625,3 +625,63 @@ export function isMaintenanceReportQuestion(question) {
 
   return hasBreakdown && hasDevice;
 }
+
+// ── isRoomNumberQuestion ─────────────────────────────────────────────────────
+// Fires when a guest asks which room they are in or what their room number is.
+// PWA-only handler — room context is only available in pwa-ask, not web-ask.
+//
+// Guards prevent triggering on questions that mention "room" in a different
+// context: service requests, room type/price/view queries, maintenance reports,
+// or key/lock questions.  Those must fall through to their own handlers.
+//
+// Croatian: "broj sobe" = room number; "koja je moja soba" = which is my room.
+export function isRoomNumberQuestion(question) {
+  const q = normalizeText(question);
+
+  // Guard: "room" in a different context — do NOT intercept these
+  if (
+    q.includes('room service')    ||  // food/beverage in-room service
+    q.includes('room type')       ||  // "what room type am I in"
+    q.includes('room price')      ||  // pricing questions
+    q.includes('room rate')       ||  // pricing questions
+    q.includes('room view')       ||  // view from room
+    q.includes('room amenities')  ||  // amenities list
+    q.includes('room feature')    ||  // room features
+    q.includes('my room key')     ||  // key card
+    q.includes('lock my room')       // security
+  ) return false;
+
+  return (
+    q.includes('my room number')     ||  // "what is my room number?"
+    q.includes('room number')        ||  // bare "room number" / "what's the room number"
+    q.includes('which room am i')    ||  // "which room am I in?"
+    q.includes('what room am i')     ||  // "what room am I in?"
+    q.includes('what is my room')    ||  // "what is my room?" (after exclusion guards)
+    q.includes('what s my room')     ||  // "what's my room?" (apostrophe → space)
+    q.includes('broj sobe')          ||  // HR: "room number"
+    q.includes('koja je moja soba')  ||  // HR: "which is my room"
+    q.includes('moja soba broj')         // HR: "my room number"
+  );
+}
+
+// ── isExtraTowelsQuestion ────────────────────────────────────────────────────
+// Fires when a guest requests extra towels or asks how to get more.
+// PWA-only handler — gives a direct operational answer directing to Reception
+// or the Help & Requests section instead of falling to GPT (which safe-handoffs).
+//
+// Intentionally NOT guarded against housekeeping-hours timing words — the
+// housekeeping hours handler requires BOTH a housekeeping keyword AND a time
+// signal, so "Can housekeeping bring towels?" (no time signal) falls through to
+// this handler correctly.
+//
+// Croatian: "ručnik/rucnik" = towel; stem covers all inflections.
+export function isExtraTowelsQuestion(question) {
+  const q = normalizeText(question);
+  return (
+    q.includes('towel')   ||  // EN: towel / towels / extra towels
+    q.includes('ručnik')  ||  // HR: towel (with diacritic — nominative/accusative)
+    q.includes('rucnik')  ||  // HR: towel (no diacritic)
+    q.includes('ručnici') ||  // HR: towels plural (with diacritic)
+    q.includes('rucnici')     // HR: towels plural (no diacritic)
+  );
+}
