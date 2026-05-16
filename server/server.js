@@ -50,6 +50,7 @@ const {
   VAPID_PUBLIC_KEY,
   VAPID_PRIVATE_KEY,
   WEBHOOK_SECRET = 'antique-split-webhook-2026',
+  RECEPTION_PIN  = '',
 
   // CORS
   CORS_ORIGINS = '',
@@ -3957,6 +3958,93 @@ app.get('/api/reception/consent-context', (req, res) => {
     guestId: session.guestId,
     stayId:  session.stayId,
   });
+});
+
+// ── /api/reception/init-consent ───────────────────────────────────────────────
+//
+// Called by start-consent.html (tablet browser) to generate a consent token
+// from a Stay record ID.  Auth uses RECEPTION_PIN (not WEBHOOK_SECRET).
+//
+// Input:  POST { stayId, pin }
+// Output: { ok, consentUrl, room, name }
+//
+// The endpoint resolves room number + guest info from Airtable so that no
+// sensitive data needs to be embedded in the Airtable button URL.
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/reception/init-consent', async (req, res) => {
+  try {
+    const { stayId = '', pin = '' } = req.body || {};
+
+    if (!RECEPTION_PIN || pin !== RECEPTION_PIN) {
+      console.warn('[init-consent] Invalid PIN');
+      return res.status(403).json({ ok: false, error: 'Forbidden' });
+    }
+    if (!stayId) {
+      return res.status(400).json({ ok: false, error: 'Missing stayId' });
+    }
+
+    // ── Fetch Stay record ──────────────────────────────────────────────────
+    const stayRecord  = await base(TABLE_STAYS).find(stayId);
+    const stayFields  = stayRecord.fields;
+
+    // ── Resolve room number ────────────────────────────────────────────────
+    // Prefer linked SOBE record → Soba oznaka; fall back to parsing Naziv.
+    let room = '';
+    const sobaIds = stayFields['Soba'] || [];
+    if (sobaIds.length > 0) {
+      try {
+        const sobaRecord = await base(TABLE_ROOMS).find(sobaIds[0]);
+        room = sobaRecord.fields['Soba oznaka'] || '';
+      } catch { /* not critical */ }
+    }
+    if (!room) {
+      const naziv = stayFields['Naziv'] || '';
+      const parts = naziv.split(' - ');
+      if (parts.length >= 2) {
+        room = parts[1].trim();
+      } else {
+        const m = naziv.match(/\b(\d{2,4})\b/);
+        if (m) room = m[1];
+      }
+    }
+    if (!room) {
+      return res.status(422).json({ ok: false, error: 'Cannot determine room from Stay record' });
+    }
+
+    // ── Resolve guest name + email ─────────────────────────────────────────
+    const guestIds = stayFields['Gost'] || [];
+    const guestId  = guestIds[0] || '';
+    let name = '', email = '';
+    if (guestId) {
+      const guestRecord = await base(TABLE_GUESTS).find(guestId);
+      const gf = guestRecord.fields;
+      name  = (gf['Ime Prezime'] || `${gf['Ime'] || ''} ${gf['Prezime'] || ''}`.trim()).trim();
+      email = gf['Email'] || '';
+    }
+
+    // ── Create consent session ─────────────────────────────────────────────
+    purgeExpiredConsentSessions();
+    const token   = generateConsentToken();
+    const expires = Date.now() + CONSENT_TOKEN_TTL_MS;
+
+    consentSessions.set(token, {
+      slug:    stayFields['HotelSlug'] || HOTEL_SLUG_DEFAULT,
+      room,
+      name,
+      email,
+      guestId,
+      stayId:  stayRecord.id,
+      expires,
+      used:    false,
+    });
+
+    const consentUrl = `/reception/consent.html?token=${token}`;
+    console.log(`[init-consent] Token for stay=${stayId} room=${room} guest=${guestId || '—'}`);
+    return res.json({ ok: true, consentUrl, room, name });
+  } catch (e) {
+    console.error('[init-consent] error:', e);
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
 });
 
 // ── /api/reception/save-guest — upsert a GUESTS record ────────────────────────
