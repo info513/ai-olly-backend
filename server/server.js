@@ -50,7 +50,7 @@ const {
   VAPID_PUBLIC_KEY,
   VAPID_PRIVATE_KEY,
   WEBHOOK_SECRET = 'antique-split-webhook-2026',
-  RECEPTION_PIN  = '',
+  RECEPTION_PIN  = 'recepcija2026',
 
   // CORS
   CORS_ORIGINS = '',
