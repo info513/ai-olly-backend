@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1a56db" />
+  <title>AI CATHEDRA — Prijava ispita</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <span class="header__logo">AI CATHEDRA</span>
+    <span class="header__sub">Prijava ispita</span>
+  </header>
+
+  <!-- Student info bar (shown after load) -->
+  <div id="student-bar" class="student-bar" style="display:none;"></div>
+
+  <!-- Main content -->
+  <main class="container">
+    <div id="subject-list">
+      <!-- cards rendered by app.js -->
+    </div>
+  </main>
+
+  <!-- Confirmation modal -->
+  <div id="confirm-overlay" class="overlay" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modal__title">Potvrdite prijavu ispita</div>
+      <div class="modal__body">
+        Prijavljujete ispit za predmet:<br />
+        <strong id="confirm-subject-name"></strong>
+      </div>
+      <div class="modal__actions">
+        <button id="confirm-ok" class="btn btn--primary">Da, prijavljujem</button>
+        <button id="confirm-cancel" class="btn btn--cancel">Odustani</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-wrap" class="toast-wrap" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,296 @@
+/* ── AI CATHEDRA — PWA styles ─────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --clr-bg:        #f4f5f7;
+  --clr-card:      #ffffff;
+  --clr-primary:   #1a56db;
+  --clr-primary-h: #1648c0;
+  --clr-danger:    #e02424;
+  --clr-success:   #057a55;
+  --clr-muted:     #6b7280;
+  --clr-border:    #e5e7eb;
+  --clr-text:      #111827;
+  --clr-sub:       #374151;
+  --radius:        10px;
+  --shadow:        0 1px 4px rgba(0,0,0,.08);
+  --font:          -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: var(--font);
+  background: var(--clr-bg);
+  color: var(--clr-text);
+  min-height: 100dvh;
+  padding-bottom: 2rem;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.header {
+  background: #fff;
+  border-bottom: 1px solid var(--clr-border);
+  padding: .9rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.header__logo {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--clr-primary);
+}
+
+.header__sub {
+  font-size: .78rem;
+  color: var(--clr-muted);
+  margin-left: auto;
+}
+
+/* ── Student info bar ────────────────────────────────────────────────────── */
+
+.student-bar {
+  background: var(--clr-primary);
+  color: #fff;
+  padding: .6rem 1rem;
+  font-size: .82rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.student-bar__name { font-weight: 600; }
+.student-bar__class { opacity: .85; }
+
+/* ── Main container ──────────────────────────────────────────────────────── */
+
+.container {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* ── Section heading ─────────────────────────────────────────────────────── */
+
+.section-title {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--clr-muted);
+  margin: 1.25rem 0 .5rem;
+}
+
+/* ── Subject card ────────────────────────────────────────────────────────── */
+
+.card {
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: .9rem 1rem;
+  margin-bottom: .6rem;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+
+.card__info { flex: 1; min-width: 0; }
+
+.card__name {
+  font-size: .95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card__meta {
+  font-size: .77rem;
+  color: var(--clr-muted);
+  margin-top: .15rem;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+.btn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 7px;
+  padding: .45rem .9rem;
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+}
+
+.btn--primary {
+  background: var(--clr-primary);
+  color: #fff;
+}
+.btn--primary:hover:not(:disabled) { background: var(--clr-primary-h); }
+
+.btn--ghost {
+  background: #f3f4f6;
+  color: var(--clr-muted);
+  cursor: default;
+}
+
+.btn--success {
+  background: #ecfdf5;
+  color: var(--clr-success);
+  cursor: default;
+}
+
+.btn--warn {
+  background: #fff7ed;
+  color: #c2710c;
+  cursor: default;
+}
+
+.btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+/* ── Status badges (inline text below name) ──────────────────────────────── */
+
+.badge {
+  display: inline-block;
+  padding: .1rem .45rem;
+  border-radius: 20px;
+  font-size: .7rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-right: .3rem;
+}
+
+.badge--green  { background: #d1fae5; color: #065f46; }
+.badge--blue   { background: #dbeafe; color: #1e40af; }
+.badge--yellow { background: #fef3c7; color: #92400e; }
+.badge--gray   { background: #f3f4f6; color: #4b5563; }
+.badge--red    { background: #fee2e2; color: #991b1b; }
+
+/* ── Loading / error states ──────────────────────────────────────────────── */
+
+.state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--clr-muted);
+}
+
+.state__icon { font-size: 2.5rem; margin-bottom: .75rem; }
+.state__msg  { font-size: .95rem; }
+
+.spinner {
+  width: 36px; height: 36px;
+  border: 3px solid #e5e7eb;
+  border-top-color: var(--clr-primary);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin: 0 auto .75rem;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Toast notification ──────────────────────────────────────────────────── */
+
+.toast-wrap {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5rem;
+  pointer-events: none;
+  width: min(90vw, 400px);
+}
+
+.toast {
+  background: #1f2937;
+  color: #fff;
+  padding: .65rem 1rem;
+  border-radius: 8px;
+  font-size: .85rem;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .25s, transform .25s;
+  text-align: center;
+  pointer-events: none;
+  width: 100%;
+}
+
+.toast.toast--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast--ok  { background: #065f46; }
+.toast--err { background: #991b1b; }
+
+/* ── Confirm modal ───────────────────────────────────────────────────────── */
+
+.overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 50;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.overlay.open { display: flex; }
+
+.modal {
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  padding: 1.5rem 1.25rem 2rem;
+  width: 100%;
+  max-width: 480px;
+}
+
+.modal__title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: .5rem;
+}
+
+.modal__body {
+  font-size: .88rem;
+  color: var(--clr-muted);
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+
+.modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+}
+
+.modal__actions .btn {
+  justify-content: center;
+  padding: .7rem;
+  font-size: .9rem;
+  width: 100%;
+}
+
+.btn--cancel {
+  background: #f3f4f6;
+  color: var(--clr-text);
+}

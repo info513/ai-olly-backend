@@ -179,6 +179,7 @@ app.use((err, req, res, next) => {
 app.use(express.json({ limit: '4mb' }));  // 4mb for signature PNG base64
 app.use('/pwa',       express.static('pwa'));
 app.use('/reception', express.static('reception'));
+app.use('/cathedra',  express.static('cathedra'));
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
