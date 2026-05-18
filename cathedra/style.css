@@ -95,7 +95,7 @@ body {
 .hero {
   background: linear-gradient(135deg, var(--clr-primary) 0%, #1648c0 100%);
   border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
+  padding: 1.25rem 1.5rem 1rem;
   color: #fff;
   margin-bottom: 1.25rem;
   position: relative;
@@ -105,35 +105,137 @@ body {
 .hero::after {
   content: '';
   position: absolute;
-  right: -30px; top: -30px;
-  width: 140px; height: 140px;
+  right: -40px; top: -40px;
+  width: 160px; height: 160px;
   border-radius: 50%;
-  background: rgba(255,255,255,.07);
+  background: rgba(255,255,255,.06);
   pointer-events: none;
 }
 
+/* ── Hero top: identity + status badge ── */
+.hero__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .9rem;
+}
+
+.hero__identity { flex: 1; min-width: 0; }
+
 .hero__label {
-  font-size: .7rem;
+  font-size: .68rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: .08em;
-  opacity: .75;
+  letter-spacing: .09em;
+  opacity: .7;
   margin-bottom: .35rem;
 }
 
 .hero__name {
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: -.01em;
-  margin-bottom: .25rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  line-height: 1.2;
+  margin-bottom: .5rem;
+  word-break: break-word;
 }
 
-.hero__sub {
-  font-size: .82rem;
+/* ── Info row: smjer, godina, skupnja ── */
+.hero__info-row {
+  display: flex;
+  flex-direction: column;
+  gap: .22rem;
+}
+
+.hero__info-item {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .8rem;
+  opacity: .9;
+  line-height: 1.4;
+}
+
+.hero__info-icon {
+  font-size: .78rem;
+  flex-shrink: 0;
   opacity: .8;
-  line-height: 1.5;
 }
 
+/* ── Status badge ── */
+.hero__status {
+  flex-shrink: 0;
+  border-radius: 20px;
+  padding: .28rem .65rem;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
+.hero__status--active {
+  background: rgba(255,255,255,.2);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.35);
+}
+
+.hero__status--locked {
+  background: rgba(254,202,202,.25);
+  color: #fecaca;
+  border: 1px solid rgba(254,202,202,.4);
+}
+
+/* ── Stat pills row ── */
+.hero__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+  padding-top: .85rem;
+  border-top: 1px solid rgba(255,255,255,.15);
+}
+
+.stat-pill {
+  display: flex;
+  align-items: baseline;
+  gap: .3rem;
+  background: rgba(255,255,255,.14);
+  border-radius: 20px;
+  padding: .28rem .7rem;
+  backdrop-filter: blur(4px);
+}
+
+.stat-pill--accent {
+  background: rgba(255,255,255,.26);
+  border: 1px solid rgba(255,255,255,.3);
+}
+
+.stat-pill__val {
+  font-size: .92rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+}
+
+.stat-pill__lbl {
+  font-size: .7rem;
+  font-weight: 600;
+  opacity: .8;
+  color: #fff;
+}
+
+/* Desktop: hero layout side-by-side (identity left, bigger name) */
+@media (min-width: 640px) {
+  .hero { padding: 1.5rem 1.75rem 1.1rem; }
+  .hero__name { font-size: 1.5rem; }
+  .hero__info-row { flex-direction: row; flex-wrap: wrap; gap: .4rem 1rem; }
+  .hero__stats { gap: .5rem; }
+  .stat-pill { padding: .32rem .8rem; }
+  .stat-pill__val { font-size: 1rem; }
+}
+
+/* Legacy chips (still supported if old markup is generated) */
 .hero__meta {
   display: flex;
   flex-wrap: wrap;

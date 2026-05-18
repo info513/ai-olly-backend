@@ -14,6 +14,8 @@ const API   = '/api/cathedra';
 
 let subjects     = [];
 let studentName  = '';
+let studentData  = null;  // { name, smjer, godina, grupa, zavrseno }
+let statsData    = null;  // { total, canRegister, activeRegistrations, passed, recognized }
 let isLocked     = false;
 let lockedMsg    = '';
 let activeFilter = 'sve';
@@ -94,7 +96,9 @@ async function loadSubjects(silent = false) {
     }
 
     subjects    = data.subjects || [];
-    studentName = data.studentName || '';
+    studentData = data.student  || null;
+    statsData   = data.stats    || null;
+    studentName = (data.student?.name) || data.studentName || '';
     isLocked    = data.locked === true;
     lockedMsg   = data.message || '';
     renderAll();
@@ -168,23 +172,60 @@ function renderLockedBanner() {
 // ── Hero card ─────────────────────────────────────────────────────────────────
 
 function renderHero() {
-  const name = studentName || 'Moji predmeti';
-  const total = subjects.length;
-  const canRegister = subjects.filter(s => s.mozePrijaviti).length;
-  const registered  = subjects.filter(s => s.imaAktivnuPrijavu).length;
-  const passed      = subjects.filter(s => s.polozio).length;
+  const sd = studentData;
+
+  // Stats — iz statsData ako postoji, inače računamo iz subjects (backward compat)
+  const total      = statsData?.total               ?? subjects.length;
+  const canReg     = statsData?.canRegister         ?? subjects.filter(s => s.mozePrijaviti).length;
+  const registered = statsData?.activeRegistrations ?? subjects.filter(s => s.imaAktivnuPrijavu).length;
+  const passed     = statsData?.passed              ?? subjects.filter(s => s.polozio).length;
+  const recognized = statsData?.recognized          ?? subjects.filter(s => s.statusPredmeta === 'PRIZNAJE SE').length;
+
+  const name = sd?.name || studentName || 'Moji predmeti';
+
+  // Status badge
+  const statusHtml = isLocked
+    ? `<span class="hero__status hero__status--locked">🔒 Program završen</span>`
+    : `<span class="hero__status hero__status--active">✓ Aktivno</span>`;
+
+  // Info red (smjer, godina, skupnja)
+  const infoItems = [];
+  if (sd?.smjer)  infoItems.push(`<span class="hero__info-item"><span class="hero__info-icon">📚</span>${esc(sd.smjer)}</span>`);
+  if (sd?.godina) infoItems.push(`<span class="hero__info-item"><span class="hero__info-icon">📅</span>${esc(sd.godina)}</span>`);
+  if (sd?.grupa)  infoItems.push(`<span class="hero__info-item"><span class="hero__info-icon">👥</span>${esc(sd.grupa)}</span>`);
+  const infoHtml = infoItems.length
+    ? `<div class="hero__info-row">${infoItems.join('')}</div>`
+    : '';
+
+  // Statistike — uvijek prikaži Ukupno i Za prijavu, ostalo samo ako > 0
+  const statDefs = [
+    { val: total,      lbl: 'Ukupno',     always: true  },
+    { val: canReg,     lbl: 'Za prijavu', always: true,  accent: true },
+    { val: registered, lbl: 'Prijavljeno', always: false },
+    { val: passed,     lbl: 'Položeno',   always: false },
+    { val: recognized, lbl: 'Priznato',   always: false },
+  ];
+
+  const statsHtml = statDefs
+    .filter(s => s.always || s.val > 0)
+    .map(s => `
+      <div class="stat-pill${s.accent ? ' stat-pill--accent' : ''}">
+        <span class="stat-pill__val">${s.val}</span>
+        <span class="stat-pill__lbl">${esc(s.lbl)}</span>
+      </div>`)
+    .join('');
 
   $hero.innerHTML = `
     <div class="hero">
-      <div class="hero__label">Prijava ispita</div>
-      <div class="hero__name">${esc(name)}</div>
-      <div class="hero__sub">Ovdje možete pregledati predmete i poslati prijavu za ispit.</div>
-      <div class="hero__meta">
-        <span class="hero__chip">📚 ${total} predmeta</span>
-        ${canRegister > 0 ? `<span class="hero__chip">✏️ ${canRegister} za prijavu</span>` : ''}
-        ${registered  > 0 ? `<span class="hero__chip">⏳ ${registered} prijavljeno</span>` : ''}
-        ${passed      > 0 ? `<span class="hero__chip">✓ ${passed} položeno</span>` : ''}
+      <div class="hero__top">
+        <div class="hero__identity">
+          <div class="hero__label">AI CATHEDRA &mdash; Polaznički portal</div>
+          <div class="hero__name">${esc(name)}</div>
+          ${infoHtml}
+        </div>
+        ${statusHtml}
       </div>
+      <div class="hero__stats">${statsHtml}</div>
     </div>`;
 }
 

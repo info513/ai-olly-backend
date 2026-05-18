@@ -4283,6 +4283,16 @@ const UPISI_PWA_TOKEN = 'PWA Token';           // singleLineText
 const UPISI_ZAVRSENO  = 'Završeno';            // checkbox
 const UPISI_EP_LINK   = 'EVIDENCIJA PREDMETA'; // multipleRecordLinks
 
+// ── UPISI — dashboard polja ───────────────────────────────────────────────────
+const UPISI_POLAZNIK_FORMULA = 'Upisi (ID)';    // formula → ARRAYJOIN(POLAZNICI) → ime
+const UPISI_SMJER_TXT        = 'Smjer_txt';     // formula → tekst smjera
+const UPISI_SKUPINA_LINK     = 'Skupina';       // multipleRecordLinks → GRUPE
+const UPISI_GODINA_LINK      = 'Godina';        // multipleRecordLinks → GODINE
+
+// ── Dodatne tablice za student dashboard ─────────────────────────────────────
+const CAT_TABLE_GRUPE  = 'tblUpPK0ITMx9WDmG'; // GRUPE
+const CAT_TABLE_GODINE = 'tblLk7uqZWEzadLHP';  // GODINE
+
 // ── EVIDENCIJA PREDMETA field imena ──────────────────────────────────────────
 const EP_PREDMET_ZAPIS = 'Predmet zapis';   // primary, singleLineText
 const EP_UPIS_LINK     = 'Upis';            // multipleRecordLinks
@@ -4353,33 +4363,66 @@ app.get('/api/cathedra/subjects', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'MISSING_TOKEN', message: 'Token je obavezan.' });
     }
 
-    // 2. Nađi UPIS po PWA Tokenu
+    // 2. Nađi UPIS po PWA Tokenu — dohvaćamo i dashboard polja
     const upis = await cathedraSelectFirst(CAT_TABLE_UPISI, {
       filterByFormula: `{${UPISI_PWA_TOKEN}} = '${escapeAirtableFormulaString(token)}'`,
-      fields: [UPISI_PWA_TOKEN, UPISI_ZAVRSENO, UPISI_EP_LINK],
+      fields: [
+        UPISI_PWA_TOKEN, UPISI_ZAVRSENO, UPISI_EP_LINK,
+        UPISI_POLAZNIK_FORMULA, UPISI_SMJER_TXT,
+        UPISI_SKUPINA_LINK, UPISI_GODINA_LINK,
+      ],
     });
 
     if (!upis) {
       return res.status(403).json({ ok: false, error: 'TOKEN_INVALID', message: 'Nevažeći token.' });
     }
 
-    // 3. Dohvati EVIDENCIJA PREDMETA zapise za ovaj UPIS
-    const epIds = asArray(upis.fields[UPISI_EP_LINK]);
-    const upisId = upis.id;
-    const locked = upis.fields[UPISI_ZAVRSENO] === true;
+    // 3. Izvuci osnovne podatke iz UPIS zapisa
+    const epIds      = asArray(upis.fields[UPISI_EP_LINK]);
+    const upisId     = upis.id;
+    const locked     = upis.fields[UPISI_ZAVRSENO] === true;
+    const skupinaIds = asArray(upis.fields[UPISI_SKUPINA_LINK])
+                         .filter(id => typeof id === 'string' && id.startsWith('rec'));
+    const godinaIds  = asArray(upis.fields[UPISI_GODINA_LINK])
+                         .filter(id => typeof id === 'string' && id.startsWith('rec'));
 
+    // 4. Paralelno: EP zapisi + skupnja + godina (sve odjednom)
+    const [epRecords, skupinaRec, godinaRec] = await Promise.all([
+      epIds.length
+        ? cathedraFindByIds(CAT_TABLE_EP, epIds)
+        : Promise.resolve([]),
+      skupinaIds[0]
+        ? cathedraBase(CAT_TABLE_GRUPE).find(skupinaIds[0]).catch(() => null)
+        : Promise.resolve(null),
+      godinaIds[0]
+        ? cathedraBase(CAT_TABLE_GODINE).find(godinaIds[0]).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+
+    // 5. Gradi student objekt za dashboard
+    const student = {
+      name:     upis.fields[UPISI_POLAZNIK_FORMULA] || '',
+      smjer:    upis.fields[UPISI_SMJER_TXT]        || '',
+      godina:   godinaRec?.fields?.['Školska godina'] ?? '',
+      grupa:    skupinaRec?.fields?.['Skupina']
+                  ?? skupinaRec?.fields?.['Naziv grupe']
+                  ?? '',
+      zavrseno: locked,
+    };
+
+    // 6. Rano vraćanje ako nema predmeta
     if (!epIds.length) {
       return res.json({
         ok: true,
         ...(locked ? { locked: true, message: 'Vaš program je završen. Prijava ispita više nije dostupna.' } : {}),
+        student,
+        studentName: student.name,
+        stats: { total: 0, canRegister: 0, activeRegistrations: 0, passed: 0, recognized: 0 },
         subjects: [],
       });
     }
 
-    const epRecords = await cathedraFindByIds(CAT_TABLE_EP, epIds);
-
-    // 4. Dohvati sve PRIJAVE ISPITA za ovaj UPIS odjednom (jedan API poziv)
-    //    Filtriramo po PWA Tokenu koji pohranjujemo direktno u PI zapis
+    // 7. Dohvati sve PRIJAVE ISPITA za ovaj UPIS odjednom (jedan API poziv)
     const piRecords = locked ? [] : await cathedraSelectAll(CAT_TABLE_PI, {
       filterByFormula: `{${PI_PWA_TOKEN}} = '${escapeAirtableFormulaString(token)}'`,
       fields: [PI_EP_LINK, PI_STATUS],
@@ -4396,13 +4439,13 @@ app.get('/api/cathedra/subjects', async (req, res) => {
       }
     }
 
-    // 5. Gradi response
+    // 8. Gradi subjects
     const subjects = epRecords.map(ep => {
       const f = ep.fields;
       const naziv  = asArray(f[EP_NAZIV])[0]  || f[EP_PREDMET_ZAPIS] || '';
       const razred = asArray(f[EP_RAZRED])[0] || '';
-      const statusPred       = f[EP_STATUS_PRED] || '';
-      const polozio          = f[EP_POLOZIO] === true;
+      const statusPred        = f[EP_STATUS_PRED] || '';
+      const polozio           = f[EP_POLOZIO] === true;
       const imaAktivnuPrijavu = activePrijaveByEpId.has(ep.id);
 
       let mozePrijaviti = true;
@@ -4434,10 +4477,22 @@ app.get('/api/cathedra/subjects', async (req, res) => {
       };
     });
 
+    // 9. Statistike
+    const stats = {
+      total:               subjects.length,
+      canRegister:         subjects.filter(s => s.mozePrijaviti).length,
+      activeRegistrations: subjects.filter(s => s.imaAktivnuPrijavu).length,
+      passed:              subjects.filter(s => s.polozio).length,
+      recognized:          subjects.filter(s => s.statusPredmeta === 'PRIZNAJE SE').length,
+    };
+
     console.log(`[cathedra] subjects OK — upis=${upisId} locked=${locked} predmeta=${subjects.length}`);
     return res.json({
       ok: true,
       ...(locked ? { locked: true, message: 'Vaš program je završen. Prijava ispita više nije dostupna.' } : {}),
+      student,
+      studentName: student.name,   // backward compat
+      stats,
       subjects,
     });
 
