@@ -4363,28 +4363,24 @@ app.get('/api/cathedra/subjects', async (req, res) => {
       return res.status(403).json({ ok: false, error: 'TOKEN_INVALID', message: 'Nevažeći token.' });
     }
 
-    // 3. Provjera završenosti programa
-    if (upis.fields[UPISI_ZAVRSENO] === true) {
-      return res.status(403).json({
-        ok: false,
-        locked: true,
-        error: 'PROGRAM_COMPLETED',
-        message: 'Vaš program je završen. Prijava ispita više nije dostupna.',
-      });
-    }
-
-    // 4. Dohvati EVIDENCIJA PREDMETA zapise za ovaj UPIS
+    // 3. Dohvati EVIDENCIJA PREDMETA zapise za ovaj UPIS
     const epIds = asArray(upis.fields[UPISI_EP_LINK]);
+    const upisId = upis.id;
+    const locked = upis.fields[UPISI_ZAVRSENO] === true;
+
     if (!epIds.length) {
-      return res.json({ ok: true, subjects: [] });
+      return res.json({
+        ok: true,
+        ...(locked ? { locked: true, message: 'Vaš program je završen. Prijava ispita više nije dostupna.' } : {}),
+        subjects: [],
+      });
     }
 
     const epRecords = await cathedraFindByIds(CAT_TABLE_EP, epIds);
 
-    // 5. Dohvati sve PRIJAVE ISPITA za ovaj UPIS odjednom (jedan API poziv)
+    // 4. Dohvati sve PRIJAVE ISPITA za ovaj UPIS odjednom (jedan API poziv)
     //    Filtriramo po PWA Tokenu koji pohranjujemo direktno u PI zapis
-    const upisId = upis.id;
-    const piRecords = await cathedraSelectAll(CAT_TABLE_PI, {
+    const piRecords = locked ? [] : await cathedraSelectAll(CAT_TABLE_PI, {
       filterByFormula: `{${PI_PWA_TOKEN}} = '${escapeAirtableFormulaString(token)}'`,
       fields: [PI_EP_LINK, PI_STATUS],
       pageSize: 100,
@@ -4400,7 +4396,7 @@ app.get('/api/cathedra/subjects', async (req, res) => {
       }
     }
 
-    // 6. Gradi response
+    // 5. Gradi response
     const subjects = epRecords.map(ep => {
       const f = ep.fields;
       const naziv  = asArray(f[EP_NAZIV])[0]  || f[EP_PREDMET_ZAPIS] || '';
@@ -4412,7 +4408,10 @@ app.get('/api/cathedra/subjects', async (req, res) => {
       let mozePrijaviti = true;
       let razlog = null;
 
-      if (statusPred === 'PRIZNAJE SE') {
+      if (locked) {
+        mozePrijaviti = false;
+        razlog = 'Vaš program je završen.';
+      } else if (statusPred === 'PRIZNAJE SE') {
         mozePrijaviti = false;
         razlog = 'Predmet je priznat — ne prijavljuje se za ispit.';
       } else if (polozio) {
@@ -4435,8 +4434,12 @@ app.get('/api/cathedra/subjects', async (req, res) => {
       };
     });
 
-    console.log(`[cathedra] subjects OK — upis=${upisId} predmeta=${subjects.length}`);
-    return res.json({ ok: true, subjects });
+    console.log(`[cathedra] subjects OK — upis=${upisId} locked=${locked} predmeta=${subjects.length}`);
+    return res.json({
+      ok: true,
+      ...(locked ? { locked: true, message: 'Vaš program je završen. Prijava ispita više nije dostupna.' } : {}),
+      subjects,
+    });
 
   } catch (e) {
     console.error('[cathedra] subjects error:', e);

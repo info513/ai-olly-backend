@@ -14,6 +14,8 @@ const API   = '/api/cathedra';
 
 let subjects     = [];
 let studentName  = '';
+let isLocked     = false;
+let lockedMsg    = '';
 let activeFilter = 'sve';
 let pendingEpId  = null;
 let registering  = false; // guard against double-submit
@@ -93,6 +95,8 @@ async function loadSubjects(silent = false) {
 
     subjects    = data.subjects || [];
     studentName = data.studentName || '';
+    isLocked    = data.locked === true;
+    lockedMsg   = data.message || '';
     renderAll();
   } catch {
     renderFatal(
@@ -136,8 +140,29 @@ async function registerExam(epId) {
 
 function renderAll() {
   renderHero();
+  if (isLocked) renderLockedBanner();
   renderFilters();
   renderSubjects();
+}
+
+// ── Locked banner ─────────────────────────────────────────────────────────────
+
+function renderLockedBanner() {
+  const existing = document.getElementById('locked-banner');
+  if (existing) return; // already shown
+
+  const banner = document.createElement('div');
+  banner.id = 'locked-banner';
+  banner.className = 'locked-banner';
+  banner.innerHTML = `
+    <div class="locked-banner__icon">🔒</div>
+    <div class="locked-banner__text">
+      <strong>Program završen</strong>
+      <span>${esc(lockedMsg || 'Vaš program je završen. Prijava ispita više nije dostupna.')}</span>
+    </div>`;
+
+  const $filtersEl = document.getElementById('filter-section');
+  $filtersEl.parentNode.insertBefore(banner, $filtersEl);
 }
 
 // ── Hero card ─────────────────────────────────────────────────────────────────

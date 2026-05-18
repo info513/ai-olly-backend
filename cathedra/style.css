@@ -150,6 +150,38 @@ body {
   backdrop-filter: blur(4px);
 }
 
+/* ── Locked banner ───────────────────────────────────────────────────────── */
+
+.locked-banner {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  background: #fef2f2;
+  border: 1.5px solid #fca5a5;
+  border-radius: var(--radius);
+  padding: .9rem 1.1rem;
+  margin-bottom: 1.25rem;
+  color: #991b1b;
+}
+
+.locked-banner__icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.locked-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  font-size: .84rem;
+  line-height: 1.45;
+}
+
+.locked-banner__text strong {
+  font-size: .9rem;
+  font-weight: 700;
+}
+
 /* ── Filter tabs ─────────────────────────────────────────────────────────── */
 
 .filters {
