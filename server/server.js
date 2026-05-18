@@ -154,10 +154,11 @@ const app = express();
 // -------------------------
 // CORS
 // -------------------------
-const allowedOrigins = String(CORS_ORIGINS || '')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean);
+const allowedOrigins = [
+  ...String(CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean),
+  // Render automatically sets RENDER_EXTERNAL_URL — always allow same-origin POSTs
+  process.env.RENDER_EXTERNAL_URL,
+].filter(Boolean);
 
 app.use(cors({
   origin: (origin, cb) => {
