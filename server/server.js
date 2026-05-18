@@ -4286,7 +4286,7 @@ const UPISI_EP_LINK   = 'EVIDENCIJA PREDMETA'; // multipleRecordLinks
 // ── UPISI — dashboard polja ───────────────────────────────────────────────────
 const UPISI_POLAZNIK_FORMULA = 'Upisi (ID)';    // formula → ARRAYJOIN(POLAZNICI) → ime
 const UPISI_SMJER_TXT        = 'Smjer_txt';     // formula → tekst smjera
-const UPISI_SKUPINA_LINK     = 'Skupina';       // multipleRecordLinks → GRUPE
+const UPISI_SKUPINA_LINK     = 'Grupa';         // multipleRecordLinks → GRUPE
 const UPISI_GODINA_LINK      = 'Godina';        // multipleRecordLinks → GODINE
 
 // ── Dodatne tablice za student dashboard ─────────────────────────────────────
@@ -4404,8 +4404,8 @@ app.get('/api/cathedra/subjects', async (req, res) => {
       name:     upis.fields[UPISI_POLAZNIK_FORMULA] || '',
       smjer:    upis.fields[UPISI_SMJER_TXT]        || '',
       godina:   godinaRec?.fields?.['Školska godina'] ?? '',
-      grupa:    skupinaRec?.fields?.['Skupina']
-                  ?? skupinaRec?.fields?.['Naziv grupe']
+      grupa:    skupinaRec?.fields?.['Naziv grupe']
+                  ?? skupinaRec?.fields?.['Grupa']
                   ?? '',
       zavrseno: locked,
     };
