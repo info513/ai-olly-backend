@@ -4257,6 +4257,313 @@ app.post('/api/reception/save-consent', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── AI CATHEDRA — Prijave ispita iz PWA
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const CATHEDRA_BASE_ID = process.env.CATHEDRA_AIRTABLE_BASE_ID || '';
+const CATHEDRA_API_KEY = process.env.CATHEDRA_AIRTABLE_API_KEY || '';
+if (!CATHEDRA_BASE_ID || !CATHEDRA_API_KEY) {
+  console.warn('⚠️  CATHEDRA_AIRTABLE_BASE_ID ili CATHEDRA_AIRTABLE_API_KEY nije postavljen — /api/cathedra/* endpointi neće raditi');
+}
+const cathedraAirtable = (CATHEDRA_BASE_ID && CATHEDRA_API_KEY)
+  ? new Airtable({ apiKey: CATHEDRA_API_KEY })
+  : null;
+const cathedraBase = cathedraAirtable ? cathedraAirtable.base(CATHEDRA_BASE_ID) : null;
+
+// ── Table ID-jevi ─────────────────────────────────────────────────────────────
+const CAT_TABLE_UPISI = 'tblWEFFvDyvZqtsej'; // UPISI
+const CAT_TABLE_EP    = 'tblcOhQOfPSWmEmPj'; // EVIDENCIJA PREDMETA
+const CAT_TABLE_PI    = 'tblVk6NRhF7ejohC8'; // PRIJAVE ISPITA
+
+// ── UPISI field imena ─────────────────────────────────────────────────────────
+const UPISI_PWA_TOKEN = 'PWA Token';           // singleLineText
+const UPISI_ZAVRSENO  = 'Završeno';            // checkbox
+const UPISI_EP_LINK   = 'EVIDENCIJA PREDMETA'; // multipleRecordLinks
+
+// ── EVIDENCIJA PREDMETA field imena ──────────────────────────────────────────
+const EP_PREDMET_ZAPIS = 'Predmet zapis';   // primary, singleLineText
+const EP_UPIS_LINK     = 'Upis';            // multipleRecordLinks
+const EP_NAZIV         = 'Naziv predmeta';  // multipleLookupValues
+const EP_RAZRED        = 'Razred_predmeta'; // multipleLookupValues
+const EP_STATUS_PRED   = 'Status predmeta'; // singleSelect
+const EP_POLOZIO       = 'Položio';         // checkbox
+
+// ── PRIJAVE ISPITA field imena ────────────────────────────────────────────────
+const PI_EP_LINK   = 'EVIDENCIJA PREDMETA'; // multipleRecordLinks
+const PI_UPIS_LINK = 'UPIS';                // multipleRecordLinks
+const PI_STATUS    = 'Status prijave';       // singleSelect
+const PI_IZVOR     = 'Izvor prijave';        // singleSelect
+const PI_PWA_TOKEN = 'PWA Token';            // singleLineText
+
+// Statusi koji znače da prijava još nije zatvorena/poništena
+const CATHEDRA_ACTIVE_STATUSES = new Set(['Nova prijava', 'U obradi', 'Prijavljeno']);
+
+// ── CATHEDRA Airtable helperi ─────────────────────────────────────────────────
+
+function cathedraGuard(res) {
+  if (!cathedraBase) {
+    res.status(503).json({ ok: false, error: 'CATHEDRA_NOT_CONFIGURED', message: 'Cathedra modul nije konfiguriran.' });
+    return false;
+  }
+  return true;
+}
+
+async function cathedraSelectAll(tableId, options = {}) {
+  const records = [];
+  const safe = { ...options };
+  safe.pageSize = clampPageSize(safe.pageSize ?? 50);
+  await cathedraBase(tableId).select(safe).eachPage((pageRecords, fetchNextPage) => {
+    records.push(...pageRecords);
+    fetchNextPage();
+  });
+  return records;
+}
+
+async function cathedraSelectFirst(tableId, options = {}) {
+  const safe = { ...options };
+  safe.pageSize = 1;
+  safe.maxRecords = 1;
+  const recs = await cathedraSelectAll(tableId, safe);
+  return recs[0] || null;
+}
+
+async function cathedraFindByIds(tableId, ids = []) {
+  const uniq = Array.from(new Set(asArray(ids).map(String).filter(Boolean)));
+  if (!uniq.length) return [];
+  const out = await Promise.allSettled(
+    uniq.map(id => cathedraBase(tableId).find(id))
+  );
+  return out.filter(x => x.status === 'fulfilled' && x.value).map(x => x.value);
+}
+
+// ── GET /api/cathedra/subjects?token=... ──────────────────────────────────────
+// Vraća popis predmeta za UPIS koji odgovara danom PWA tokenu.
+// Za svaki predmet vraća mogu li ga prijaviti i zašto ne ako ne mogu.
+
+app.get('/api/cathedra/subjects', async (req, res) => {
+  if (!cathedraGuard(res)) return;
+  try {
+    const { token } = req.query;
+
+    // 1. Token mora biti prisutan
+    if (!token || !String(token).trim()) {
+      return res.status(400).json({ ok: false, error: 'MISSING_TOKEN', message: 'Token je obavezan.' });
+    }
+
+    // 2. Nađi UPIS po PWA Tokenu
+    const upis = await cathedraSelectFirst(CAT_TABLE_UPISI, {
+      filterByFormula: `{${UPISI_PWA_TOKEN}} = '${escapeAirtableFormulaString(token)}'`,
+      fields: [UPISI_PWA_TOKEN, UPISI_ZAVRSENO, UPISI_EP_LINK],
+    });
+
+    if (!upis) {
+      return res.status(403).json({ ok: false, error: 'TOKEN_INVALID', message: 'Nevažeći token.' });
+    }
+
+    // 3. Provjera završenosti programa
+    if (upis.fields[UPISI_ZAVRSENO] === true) {
+      return res.status(403).json({
+        ok: false,
+        locked: true,
+        error: 'PROGRAM_COMPLETED',
+        message: 'Vaš program je završen. Prijava ispita više nije dostupna.',
+      });
+    }
+
+    // 4. Dohvati EVIDENCIJA PREDMETA zapise za ovaj UPIS
+    const epIds = asArray(upis.fields[UPISI_EP_LINK]);
+    if (!epIds.length) {
+      return res.json({ ok: true, subjects: [] });
+    }
+
+    const epRecords = await cathedraFindByIds(CAT_TABLE_EP, epIds);
+
+    // 5. Dohvati sve PRIJAVE ISPITA za ovaj UPIS odjednom (jedan API poziv)
+    //    Filtriramo po PWA Tokenu koji pohranjujemo direktno u PI zapis
+    const upisId = upis.id;
+    const piRecords = await cathedraSelectAll(CAT_TABLE_PI, {
+      filterByFormula: `{${PI_PWA_TOKEN}} = '${escapeAirtableFormulaString(token)}'`,
+      fields: [PI_EP_LINK, PI_STATUS],
+      pageSize: 100,
+    });
+
+    // Indeks aktivnih prijava po EP record ID-u
+    const activePrijaveByEpId = new Map();
+    for (const pi of piRecords) {
+      const status = pi.fields[PI_STATUS] || '';
+      if (!CATHEDRA_ACTIVE_STATUSES.has(status)) continue;
+      for (const epId of asArray(pi.fields[PI_EP_LINK])) {
+        activePrijaveByEpId.set(epId, true);
+      }
+    }
+
+    // 6. Gradi response
+    const subjects = epRecords.map(ep => {
+      const f = ep.fields;
+      const naziv  = asArray(f[EP_NAZIV])[0]  || f[EP_PREDMET_ZAPIS] || '';
+      const razred = asArray(f[EP_RAZRED])[0] || '';
+      const statusPred       = f[EP_STATUS_PRED] || '';
+      const polozio          = f[EP_POLOZIO] === true;
+      const imaAktivnuPrijavu = activePrijaveByEpId.has(ep.id);
+
+      let mozePrijaviti = true;
+      let razlog = null;
+
+      if (statusPred === 'PRIZNAJE SE') {
+        mozePrijaviti = false;
+        razlog = 'Predmet je priznat — ne prijavljuje se za ispit.';
+      } else if (polozio) {
+        mozePrijaviti = false;
+        razlog = 'Predmet je već položen.';
+      } else if (imaAktivnuPrijavu) {
+        mozePrijaviti = false;
+        razlog = 'Već imate aktivnu prijavu za ovaj predmet.';
+      }
+
+      return {
+        evidencijaPredmetaId: ep.id,
+        naziv,
+        razred,
+        statusPredmeta: statusPred,
+        polozio,
+        imaAktivnuPrijavu,
+        mozePrijaviti,
+        ...(razlog ? { razlog } : {}),
+      };
+    });
+
+    console.log(`[cathedra] subjects OK — upis=${upisId} predmeta=${subjects.length}`);
+    return res.json({ ok: true, subjects });
+
+  } catch (e) {
+    console.error('[cathedra] subjects error:', e);
+    return res.status(500).json({ ok: false, error: 'SERVER_ERROR', message: 'Interna greška servera.' });
+  }
+});
+
+// ── POST /api/cathedra/exam-registration ──────────────────────────────────────
+// Kreira zapis u PRIJAVE ISPITA nakon 7 sigurnosnih provjera.
+// Payload: { token, evidencijaPredmetaId }
+
+app.post('/api/cathedra/exam-registration', async (req, res) => {
+  if (!cathedraGuard(res)) return;
+  try {
+    const { token, evidencijaPredmetaId } = req.body || {};
+
+    // 1. Provjera obaveznih parametara
+    if (!token || !String(token).trim()) {
+      return res.status(400).json({ ok: false, error: 'MISSING_TOKEN', message: 'Token je obavezan.' });
+    }
+    if (!evidencijaPredmetaId || !String(evidencijaPredmetaId).startsWith('rec')) {
+      return res.status(400).json({ ok: false, error: 'MISSING_SUBJECT', message: 'ID predmeta je obavezan.' });
+    }
+
+    // 2. Nađi UPIS po PWA Tokenu
+    const upis = await cathedraSelectFirst(CAT_TABLE_UPISI, {
+      filterByFormula: `{${UPISI_PWA_TOKEN}} = '${escapeAirtableFormulaString(token)}'`,
+      fields: [UPISI_PWA_TOKEN, UPISI_ZAVRSENO, UPISI_EP_LINK],
+    });
+
+    if (!upis) {
+      return res.status(401).json({ ok: false, error: 'TOKEN_INVALID', message: 'Nevažeći token.' });
+    }
+
+    // 3. Provjera završenosti programa
+    if (upis.fields[UPISI_ZAVRSENO] === true) {
+      return res.status(403).json({
+        ok: false,
+        error: 'PROGRAM_COMPLETED',
+        message: 'Vaš program je završen. Prijava ispita više nije dostupna.',
+      });
+    }
+
+    // 4. Dohvati EP zapis (direktno po ID-u)
+    let epRecord = null;
+    try {
+      epRecord = await cathedraBase(CAT_TABLE_EP).find(evidencijaPredmetaId);
+    } catch (_) {
+      epRecord = null;
+    }
+    if (!epRecord) {
+      return res.status(404).json({ ok: false, error: 'SUBJECT_NOT_FOUND', message: 'Predmet nije pronađen.' });
+    }
+
+    // 5. Provjera da EP pripada ovom UPISU
+    //    Koristimo listu EP ID-ova iz UPIS zapisa (brže od cross-querying)
+    const upisEpIds = asArray(upis.fields[UPISI_EP_LINK]);
+    if (!upisEpIds.includes(evidencijaPredmetaId)) {
+      return res.status(403).json({ ok: false, error: 'SUBJECT_NOT_ALLOWED', message: 'Ovaj predmet ne pripada vašem upisu.' });
+    }
+
+    // 6. Provjera Status predmeta — PRIZNAJE SE ne može se prijaviti
+    const statusPred = epRecord.fields[EP_STATUS_PRED] || '';
+    if (statusPred === 'PRIZNAJE SE') {
+      return res.status(400).json({
+        ok: false,
+        error: 'SUBJECT_RECOGNIZED',
+        message: 'Ovaj predmet vam je priznat i ne prijavljuje se za ispit.',
+      });
+    }
+
+    // 7. Provjera je li predmet već položen
+    if (epRecord.fields[EP_POLOZIO] === true) {
+      return res.status(400).json({
+        ok: false,
+        error: 'SUBJECT_ALREADY_PASSED',
+        message: 'Ovaj predmet je već evidentiran kao položen.',
+      });
+    }
+
+    // 8. Provjera aktivne duplikatne prijave
+    //    Dohvati sve aktivne PI za ovaj token, zatim provjeri EP u JS-u
+    const activePiForUpis = await cathedraSelectAll(CAT_TABLE_PI, {
+      filterByFormula: `AND(
+        {${PI_PWA_TOKEN}} = '${escapeAirtableFormulaString(token)}',
+        OR(
+          {${PI_STATUS}} = 'Nova prijava',
+          {${PI_STATUS}} = 'U obradi',
+          {${PI_STATUS}} = 'Prijavljeno'
+        )
+      )`,
+      fields: [PI_STATUS, PI_EP_LINK],
+      pageSize: 100,
+    });
+    const existingActive = activePiForUpis.find(pi =>
+      asArray(pi.fields[PI_EP_LINK]).includes(evidencijaPredmetaId)
+    );
+
+    if (existingActive) {
+      return res.status(409).json({
+        ok: false,
+        error: 'ACTIVE_REGISTRATION_EXISTS',
+        message: 'Već imate aktivnu prijavu za ovaj predmet. Za izmjenu se obratite recepciji.',
+      });
+    }
+
+    // 9. Sve provjere prošle — kreiraj PRIJAVE ISPITA zapis
+    const created = await cathedraBase(CAT_TABLE_PI).create({
+      [PI_UPIS_LINK]: [upis.id],
+      [PI_EP_LINK]:   [evidencijaPredmetaId],
+      [PI_STATUS]:    'Nova prijava',
+      [PI_IZVOR]:     'PWA',
+      [PI_PWA_TOKEN]: String(token),
+    });
+
+    console.log(`[cathedra] exam-registration OK — prijavaId=${created.id} upis=${upis.id} ep=${evidencijaPredmetaId}`);
+    return res.json({
+      ok: true,
+      prijavaId: created.id,
+      status: 'Nova prijava',
+      message: 'Vaša prijava ispita je zaprimljena.',
+    });
+
+  } catch (e) {
+    console.error('[cathedra] exam-registration error:', e);
+    return res.status(500).json({ ok: false, error: 'SERVER_ERROR', message: 'Interna greška servera.' });
+  }
+});
+
 app.listen(PORT, async () => {
   console.log(`✅ AI Olly HUB WEB server running on :${PORT} (build=${BUILD})`);
   await loadPushSubscriptionsFromAirtable();
