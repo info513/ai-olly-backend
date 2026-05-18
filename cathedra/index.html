@@ -3,45 +3,60 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#1a56db" />
+  <meta name="theme-color" content="#1f5fd6" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <title>AI CATHEDRA — Prijava ispita</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- Header -->
+  <!-- ── Header ─────────────────────────────────────────────────────────── -->
   <header class="header">
-    <span class="header__logo">AI CATHEDRA</span>
-    <span class="header__sub">Prijava ispita</span>
+    <div class="header__logo-mark" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24">
+        <path d="M12 3L1 9l11 6 11-6-11-6zM1 15l11 6 11-6M1 9v6m22-6v6"/>
+        <path d="M12 3L1 9l11 6 11-6z" fill-opacity=".4"/>
+      </svg>
+    </div>
+    <span class="header__title">AI <span>CATHEDRA</span></span>
+    <span class="header__right">Prijava ispita</span>
   </header>
 
-  <!-- Student info bar (shown after load) -->
-  <div id="student-bar" class="student-bar" style="display:none;"></div>
+  <!-- ── Main ───────────────────────────────────────────────────────────── -->
+  <main class="container" id="main-content">
 
-  <!-- Main content -->
-  <main class="container">
-    <div id="subject-list">
-      <!-- cards rendered by app.js -->
-    </div>
+    <!-- Hero card (rendered by JS) -->
+    <div id="hero-section"></div>
+
+    <!-- Filter tabs (rendered by JS) -->
+    <div id="filter-section"></div>
+
+    <!-- Subject list (rendered by JS) -->
+    <div id="subject-list"></div>
+
   </main>
 
-  <!-- Confirmation modal -->
-  <div id="confirm-overlay" class="overlay" role="dialog" aria-modal="true">
+  <!-- ── Confirm modal ─────────────────────────────────────────────────── -->
+  <div id="confirm-overlay" class="overlay" role="dialog" aria-modal="true"
+       aria-labelledby="modal-title">
     <div class="modal">
-      <div class="modal__title">Potvrdite prijavu ispita</div>
+      <div class="modal__icon">📋</div>
+      <div class="modal__title" id="modal-title">Potvrda prijave ispita</div>
       <div class="modal__body">
-        Prijavljujete ispit za predmet:<br />
-        <strong id="confirm-subject-name"></strong>
+        Šaljete prijavu za ispit iz predmeta:<br />
+        <span class="modal__subject" id="confirm-subject-name"></span>
       </div>
       <div class="modal__actions">
-        <button id="confirm-ok" class="btn btn--primary">Da, prijavljujem</button>
-        <button id="confirm-cancel" class="btn btn--cancel">Odustani</button>
+        <button id="confirm-ok" class="btn btn--primary">Potvrdi prijavu</button>
+        <button id="confirm-cancel" class="btn btn--cancel-outline">Odustani</button>
       </div>
     </div>
   </div>
 
-  <!-- Toast container -->
-  <div id="toast-wrap" class="toast-wrap" aria-live="polite"></div>
+  <!-- ── Toast container ───────────────────────────────────────────────── -->
+  <div id="toast-wrap" class="toast-wrap" aria-live="polite" aria-atomic="true"></div>
 
   <script src="app.js"></script>
 </body>
