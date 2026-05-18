@@ -121,18 +121,24 @@ function renderAll() {
     byRazred[key].push(s);
   }
 
+  // Map Croatian ordinal razred names to sort order
+  const RAZRED_ORDER = {
+    'prvi razred': 1, 'drugi razred': 2,
+    'treći razred': 3, 'četvrti razred': 4,
+  };
+  const razredRank = r => RAZRED_ORDER[r.toLowerCase()] ?? 99;
+
   const sortedRazredi = Object.keys(byRazred).sort((a, b) => {
-    // numeric sort — "1", "2", ... then "Ostalo"
-    const na = parseInt(a), nb = parseInt(b);
-    if (!isNaN(na) && !isNaN(nb)) return na - nb;
-    if (!isNaN(na)) return -1;
-    if (!isNaN(nb)) return 1;
-    return a.localeCompare(b);
+    const da = razredRank(a), db = razredRank(b);
+    if (da !== db) return da - db;
+    return a.localeCompare(b, 'hr');
   });
 
   let html = '';
   for (const razred of sortedRazredi) {
-    const label = isNaN(parseInt(razred)) ? razred : `${razred}. razred`;
+    // razred may be a full string ("Prvi razred") or a number ("1")
+    const num = parseInt(razred);
+    const label = isNaN(num) ? razred : `${num}. razred`;
     html += `<div class="section-title">${esc(label)}</div>`;
     for (const s of byRazred[razred]) {
       html += renderCard(s);
