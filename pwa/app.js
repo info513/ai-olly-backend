@@ -1973,6 +1973,7 @@ function renderWhispersChapterList() {
         <div class="whispers-chapter-card-overlay"></div>
         <div class="whispers-chapter-card-content">
           <div class="whispers-chapter-number">Chapter ${escHtml(ch.number)}</div>
+          <div class="whispers-chapter-meta">3 min read · Illustrated story</div>
           <h2 class="whispers-chapter-title">${escHtml(ch.title)}</h2>
           <p class="whispers-chapter-short">${escHtml(ch.shortText)}</p>
           ${videoTag}
