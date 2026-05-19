@@ -1986,11 +1986,11 @@ function openWhispersChapter(idx) {
   const chapter = (typeof WHISPERS_CHAPTERS !== 'undefined') ? WHISPERS_CHAPTERS[idx] : null;
   if (!chapter) return;
   currentWhispersChapter = chapter;
-  _renderWhispersDetail(chapter);
+  _renderWhispersDetail(chapter, idx);
   pushScreen('whispers-detail');
 }
 
-function _renderWhispersDetail(ch) {
+function _renderWhispersDetail(ch, idx) {
   // Hero
   const heroEl = document.getElementById('whispers-detail-hero');
   if (heroEl) _applyWhispersHero(heroEl, ch);
@@ -2008,6 +2008,10 @@ function _renderWhispersDetail(ch) {
   // Body
   const bodyEl = document.getElementById('whispers-detail-body');
   if (!bodyEl) return;
+
+  const total = WHISPERS_CHAPTERS.length;
+  const prevCh = idx > 0 ? WHISPERS_CHAPTERS[idx - 1] : null;
+  const nextCh = idx < total - 1 ? WHISPERS_CHAPTERS[idx + 1] : null;
 
   // Main text paragraphs
   const paras = Array.isArray(ch.mainText)
@@ -2033,16 +2037,30 @@ function _renderWhispersDetail(ch) {
            </div>`}
     </div>`;
 
-  // Action buttons
+  // Previous / Next navigation cards
+  const prevCard = prevCh
+    ? `<button class="whispers-nav-card whispers-nav-card--prev" onclick="openWhispersChapter(${idx - 1})">
+         <span class="whispers-nav-dir">&larr; Previous</span>
+         <span class="whispers-nav-chapter">${escHtml(prevCh.number)} &middot; ${escHtml(prevCh.title)}</span>
+       </button>`
+    : `<span class="whispers-nav-card whispers-nav-card--empty"></span>`;
+
+  const nextCard = nextCh
+    ? `<button class="whispers-nav-card whispers-nav-card--next" onclick="openWhispersChapter(${idx + 1})">
+         <span class="whispers-nav-dir">Next &rarr;</span>
+         <span class="whispers-nav-chapter">${escHtml(nextCh.number)} &middot; ${escHtml(nextCh.title)}</span>
+       </button>`
+    : `<button class="whispers-nav-card whispers-nav-card--next whispers-nav-card--last" onclick="popScreen()">
+         <span class="whispers-nav-dir">All chapters</span>
+         <span class="whispers-nav-chapter">Back to stories</span>
+       </button>`;
+
+  // Secondary actions
   const mapBtn = ch.relatedPlace
-    ? `<button class="whispers-action-btn whispers-action-btn--map" onclick="whispersOpenMap(${WHISPERS_CHAPTERS.indexOf(ch)})">
+    ? `<button class="whispers-action-btn whispers-action-btn--map" onclick="whispersOpenMap(${idx})">
          Open ${escHtml(ch.relatedPlace)}
        </button>`
     : '';
-
-  const askBtn = `<button class="whispers-action-btn whispers-action-btn--ask" onclick="whispersAskDioclea(${JSON.stringify(escHtml(ch.ctaAsk || 'Ask about this chapter'))})">
-    ${escHtml(ch.ctaAsk || 'Ask Dioclea about this')}
-  </button>`;
 
   const backBtn = `<button class="whispers-action-btn whispers-action-btn--back" onclick="popScreen()">
     &larr; Back to stories
@@ -2055,25 +2073,16 @@ function _renderWhispersDetail(ch) {
       </div>
       ${didYouKnow}
       ${videoBlock}
-      <div class="whispers-actions">
+      <div class="whispers-nav">
+        ${prevCard}
+        ${nextCard}
+      </div>
+      <div class="whispers-actions whispers-actions--secondary">
         ${mapBtn}
-        ${askBtn}
         ${backBtn}
       </div>
     </div>
   `;
-}
-
-// Navigate to Ask Dioclea and pre-fill the question
-function whispersAskDioclea(question) {
-  // Unescape HTML entities from escHtml output
-  const text = question.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
-  const input = document.getElementById('ask-input');
-  if (input) {
-    input.value = text;
-    onAskInput();
-  }
-  gotoRoot('ask');
 }
 
 // Open related place on City Map (routes to city-map welcome; TODO: deep-link to POI)
