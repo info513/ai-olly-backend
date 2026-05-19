@@ -94,6 +94,8 @@ function _activateScreen(name, direction = 'forward') {
     else renderEventsList();
   }
   if (name === 'feedback') _activateFeedbackScreen();
+  if (name === 'whispers-intro') _initWhispersIntroHero();
+  if (name === 'whispers-list')  renderWhispersChapterList();
 }
 
 function pushScreen(name) {
@@ -1925,6 +1927,179 @@ async function submitConciergeForm(e) {
     alert('Network error. Please try again.');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Send Request'; }
+  }
+}
+
+// ── Whispers of the Palace ────────────────────────────────────────────────
+
+let currentWhispersChapter = null; // currently open chapter object
+
+// Gradients used as fallback when image file is missing
+function _whispersGradient(chapter) {
+  return chapter.gradient || 'linear-gradient(160deg, #1a0e2e 0%, #2c1f14 100%)';
+}
+
+// Apply background to a hero element: image with gradient fallback
+function _applyWhispersHero(el, chapter) {
+  if (!el) return;
+  const img = chapter.image || '';
+  if (img) {
+    el.style.backgroundImage =
+      `url('${img}'), ${_whispersGradient(chapter)}`;
+  } else {
+    el.style.backgroundImage = _whispersGradient(chapter);
+  }
+}
+
+function openWhispersList() {
+  renderWhispersChapterList();
+  pushScreen('whispers-list');
+}
+
+function renderWhispersChapterList() {
+  const container = document.getElementById('whispers-chapters-list');
+  if (!container || typeof WHISPERS_CHAPTERS === 'undefined') return;
+
+  container.innerHTML = WHISPERS_CHAPTERS.map((ch, idx) => {
+    const videoTag = ch.videoLabel
+      ? `<div class="whispers-video-tag">&#9654; ${escHtml(ch.videoLabel)}</div>`
+      : '';
+    const mapBtn = ch.relatedPlace
+      ? `<button class="whispers-card-btn whispers-card-btn--map" onclick="event.stopPropagation();whispersOpenMap(${idx})">Map</button>`
+      : '';
+    return `
+      <div class="whispers-chapter-card" onclick="openWhispersChapter(${idx})"
+           style="background-image:url('${escHtml(ch.image)}'),${ch.gradient};">
+        <div class="whispers-chapter-card-overlay"></div>
+        <div class="whispers-chapter-card-content">
+          <div class="whispers-chapter-number">Chapter ${escHtml(ch.number)}</div>
+          <h2 class="whispers-chapter-title">${escHtml(ch.title)}</h2>
+          <p class="whispers-chapter-short">${escHtml(ch.shortText)}</p>
+          ${videoTag}
+          <div class="whispers-card-actions">
+            <button class="whispers-card-btn whispers-card-btn--read" onclick="event.stopPropagation();openWhispersChapter(${idx})">Read</button>
+            ${mapBtn}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function openWhispersChapter(idx) {
+  const chapter = (typeof WHISPERS_CHAPTERS !== 'undefined') ? WHISPERS_CHAPTERS[idx] : null;
+  if (!chapter) return;
+  currentWhispersChapter = chapter;
+  _renderWhispersDetail(chapter);
+  pushScreen('whispers-detail');
+}
+
+function _renderWhispersDetail(ch) {
+  // Hero
+  const heroEl = document.getElementById('whispers-detail-hero');
+  if (heroEl) _applyWhispersHero(heroEl, ch);
+
+  // Hero content (chapter number + title overlay)
+  const heroContent = document.getElementById('whispers-detail-hero-content');
+  if (heroContent) {
+    heroContent.innerHTML = `
+      <div class="whispers-detail-number">Chapter ${escHtml(ch.number)}</div>
+      <h1 class="whispers-detail-title">${escHtml(ch.title)}</h1>
+      <p class="whispers-detail-subtitle">${escHtml(ch.subtitle)}</p>
+    `;
+  }
+
+  // Body
+  const bodyEl = document.getElementById('whispers-detail-body');
+  if (!bodyEl) return;
+
+  // Main text paragraphs
+  const paras = Array.isArray(ch.mainText)
+    ? ch.mainText.map(p => `<p class="whispers-para">${escHtml(p)}</p>`).join('')
+    : `<p class="whispers-para">${escHtml(ch.mainText || '')}</p>`;
+
+  // Did you know box
+  const didYouKnow = ch.didYouKnow
+    ? `<div class="whispers-did-you-know">
+        <div class="whispers-did-you-know-label">Did you know?</div>
+        <p class="whispers-did-you-know-text">${escHtml(ch.didYouKnow)}</p>
+       </div>`
+    : '';
+
+  // Video placeholder
+  const videoBlock = `
+    <div class="whispers-video-placeholder">
+      ${ch.videoUrl
+        ? `<video src="${escHtml(ch.videoUrl)}" controls playsinline class="whispers-video"></video>`
+        : `<div class="whispers-video-empty">
+             <span class="whispers-video-icon">&#9654;</span>
+             <span class="whispers-video-label">${escHtml(ch.videoLabel || 'Video coming later')}</span>
+           </div>`}
+    </div>`;
+
+  // Action buttons
+  const mapBtn = ch.relatedPlace
+    ? `<button class="whispers-action-btn whispers-action-btn--map" onclick="whispersOpenMap(${WHISPERS_CHAPTERS.indexOf(ch)})">
+         Open ${escHtml(ch.relatedPlace)}
+       </button>`
+    : '';
+
+  const askBtn = `<button class="whispers-action-btn whispers-action-btn--ask" onclick="whispersAskDioclea(${JSON.stringify(escHtml(ch.ctaAsk || 'Ask about this chapter'))})">
+    ${escHtml(ch.ctaAsk || 'Ask Dioclea about this')}
+  </button>`;
+
+  const backBtn = `<button class="whispers-action-btn whispers-action-btn--back" onclick="popScreen()">
+    &larr; Back to stories
+  </button>`;
+
+  bodyEl.innerHTML = `
+    <div class="whispers-detail">
+      <div class="whispers-text-body">
+        ${paras}
+      </div>
+      ${didYouKnow}
+      ${videoBlock}
+      <div class="whispers-actions">
+        ${mapBtn}
+        ${askBtn}
+        ${backBtn}
+      </div>
+    </div>
+  `;
+}
+
+// Navigate to Ask Dioclea and pre-fill the question
+function whispersAskDioclea(question) {
+  // Unescape HTML entities from escHtml output
+  const text = question.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
+  const input = document.getElementById('ask-input');
+  if (input) {
+    input.value = text;
+    onAskInput();
+  }
+  gotoRoot('ask');
+}
+
+// Open related place on City Map (routes to city-map welcome; TODO: deep-link to POI)
+function whispersOpenMap(idx) {
+  const ch = (typeof WHISPERS_CHAPTERS !== 'undefined') ? WHISPERS_CHAPTERS[idx] : null;
+  if (!ch || !ch.relatedPlace) return;
+  // TODO: when relatedPoiKey is set and poisData is loaded, find and navigate to POI directly.
+  // For now, open city-map-welcome so guest can explore.
+  openCityMapWelcome();
+}
+
+// Render whispers intro hero gradient on first open
+function _initWhispersIntroHero() {
+  const el = document.getElementById('whispers-intro-hero');
+  if (!el) return;
+  // Use cover image of Ch01 as the intro hero, or fallback to a rich gradient
+  const coverImg = (typeof WHISPERS_CHAPTERS !== 'undefined' && WHISPERS_CHAPTERS[0])
+    ? WHISPERS_CHAPTERS[0].image
+    : '';
+  if (coverImg) {
+    el.style.backgroundImage = `url('${coverImg}'), linear-gradient(160deg,#1a0e2e 0%,#3a1a0e 60%,#2c1f14 100%)`;
+  } else {
+    el.style.backgroundImage = 'linear-gradient(160deg,#1a0e2e 0%,#3a1a0e 60%,#2c1f14 100%)';
   }
 }
 

@@ -148,6 +148,17 @@
           <span class="guide-card-label">Split Today</span>
         </div>
 
+        <!-- Whispers of the Palace — full-width cultural guide card -->
+        <div class="guide-card guide-card--whispers" onclick="openModule('whispers-intro')">
+          <div class="whispers-card-home-bg"></div>
+          <div class="whispers-card-home-content">
+            <span class="whispers-card-home-badge">CULTURAL GUIDE</span>
+            <div class="whispers-card-home-title">Whispers of the Palace</div>
+            <div class="whispers-card-home-sub">The story of Diocletian, Salona and the Palace that became a city.</div>
+            <span class="whispers-card-home-cta">Explore &rarr;</span>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -983,6 +994,56 @@
     </div>
   </div>
 
+  <!-- ── Screen: Whispers Intro ───────────────────────────────────────────── -->
+  <div id="screen-whispers-intro" class="screen">
+
+    <div class="whispers-hero whispers-intro-hero" id="whispers-intro-hero">
+      <div class="whispers-hero-overlay"></div>
+      <button class="whispers-back-btn" onclick="popScreen()">&larr;</button>
+      <div class="whispers-intro-content">
+        <p class="whispers-eyebrow">Hotel Antique Split</p>
+        <h1 class="whispers-hero-title">Whispers of the Palace</h1>
+        <p class="whispers-intro-text">Before Split became a city, it was a palace.<br>Before the palace, there was Salona.<br>And before the streets you walk today, there was an emperor who chose this coast for his final home.</p>
+        <p class="whispers-intro-meta">9 chapters &middot; Illustrated guide</p>
+        <button class="whispers-begin-btn" onclick="openWhispersList()">Begin</button>
+        <p class="whispers-intro-tagline">A quiet journey through Diocletian, Salona and the Palace that became Split.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Screen: Whispers List ─────────────────────────────────────────────── -->
+  <div id="screen-whispers-list" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div class="screen-title">The Stories</div>
+    </div>
+
+    <div class="screen-body whispers-list-body">
+      <p class="whispers-list-intro">Nine chapters. One palace. Choose where to begin.</p>
+      <div id="whispers-chapters-list"></div>
+    </div>
+
+  </div>
+
+  <!-- ── Screen: Whispers Detail ───────────────────────────────────────────── -->
+  <div id="screen-whispers-detail" class="screen">
+
+    <div class="whispers-hero whispers-detail-hero" id="whispers-detail-hero">
+      <div class="whispers-hero-overlay"></div>
+      <button class="whispers-back-btn" onclick="popScreen()">&larr;</button>
+      <div class="whispers-detail-hero-content" id="whispers-detail-hero-content">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
+    <div class="screen-body whispers-detail-body" id="whispers-detail-body">
+      <!-- populated by JS -->
+    </div>
+
+  </div>
+
   <!-- ── Bottom Navigation ──────────────────────────────────────────────── -->
   <nav id="bottom-nav" class="bottom-nav" hidden>
     <button class="bottom-nav-item" data-screen="home" onclick="gotoRoot('home')">
@@ -1004,6 +1065,7 @@
   </nav>
 
   <script src="config.js"></script>
+  <script src="whispers-data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
