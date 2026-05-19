@@ -1961,25 +1961,21 @@ function renderWhispersChapterList() {
   if (!container || typeof WHISPERS_CHAPTERS === 'undefined') return;
 
   container.innerHTML = WHISPERS_CHAPTERS.map((ch, idx) => {
-    const videoTag = ch.videoLabel
-      ? `<div class="whispers-video-tag">&#9654; ${escHtml(ch.videoLabel)}</div>`
-      : '';
-    const mapBtn = ch.relatedPlace
-      ? `<button class="whispers-card-btn whispers-card-btn--map" onclick="event.stopPropagation();whispersOpenMap(${idx})">Map</button>`
+    const mapLink = ch.relatedPlace
+      ? `<button class="whispers-card-btn--map" onclick="event.stopPropagation();whispersOpenMap(${idx})">Map</button>`
       : '';
     return `
-      <div class="whispers-chapter-card" onclick="openWhispersChapter(${idx})"
-           style="background-image:url('${escHtml(ch.image)}'),${ch.gradient};">
-        <div class="whispers-chapter-card-overlay"></div>
+      <div class="whispers-chapter-card" onclick="openWhispersChapter(${idx})">
+        <div class="whispers-chapter-img"
+             style="background-image:url('${escHtml(ch.image)}'),${ch.gradient};"></div>
         <div class="whispers-chapter-card-content">
           <div class="whispers-chapter-number">Chapter ${escHtml(ch.number)}</div>
-          <div class="whispers-chapter-meta">3 min read · Illustrated story</div>
           <h2 class="whispers-chapter-title">${escHtml(ch.title)}</h2>
           <p class="whispers-chapter-short">${escHtml(ch.shortText)}</p>
-          ${videoTag}
+          <div class="whispers-chapter-meta">Illustrated story &middot; 3 min read</div>
           <div class="whispers-card-actions">
-            <button class="whispers-card-btn whispers-card-btn--read" onclick="event.stopPropagation();openWhispersChapter(${idx})">Read</button>
-            ${mapBtn}
+            <button class="whispers-card-btn--read" onclick="event.stopPropagation();openWhispersChapter(${idx})">Read story</button>
+            ${mapLink}
           </div>
         </div>
       </div>`;
