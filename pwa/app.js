@@ -1778,8 +1778,8 @@ function renderEventsList() {
 
   if (filtered.length === 0) {
     const msgs = {
-      today:    'No special events listed for today. Reception can always suggest what is happening nearby.',
-      upcoming: 'No upcoming events at the moment. Ask reception — they always know what’s on.',
+      today:    'No weather-based picks are available right now. Reception can always suggest what makes sense today.',
+      upcoming: 'No upcoming events are listed at the moment. Reception will be happy to suggest what is happening nearby.',
       alwayson: 'No permanent attractions listed yet.',
     };
     list.innerHTML = `<p style="color:var(--text-secondary);font-size:14px;padding:8px 0">${msgs[activeEventsTab]}</p>`;
