@@ -13,6 +13,7 @@ let GOOGLE_REVIEW_URL = ''; // set from /api/pwa-welcome response
 let feedbackRatings   = {}; // { overall, room_score, staff, location, cleanliness }
 let roomGuideData    = null;
 let servicesData     = null;
+let serviceCategories = [];  // [{cat, icon, items:[{s,i}]}] built during renderServicesList
 let servicesScrollY  = 0;    // saved scroll position for services list
 let poisData         = null; // loaded from /api/pwa-pois
 let routesData       = null; // loaded from /api/pwa-routes
@@ -225,6 +226,15 @@ function renderRoomSection(section) {
 }
 
 // ── Hotel Services ────────────────────────────────────────────────────────
+// Map route type keyword \u2192 emoji icon
+function _routeIcon(type) {
+  const t = (type || '').toLowerCase();
+  if (/cycl|bike/.test(t))       return '\ud83d\udeb4';
+  if (/driv|car/.test(t))        return '\ud83d\ude97';
+  if (/boat|sea|kayak/.test(t))  return '\u26f5';
+  return '\ud83d\udeb6';
+}
+
 // Map category keyword \u2192 emoji icon
 function _svcCatIcon(catName) {
   const n = (catName || '').toLowerCase();
@@ -256,58 +266,45 @@ function renderServicesList() {
   }
   hide('services-empty');
 
-  // Group by first category tag
+  // Build category index (stored so openServicesCategory can look up by idx)
   const catMap = new Map();
   servicesData.forEach((s, i) => {
     const cat = (Array.isArray(s.kategorija) ? s.kategorija[0] : s.kategorija) || 'Other';
     if (!catMap.has(cat)) catMap.set(cat, []);
     catMap.get(cat).push({ s, i });
   });
+  serviceCategories = Array.from(catMap.entries()).map(([cat, items]) => ({
+    cat, icon: _svcCatIcon(cat), items,
+  }));
 
-  container.innerHTML = Array.from(catMap.entries()).map(([cat, items]) => {
-    const icon  = _svcCatIcon(cat);
-    const count = items.length;
-    const label = count === 1 ? '1 service' : `${count} services`;
-    return `
-      <button class="svc-cat-card" onclick="openServicesCategory(${JSON.stringify(escHtml(cat))})">
-        <span class="svc-cat-icon">${icon}</span>
-        <span class="svc-cat-info">
-          <span class="svc-cat-title">${escHtml(cat)}</span>
-          <span class="svc-cat-count">${label}</span>
-        </span>
-        <span class="svc-cat-arrow">\u203a</span>
-      </button>`;
-  }).join('');
+  // Render as section-list rows \u2014 same markup as Room Guide
+  container.innerHTML = `<div class="section-list">${
+    serviceCategories.map((entry, idx) => `
+      <div class="section-item" onclick="openServicesCategory(${idx})">
+        <span>${entry.icon}</span>
+        <span>${escHtml(entry.cat)}</span>
+        <span class="section-arrow">\u203a</span>
+      </div>`).join('')
+  }</div>`;
 }
 
-function openServicesCategory(catName) {
-  if (!servicesData) return;
-  const cat = catName.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
-  const catItems = servicesData
-    .map((s, i) => ({ s, i }))
-    .filter(({ s }) => {
-      const c = (Array.isArray(s.kategorija) ? s.kategorija[0] : s.kategorija) || 'Other';
-      return c === cat;
-    });
+function openServicesCategory(idx) {
+  const entry = serviceCategories[idx];
+  if (!entry) return;
 
-  setText('svc-cat-screen-title', cat);
+  setText('svc-cat-screen-title', entry.cat);
 
+  // Render service rows as section-list \u2014 same markup as Room Guide
   const container = document.getElementById('services-cat-list');
   if (container) {
-    const icon = _svcCatIcon(cat);
-    container.innerHTML = catItems.map(({ s, i }) => {
-      const desc  = _stripUrls(s.opis || '');
-      const snippet = desc.length > 60 ? desc.slice(0, 60).trimEnd() + '\u2026' : desc;
-      return `
-        <div class="svc-row" onclick="openServiceDetail(${i})">
-          <span class="svc-row-icon">${icon}</span>
-          <span class="svc-row-info">
-            <span class="svc-row-title">${escHtml(s.naziv || '')}</span>
-            ${snippet ? `<span class="svc-row-desc">${escHtml(snippet)}</span>` : ''}
-          </span>
-          <span class="svc-row-arrow">\u203a</span>
-        </div>`;
-    }).join('');
+    container.innerHTML = `<div class="section-list">${
+      entry.items.map(({ s, i }) => `
+        <div class="section-item" onclick="openServiceDetail(${i})">
+          <span>${entry.icon}</span>
+          <span>${escHtml(s.naziv || '')}</span>
+          <span class="section-arrow">\u203a</span>
+        </div>`).join('')
+    }</div>`;
   }
 
   pushScreen('services-category');
@@ -757,21 +754,24 @@ function renderRoutesList() {
     container.innerHTML = '<p style="color:var(--text-muted);font-size:14px;padding:16px 0;">No routes available at this time.</p>';
     return;
   }
-  container.innerHTML = routesData.map((r, i) => {
-    const metaParts = [];
-    if (r.type)     metaParts.push(`<span class="route-meta-type">${escHtml(r.type)}</span>`);
-    if (r.duration) metaParts.push(`<span class="route-meta-dur"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${escHtml(r.duration)}</span>`);
-    const meta = metaParts.join('<span class="route-dot">\u00b7</span>');
-    return `
-      <div class="route-card" onclick="openRouteDetail(${i})">
-        <div class="route-card-accent"></div>
-        <div class="route-card-body">
-          <div class="route-card-title">${escHtml(r.name)}</div>
-          ${meta ? `<div class="route-card-meta">${meta}</div>` : ''}
-        </div>
-        <span class="route-card-arrow">\u203a</span>
-      </div>`;
-  }).join('');
+  container.innerHTML = `<div class="section-list">${
+    routesData.map((r, i) => {
+      const icon = _routeIcon(r.type);
+      const subParts = [];
+      if (r.type)     subParts.push(escHtml(r.type));
+      if (r.duration) subParts.push('\u23f1 ' + escHtml(r.duration));
+      const sub = subParts.join(' \u00b7 ');
+      return `
+        <div class="section-item" onclick="openRouteDetail(${i})">
+          <span>${icon}</span>
+          <span class="section-item-body">
+            <span>${escHtml(r.name)}</span>
+            ${sub ? `<span class="section-item-sub">${sub}</span>` : ''}
+          </span>
+          <span class="section-arrow">\u203a</span>
+        </div>`;
+    }).join('')
+  }</div>`;
 }
 
 function openRouteDetail(idx) {

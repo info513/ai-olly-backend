@@ -685,6 +685,21 @@ html, body {
   font-size: 18px;
 }
 
+/* Multi-line section item body (title + subtitle) */
+.section-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.section-item-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 /* ── Room Guide content ──────────────────────────────────────────────────── */
 
 .rg-content {
@@ -728,13 +743,12 @@ html, body {
   margin-top: 8px;
 }
 
-/* ── Service category overview (screen-services) ─────────────────────────── */
+/* ── Service / Route list containers — plain wrappers, section-list inside ── */
 
-#services-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 4px;
+#services-list,
+#services-cat-list,
+#routes-list {
+  /* Plain containers — JS renders .section-list inside */
 }
 
 .svc-cat-card {
@@ -796,13 +810,6 @@ html, body {
 }
 
 /* ── Service rows inside a category (screen-services-category) ───────────── */
-
-#services-cat-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 4px;
-}
 
 .svc-row {
   display: flex;
@@ -1174,13 +1181,6 @@ html, body {
 .map-legend-dot--poi   { background: #c9a227; }
 
 /* ── Route list — compact rows, no image hero ────────────────────────────── */
-
-#routes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 4px;
-}
 
 .route-card {
   display: flex;
