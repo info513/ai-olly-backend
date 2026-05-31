@@ -76,10 +76,13 @@ function _activateScreen(name, direction = 'forward') {
   if (name === 'room-guide') renderRoomGuideSections();
   if (name === 'services') {
     renderServicesList();
-    // Restore scroll position when going back from a service detail
+    // Restore scroll position when going back from a service category or detail
     if (direction === 'back') {
       requestAnimationFrame(() => window.scrollTo(0, servicesScrollY));
     }
+  }
+  if (name === 'services-category') {
+    // scroll restored by pushScreen → window.scrollTo(0,0)
   }
   if (name === 'routes')    renderRoutesList();
   if (name === 'concierge') {
@@ -222,6 +225,21 @@ function renderRoomSection(section) {
 }
 
 // ── Hotel Services ────────────────────────────────────────────────────────
+// Map category keyword \u2192 emoji icon
+function _svcCatIcon(catName) {
+  const n = (catName || '').toLowerCase();
+  if (/arriv|check.?in|reception|front.?desk|check.?out/.test(n)) return '\ud83d\udece';
+  if (/room|comfort|bed|sleep|pillow|amenity/.test(n)) return '\ud83d\udecf';
+  if (/housekeep|clean|laundry|towel|linen/.test(n)) return '\u2728';
+  if (/breakfast|food|dine|dining|restaur|coffee|drink|meal/.test(n)) return '\u2615';
+  if (/transport|parking|taxi|transfer|car|shuttle/.test(n)) return '\ud83d\ude97';
+  if (/spa|wellnes|gym|fitness|pool/.test(n)) return '\ud83d\udc86';
+  if (/concierge|vip|premium/.test(n)) return '\ud83d\udddd';
+  if (/emerg|urgent|safe|securit/.test(n)) return '\ud83d\udd12';
+  if (/polic|assist|info|help|general/.test(n)) return '\u2139\ufe0f';
+  return '\u25c6';
+}
+
 function renderServicesList() {
   const container = document.getElementById('services-list');
   if (!container) return;
@@ -237,20 +255,62 @@ function renderServicesList() {
     return;
   }
   hide('services-empty');
-  container.innerHTML = servicesData.map((s, i) => {
-    const cat   = Array.isArray(s.kategorija) ? s.kategorija[0] || '' : '';
-    const desc  = _stripUrls(s.opis || '');
-    const snippet = desc.length > 90 ? desc.slice(0, 90).trimEnd() + '\u2026' : desc;
+
+  // Group by first category tag
+  const catMap = new Map();
+  servicesData.forEach((s, i) => {
+    const cat = (Array.isArray(s.kategorija) ? s.kategorija[0] : s.kategorija) || 'Other';
+    if (!catMap.has(cat)) catMap.set(cat, []);
+    catMap.get(cat).push({ s, i });
+  });
+
+  container.innerHTML = Array.from(catMap.entries()).map(([cat, items]) => {
+    const icon  = _svcCatIcon(cat);
+    const count = items.length;
+    const label = count === 1 ? '1 service' : `${count} services`;
     return `
-      <div class="service-card" onclick="openServiceDetail(${i})">
-        <div class="service-card-hero"></div>
-        <div class="service-card-body">
-          ${cat ? `<div class="service-card-cat">${escHtml(cat)}</div>` : ''}
-          <div class="service-card-title">${escHtml(s.naziv || '')}</div>
-          ${snippet ? `<div class="service-card-desc">${escHtml(snippet)}</div>` : ''}
-        </div>
-      </div>`;
+      <button class="svc-cat-card" onclick="openServicesCategory(${JSON.stringify(escHtml(cat))})">
+        <span class="svc-cat-icon">${icon}</span>
+        <span class="svc-cat-info">
+          <span class="svc-cat-title">${escHtml(cat)}</span>
+          <span class="svc-cat-count">${label}</span>
+        </span>
+        <span class="svc-cat-arrow">\u203a</span>
+      </button>`;
   }).join('');
+}
+
+function openServicesCategory(catName) {
+  if (!servicesData) return;
+  const cat = catName.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
+  const catItems = servicesData
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => {
+      const c = (Array.isArray(s.kategorija) ? s.kategorija[0] : s.kategorija) || 'Other';
+      return c === cat;
+    });
+
+  setText('svc-cat-screen-title', cat);
+
+  const container = document.getElementById('services-cat-list');
+  if (container) {
+    const icon = _svcCatIcon(cat);
+    container.innerHTML = catItems.map(({ s, i }) => {
+      const desc  = _stripUrls(s.opis || '');
+      const snippet = desc.length > 60 ? desc.slice(0, 60).trimEnd() + '\u2026' : desc;
+      return `
+        <div class="svc-row" onclick="openServiceDetail(${i})">
+          <span class="svc-row-icon">${icon}</span>
+          <span class="svc-row-info">
+            <span class="svc-row-title">${escHtml(s.naziv || '')}</span>
+            ${snippet ? `<span class="svc-row-desc">${escHtml(snippet)}</span>` : ''}
+          </span>
+          <span class="svc-row-arrow">\u203a</span>
+        </div>`;
+    }).join('');
+  }
+
+  pushScreen('services-category');
 }
 
 function openServiceDetail(idx) {
@@ -704,12 +764,12 @@ function renderRoutesList() {
     const meta = metaParts.join('<span class="route-dot">\u00b7</span>');
     return `
       <div class="route-card" onclick="openRouteDetail(${i})">
-        <div class="route-card-hero"></div>
+        <div class="route-card-accent"></div>
         <div class="route-card-body">
-          ${meta ? `<div class="route-card-meta">${meta}</div>` : ''}
           <div class="route-card-title">${escHtml(r.name)}</div>
-          ${r.shortDesc ? `<div class="route-card-desc">${escHtml(r.shortDesc)}</div>` : ''}
+          ${meta ? `<div class="route-card-meta">${meta}</div>` : ''}
         </div>
+        <span class="route-card-arrow">\u203a</span>
       </div>`;
   }).join('');
 }

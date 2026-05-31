@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="manifest" href="/pwa/manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="style.css?v=whispers6">
+  <link rel="stylesheet" href="style.css?v=v7">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
   <script>
     // Register service worker for push notifications
@@ -293,6 +293,20 @@
       <div class="spinner"></div>
       <p class="loading-text">Loading services&hellip;</p>
     </div>
+  </div>
+
+  <!-- ── Screen: Services Category ────────────────────────────────────────── -->
+  <div id="screen-services-category" class="screen">
+
+    <div class="screen-header">
+      <button class="back-btn" onclick="popScreen()">&larr; Back</button>
+      <div id="svc-cat-screen-title" class="screen-title"></div>
+    </div>
+
+    <div class="screen-body">
+      <div id="services-cat-list"></div>
+    </div>
+
   </div>
 
   <!-- ── Screen: Service Detail ─────────────────────────────────────────── -->
@@ -1066,7 +1080,7 @@
   </nav>
 
   <script src="config.js"></script>
-  <script src="whispers-data.js?v=whispers6"></script>
-  <script src="app.js?v=whispers6"></script>
+  <script src="whispers-data.js?v=v7"></script>
+  <script src="app.js?v=v7"></script>
 </body>
 </html>
