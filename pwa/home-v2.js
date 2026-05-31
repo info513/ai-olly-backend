@@ -254,11 +254,18 @@ function v2RenderForecast() {
   var container = document.getElementById('v2-wx-days');
   if (!container) return;
 
+  // Use the real current day name for the first (today) column
+  var DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var todayLabel = DAY_NAMES[new Date().getDay()];
+
   container.innerHTML = MOCK_WEATHER.forecast.map(function (day, i) {
-    var labelCls = 'v2-wx-day__label' + (i === 0 ? ' v2-wx-day__label--today' : '');
+    var isToday  = (i === 0);
+    var label    = isToday ? todayLabel : v2Esc(day.day);
+    var wrapCls  = 'v2-wx-day' + (isToday ? ' v2-wx-day--today' : '');
+    var labelCls = 'v2-wx-day__label' + (isToday ? ' v2-wx-day__label--today' : '');
     return (
-      '<div class="v2-wx-day">' +
-        '<span class="' + labelCls + '">' + v2Esc(day.day) + '</span>' +
+      '<div class="' + wrapCls + '">' +
+        '<span class="' + labelCls + '">' + label + '</span>' +
         '<span class="v2-wx-day__icon">' +
           '<svg class="v2-icon v2-icon--sm"><use href="#' + day.icon + '"/></svg>' +
         '</span>' +

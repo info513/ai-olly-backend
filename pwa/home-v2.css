@@ -288,6 +288,15 @@ html, body {
   white-space: nowrap;
 }
 
+/* Today column — subtle cream frame */
+.v2-wx-day--today {
+  background: rgba(232,212,160,.09);
+  border: 1px solid rgba(232,212,160,.20);
+  border-radius: 8px;
+  padding: 5px 3px 4px;
+  margin: -5px -3px -4px;
+}
+
 /* Room strip */
 .v2-hero__room {
   display: flex;
