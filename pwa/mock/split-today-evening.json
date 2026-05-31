@@ -1,0 +1,12 @@
+{
+  "mode": "evening",
+  "timeOfDay": "evening",
+  "moodTitle": "Evening on the Riva",
+  "moodSub": "Warm · 22° · Golden hour along the waterfront",
+  "pois": [
+    { "id": "riva",       "name": "Riva Promenade",  "distanceM": 100 },
+    { "id": "peristyle",  "name": "Peristyle",       "distanceM": 50  },
+    { "id": "vestibule",  "name": "Vestibule",       "distanceM": 60  },
+    { "id": "varos",      "name": "Varoš Quarter",   "distanceM": 300 }
+  ]
+}

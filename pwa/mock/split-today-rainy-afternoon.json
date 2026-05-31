@@ -1,0 +1,12 @@
+{
+  "mode": "rainy",
+  "timeOfDay": "afternoon",
+  "moodTitle": "Rainy afternoon, perfect for cellars and coffee",
+  "moodSub": "Cloudy · 18° · Best time for indoor sites",
+  "pois": [
+    { "id": "cellars",     "name": "Diocletian's Cellars",   "distanceM": 70  },
+    { "id": "city-museum", "name": "City Museum",            "distanceM": 150 },
+    { "id": "cathedral",   "name": "Cathedral of St Domnius","distanceM": 80  },
+    { "id": "vestibule",   "name": "Vestibule",              "distanceM": 60  }
+  ]
+}
