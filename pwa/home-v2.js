@@ -35,9 +35,19 @@ const MOCK_GUEST = {
 };
 
 const MOCK_WEATHER = {
-  mode:   'sunny',  // sunny | hot | cloudy_mild | rainy | stormy_windy | evening
-  tempC:  26,
-  city:   'Split',
+  mode:      'sunny',  // sunny | hot | cloudy_mild | rainy | stormy_windy | evening
+  tempC:     26,
+  condition: 'Sunny',
+  hiC:       29,
+  loC:       18,
+  city:      'Split',
+  forecast: [
+    { day: 'Today', icon: 'ico-sun',        tempC: 26, hiC: 29, loC: 18 },
+    { day: 'Mon',   icon: 'ico-sun',        tempC: 24, hiC: 27, loC: 16 },
+    { day: 'Tue',   icon: 'ico-cloud-sun',  tempC: 21, hiC: 23, loC: 15 },
+    { day: 'Wed',   icon: 'ico-cloud-rain', tempC: 17, hiC: 20, loC: 13 },
+    { day: 'Thu',   icon: 'ico-sun',        tempC: 23, hiC: 26, loC: 16 },
+  ],
 };
 
 // 11 POIs — seeded for prototype; production comes from /api/pwa-pois
@@ -202,29 +212,83 @@ function v2Toast(msg) {
 function v2RenderHero() {
   var $ = function (id) { return document.getElementById(id); };
 
+  // Text fields
   var timeEl = $('v2-time');
   var nameEl = $('v2-name');
   var atEl   = $('v2-at');
-  var tempEl = $('v2-temp');
-  var cityEl = $('v2-city');
   var roomEl = $('v2-room');
   var rtEl   = $('v2-rtype');
   var coEl   = $('v2-checkout');
-  var wiEl   = $('v2-weather-icon');
 
   if (timeEl) timeEl.textContent = v2Greeting();
   if (nameEl) nameEl.textContent = MOCK_GUEST.firstName;
   if (atEl)   atEl.textContent   = 'at ' + HOTEL_CONFIG.name;
-  if (tempEl) tempEl.innerHTML   = MOCK_WEATHER.tempC + '&deg;';
-  if (cityEl) cityEl.textContent = MOCK_WEATHER.city;
   if (roomEl) roomEl.textContent = 'Room ' + MOCK_GUEST.room;
   if (rtEl)   rtEl.textContent   = MOCK_GUEST.roomType;
   if (coEl)   coEl.textContent   = 'Check-out ' + v2FormatCheckout(MOCK_GUEST.checkOut);
 
-  // Swap weather icon href
-  if (wiEl) {
-    var use = wiEl.querySelector('use');
+  // Weather pill — collapsed state
+  var tempEl = $('v2-temp');
+  var condEl = $('v2-wx-cond');
+  var hlEl   = $('v2-wx-hl');
+  var iconEl = $('v2-wx-icon');
+
+  if (tempEl) tempEl.innerHTML = MOCK_WEATHER.tempC + '&deg;';
+  if (condEl) condEl.textContent = MOCK_WEATHER.condition;
+  if (hlEl)   hlEl.innerHTML = 'H:' + MOCK_WEATHER.hiC + ' &middot; L:' + MOCK_WEATHER.loC;
+
+  // Swap weather icon
+  if (iconEl) {
+    var use = iconEl.querySelector('use');
     if (use) use.setAttribute('href', '#' + v2WeatherIconId(MOCK_WEATHER.mode));
+  }
+
+  // Render 5-day forecast (hidden initially)
+  v2RenderForecast();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Render: 5-day forecast panel
+// ─────────────────────────────────────────────────────────────────────────────
+function v2RenderForecast() {
+  var container = document.getElementById('v2-wx-days');
+  if (!container) return;
+
+  container.innerHTML = MOCK_WEATHER.forecast.map(function (day, i) {
+    var labelCls = 'v2-wx-day__label' + (i === 0 ? ' v2-wx-day__label--today' : '');
+    return (
+      '<div class="v2-wx-day">' +
+        '<span class="' + labelCls + '">' + v2Esc(day.day) + '</span>' +
+        '<span class="v2-wx-day__icon">' +
+          '<svg class="v2-icon v2-icon--sm"><use href="#' + day.icon + '"/></svg>' +
+        '</span>' +
+        '<span class="v2-wx-day__temp">' + day.tempC + '&deg;</span>' +
+        '<span class="v2-wx-day__hl">' + day.hiC + '&deg;&nbsp;' + day.loC + '&deg;</span>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Toggle: expand / collapse 5-day forecast
+// ─────────────────────────────────────────────────────────────────────────────
+var _wxOpen = false;
+
+function v2ToggleWeather() {
+  _wxOpen = !_wxOpen;
+  var panel  = document.getElementById('v2-wx-forecast');
+  var pill   = document.getElementById('v2-wx-pill');
+  var hint   = document.querySelector('.v2-wx-pill__hint span');
+
+  if (panel) {
+    panel.classList.toggle('v2-wx-forecast--open', _wxOpen);
+    panel.setAttribute('aria-hidden', String(!_wxOpen));
+  }
+  if (pill) {
+    pill.classList.toggle('v2-wx-pill--open', _wxOpen);
+  }
+  if (hint) {
+    hint.textContent = _wxOpen ? 'Collapse' : 'Tap for 5-day';
   }
 }
 

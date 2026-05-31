@@ -105,6 +105,20 @@
     <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
   </symbol>
 
+  <symbol id="ico-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="6 9 12 15 18 9"/>
+  </symbol>
+
+  <symbol id="ico-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/>
+  </symbol>
+
+  <symbol id="ico-cloud-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2v2M4.22 4.22l1.42 1.42M20 12h2M18.36 5.64l1.42-1.42"/>
+    <circle cx="12" cy="8" r="3"/>
+    <path d="M20 15h-1.26A8 8 0 107 21h13a4 4 0 000-6z"/>
+  </symbol>
+
 </svg>
 <!-- ── end SVG sprites ──────────────────────────────────────────────────── -->
 
@@ -130,15 +144,34 @@
           <h1 class="v2-hero__name" id="v2-name">Marko</h1>
           <div class="v2-hero__context">
             <span class="v2-hero__at" id="v2-at">at Antique Split</span>
-            <span class="v2-hero__powered">powered by Olly</span>
           </div>
         </div>
 
-        <!-- Weather pill -->
-        <div class="v2-hero__weather" id="v2-weather-icon">
-          <svg class="v2-icon v2-icon--sm"><use href="#ico-sun"/></svg>
-          <span id="v2-temp">26&deg;</span>
-          <span class="v2-hero__weather-city" id="v2-city">Split</span>
+        <!-- Weather widget (tap to expand 5-day) -->
+        <button class="v2-wx-pill" id="v2-wx-pill"
+                onclick="v2ToggleWeather()"
+                aria-label="Toggle 5-day forecast">
+          <div class="v2-wx-pill__main">
+            <span class="v2-wx-pill__icon" id="v2-wx-icon">
+              <svg class="v2-icon v2-icon--sm"><use href="#ico-sun"/></svg>
+            </span>
+            <span class="v2-wx-pill__temp" id="v2-temp">26&deg;</span>
+          </div>
+          <div class="v2-wx-pill__cond" id="v2-wx-cond">Sunny</div>
+          <div class="v2-wx-pill__hl"   id="v2-wx-hl">H:29 &middot; L:18</div>
+          <div class="v2-wx-pill__hint">
+            <span>Tap for 5-day</span>
+            <svg class="v2-icon v2-icon--xs v2-wx-chev" id="v2-wx-chev">
+              <use href="#ico-chevron-down"/>
+            </svg>
+          </div>
+        </button>
+      </div>
+
+      <!-- Expandable 5-day forecast panel -->
+      <div class="v2-wx-forecast" id="v2-wx-forecast" aria-hidden="true">
+        <div class="v2-wx-days" id="v2-wx-days">
+          <!-- rendered by home-v2.js -->
         </div>
       </div>
 

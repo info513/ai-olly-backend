@@ -158,39 +158,134 @@ html, body {
 
 .v2-hero__at { color: rgba(255,255,255,.46); }
 
-.v2-hero__powered {
-  font-family: var(--olly-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(232,212,160,.32);
-  border-left: 1px solid rgba(255,255,255,.10);
-  padding-left: 8px;
+/* ── Weather widget — collapsed pill ─────────────────────────────────────── */
+.v2-wx-pill {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  background: rgba(255,255,255,.09);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  padding: 9px 11px 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease;
+  margin-top: 2px;
+  min-width: 82px;
+  text-align: right;
 }
+.v2-wx-pill:active { background: rgba(255,255,255,.14); }
 
-/* Weather pill */
-.v2-hero__weather {
+.v2-wx-pill__main {
   display: flex;
   align-items: center;
   gap: 5px;
-  background: rgba(255,255,255,.09);
-  border: 1px solid rgba(255,255,255,.11);
-  border-radius: 100px;
-  padding: 7px 12px 7px 9px;
-  font-size: 13px;
+  color: rgba(255,255,255,.92);
+}
+
+.v2-wx-pill__temp {
+  font-family: var(--olly-font-display);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.v2-wx-pill__cond {
+  font-family: var(--olly-font-body);
+  font-size: 12px;
   font-weight: 500;
-  color: rgba(255,255,255,.88);
-  white-space: nowrap;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  flex-shrink: 0;
+  color: rgba(255,255,255,.72);
+}
+
+.v2-wx-pill__hl {
+  font-family: var(--olly-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: rgba(255,255,255,.40);
+}
+
+.v2-wx-pill__hint {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--olly-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(232,212,160,.55);
   margin-top: 2px;
 }
 
-.v2-hero__weather-city {
-  color: rgba(255,255,255,.48);
-  font-size: 12px;
+/* Chevron rotates when expanded */
+.v2-wx-chev {
+  transition: transform 0.22s ease;
+}
+.v2-wx-pill--open .v2-wx-chev {
+  transform: rotate(180deg);
+}
+
+/* ── Weather forecast panel ──────────────────────────────────────────────── */
+.v2-wx-forecast {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.28s ease, opacity 0.22s ease;
+  opacity: 0;
+}
+.v2-wx-forecast--open {
+  max-height: 110px;
+  opacity: 1;
+}
+
+.v2-wx-days {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0 14px;
+  border-top: 1px solid rgba(255,255,255,.07);
+  margin-top: 0;
+}
+
+.v2-wx-day {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.v2-wx-day__label {
+  font-family: var(--olly-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.40);
+}
+.v2-wx-day__label--today {
+  color: var(--olly-cream);
+  opacity: 0.80;
+}
+
+.v2-wx-day__icon {
+  color: rgba(255,255,255,.70);
+}
+
+.v2-wx-day__temp {
+  font-family: var(--olly-font-display);
+  font-size: 16px;
   font-weight: 400;
+  color: rgba(255,255,255,.88);
+  line-height: 1;
+}
+
+.v2-wx-day__hl {
+  font-family: var(--olly-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  color: rgba(255,255,255,.30);
+  white-space: nowrap;
 }
 
 /* Room strip */
