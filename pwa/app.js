@@ -226,28 +226,56 @@ function renderRoomSection(section) {
 }
 
 // ── Hotel Services ────────────────────────────────────────────────────────
-// Map route type keyword \u2192 emoji icon
+
 function _routeIcon(type) {
   const t = (type || '').toLowerCase();
-  if (/cycl|bike/.test(t))       return '\ud83d\udeb4';
-  if (/driv|car/.test(t))        return '\ud83d\ude97';
-  if (/boat|sea|kayak/.test(t))  return '\u26f5';
-  return '\ud83d\udeb6';
+  if (/cycl|bike/.test(t))       return '🚴';
+  if (/driv|car/.test(t))        return '🚗';
+  if (/boat|sea|kayak/.test(t))  return '⛵';
+  return '🚶';
 }
 
-// Map category keyword \u2192 emoji icon
-function _svcCatIcon(catName) {
-  const n = (catName || '').toLowerCase();
-  if (/arriv|check.?in|reception|front.?desk|check.?out/.test(n)) return '\ud83d\udece';
-  if (/room|comfort|bed|sleep|pillow|amenity/.test(n)) return '\ud83d\udecf';
-  if (/housekeep|clean|laundry|towel|linen/.test(n)) return '\u2728';
-  if (/breakfast|food|dine|dining|restaur|coffee|drink|meal/.test(n)) return '\u2615';
-  if (/transport|parking|taxi|transfer|car|shuttle/.test(n)) return '\ud83d\ude97';
-  if (/spa|wellnes|gym|fitness|pool/.test(n)) return '\ud83d\udc86';
-  if (/concierge|vip|premium/.test(n)) return '\ud83d\udddd';
-  if (/emerg|urgent|safe|securit/.test(n)) return '\ud83d\udd12';
-  if (/polic|assist|info|help|general/.test(n)) return '\u2139\ufe0f';
-  return '\u25c6';
+const SERVICE_GROUPS = [
+  { id: 'arrival', icon: '🛎', label: 'Arrival & Reception',
+    keywords: ['reception', 'check-in', 'check in', 'check out', 'check-out',
+               'late arrival', 'luggage', 'contact', 'direct booking',
+               'booking & offers', 'booking and offers', 'r1', 'tourist tax',
+               'invoice', 'payment', 'front desk', 'concierge'] },
+  { id: 'room', icon: '🛏', label: 'Room Comfort',
+    keywords: ['room feature', 'room/communication', 'air condition', 'television', ' tv',
+               'safe', 'smart glass', 'minibar', 'pillow', 'blanket',
+               'room service', 'room layout', 'room view', 'twin bed',
+               'extra bed', 'family room', 'rooms & booking', 'rooms and booking',
+               'family & booking', 'family and booking', 'family & comfort',
+               'family and comfort', 'family comfort'] },
+  { id: 'housekeeping', icon: '✨', label: 'Housekeeping & Laundry',
+    keywords: ['housekeep', 'laundry', 'towel', 'linen', 'clean',
+               'do not disturb', 'fabric softener', 'washing not', 'drying not'] },
+  { id: 'food', icon: '☕', label: 'Breakfast & Food',
+    keywords: ['food and beverage', 'food & beverage', 'beverage', 'breakfast',
+               'dietary', 'kids breakfast', 'room breakfast', 'local food',
+               'drink', 'meal', 'dining', 'where locals eat'] },
+  { id: 'transport', icon: '🚗', label: 'Transport & Parking',
+    keywords: ['parking', 'airport', 'taxi', 'ferry', 'bus station',
+               'boat tour', 'island trip', 'private transport', 'transfer', 'shuttle'] },
+  { id: 'policies', icon: '📋', label: 'Policies & Safety',
+    keywords: ['house rule', 'safety', 'security', 'emergency', 'fire',
+               'smoking', 'pet policy', 'quiet hour', 'cooking not',
+               'key policy', 'cctv', 'rule', 'policy', 'payment method'] },
+  { id: 'experiences', icon: '🌟', label: 'Local Experiences',
+    keywords: ['fun and relax', 'fun & relax', 'one day in split', 'sunset',
+               'beach', 'private tour', 'rainy day', 'souvenir',
+               'authentic', 'local experience', 'split guide', 'restaurant',
+               'where to eat', 'event'] },
+];
+
+function _mapServiceToGroup(s) {
+  const cats = Array.isArray(s.kategorija) ? s.kategorija : [s.kategorija || ''];
+  const text = [...cats, s.naziv || ''].join(' ').toLowerCase();
+  for (const g of SERVICE_GROUPS) {
+    if (g.keywords.some(kw => text.includes(kw.toLowerCase()))) return g.id;
+  }
+  return 'arrival'; // fallback — never show "Other"
 }
 
 function renderServicesList() {
@@ -266,24 +294,22 @@ function renderServicesList() {
   }
   hide('services-empty');
 
-  // Build category index (stored so openServicesCategory can look up by idx)
-  const catMap = new Map();
+  const groupMap = {};
+  SERVICE_GROUPS.forEach(g => { groupMap[g.id] = []; });
   servicesData.forEach((s, i) => {
-    const cat = (Array.isArray(s.kategorija) ? s.kategorija[0] : s.kategorija) || 'Other';
-    if (!catMap.has(cat)) catMap.set(cat, []);
-    catMap.get(cat).push({ s, i });
+    groupMap[_mapServiceToGroup(s)].push({ s, i });
   });
-  serviceCategories = Array.from(catMap.entries()).map(([cat, items]) => ({
-    cat, icon: _svcCatIcon(cat), items,
-  }));
 
-  // Render as section-list rows \u2014 same markup as Room Guide
+  serviceCategories = SERVICE_GROUPS
+    .filter(g => groupMap[g.id].length > 0)
+    .map(g => ({ cat: g.label, icon: g.icon, items: groupMap[g.id] }));
+
   container.innerHTML = `<div class="section-list">${
     serviceCategories.map((entry, idx) => `
       <div class="section-item" onclick="openServicesCategory(${idx})">
         <span>${entry.icon}</span>
         <span>${escHtml(entry.cat)}</span>
-        <span class="section-arrow">\u203a</span>
+        <span class="section-arrow">&#8250;</span>
       </div>`).join('')
   }</div>`;
 }
@@ -291,10 +317,7 @@ function renderServicesList() {
 function openServicesCategory(idx) {
   const entry = serviceCategories[idx];
   if (!entry) return;
-
   setText('svc-cat-screen-title', entry.cat);
-
-  // Render service rows as section-list \u2014 same markup as Room Guide
   const container = document.getElementById('services-cat-list');
   if (container) {
     container.innerHTML = `<div class="section-list">${
@@ -302,13 +325,13 @@ function openServicesCategory(idx) {
         <div class="section-item" onclick="openServiceDetail(${i})">
           <span>${entry.icon}</span>
           <span>${escHtml(s.naziv || '')}</span>
-          <span class="section-arrow">\u203a</span>
+          <span class="section-arrow">&#8250;</span>
         </div>`).join('')
     }</div>`;
   }
-
   pushScreen('services-category');
 }
+
 
 function openServiceDetail(idx) {
   currentService = servicesData ? servicesData[idx] : null;
