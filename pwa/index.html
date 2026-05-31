@@ -314,12 +314,19 @@
       <div class="screen-title">Split Today</div>
     </div>
     <div class="screen-hero screen-hero--events" role="img" aria-label="Split today events"></div>
+
+    <!-- Screen intro: subtitle + weather badge (badge populated by JS) -->
+    <div class="st-screen-intro">
+      <p class="st-screen-sub">Weather-aware suggestions, local events, and timeless Split highlights.</p>
+      <div class="st-weather-badge" id="st-weather-badge" style="display:none"></div>
+    </div>
+
     <div class="screen-body">
-      <!-- Tab bar -->
+      <!-- Tab bar — internal keys unchanged; labels updated for clarity -->
       <div class="st-tabs">
-        <button class="st-tab st-tab--active" onclick="switchEventsTab('today',this)">Today</button>
-        <button class="st-tab" onclick="switchEventsTab('upcoming',this)">Upcoming</button>
-        <button class="st-tab" onclick="switchEventsTab('alwayson',this)">Always on</button>
+        <button class="st-tab st-tab--active" onclick="switchEventsTab('today',this)">Weather Picks</button>
+        <button class="st-tab" onclick="switchEventsTab('upcoming',this)">Events</button>
+        <button class="st-tab" onclick="switchEventsTab('alwayson',this)">Always On</button>
       </div>
       <div id="events-loading" class="loading-hint">Loading…</div>
       <div id="events-list"></div>

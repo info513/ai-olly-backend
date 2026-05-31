@@ -91,11 +91,17 @@ function _activateScreen(name, direction = 'forward') {
     else renderConciergeRestaurants();
   }
   if (name === 'events') {
-    // Reset to Today tab on each open
+    // Reset to Weather Picks tab on each open
     activeEventsTab = 'today';
     document.querySelectorAll('.st-tab').forEach((b, i) => b.classList.toggle('st-tab--active', i === 0));
     if (!eventsData) loadEvents();
     else renderEventsList();
+    // Populate weather badge from whatever is already in the V2 pill
+    const wxCondEl = document.getElementById('v2-wx-cond');
+    const wxTempEl = document.getElementById('v2-temp');
+    const wxCond = wxCondEl && wxCondEl.textContent.trim() !== ' ' ? wxCondEl.textContent.trim() : '';
+    const wxTemp = wxTempEl ? parseInt(wxTempEl.textContent) : NaN;
+    _v2UpdateEventsWeatherBadge(wxCond || null, isNaN(wxTemp) ? undefined : wxTemp);
   }
   if (name === 'feedback') _activateFeedbackScreen();
   if (name === 'whispers-intro') _initWhispersIntroHero();
@@ -1565,16 +1571,21 @@ async function fetchSplitTemperature() {
     if (data?.daily) renderWeatherForecast(data.daily);
 
     // V2 weather pill
+    const wcode = data?.daily?.weathercode?.[0];
+    const condStr = _v2WmoCondition(wcode);
     if (!isNaN(temp)) {
       setText('v2-temp', temp + '°');
-      const wcode = data?.daily?.weathercode?.[0];
       const condEl = document.getElementById('v2-wx-cond');
-      if (condEl) condEl.textContent = _v2WmoCondition(wcode);
+      if (condEl) condEl.textContent = condStr;
       const iconEl = document.getElementById('v2-wx-icon');
       if (iconEl) {
         const use = iconEl.querySelector('use');
         if (use) use.setAttribute('href', '#' + _v2WmoIconId(wcode));
       }
+      // Re-render Split Today with live weather context
+      _v2RenderSplitToday(condStr, temp);
+      // Update weather badge on events screen if already open
+      _v2UpdateEventsWeatherBadge(condStr, temp);
     }
     if (data?.daily) {
       const max0 = Math.round(data.daily.temperature_2m_max[0]);
@@ -1767,8 +1778,8 @@ function renderEventsList() {
 
   if (filtered.length === 0) {
     const msgs = {
-      today:    'No events scheduled for today.',
-      upcoming: 'No upcoming events at the moment.',
+      today:    'No special events listed for today. Reception can always suggest what is happening nearby.',
+      upcoming: 'No upcoming events at the moment. Ask reception — they always know what’s on.',
       alwayson: 'No permanent attractions listed yet.',
     };
     list.innerHTML = `<p style="color:var(--text-secondary);font-size:14px;padding:8px 0">${msgs[activeEventsTab]}</p>`;
@@ -2467,22 +2478,82 @@ function _v2RenderStepsFromDoor() {
   }).join('');
 }
 
-// ── Render Split Today card ────────────────────────────────────────────────────
-function _v2RenderSplitToday() {
+// ── Render Split Today card — weather-aware ────────────────────────────────────
+// wxCond: string from _v2WmoCondition()  e.g. "Clear", "Rain", "Partly cloudy"
+// wxTempC: number in Celsius
+function _v2RenderSplitToday(wxCond, wxTempC) {
   var card = document.getElementById('v2-today-card');
   if (!card) return;
+
   var h   = new Date().getHours();
   var tod = h < 12 ? 'morning' : (h < 17 ? 'afternoon' : 'evening');
-  var titles = {
-    morning:   'A perfect morning for the stones',
-    afternoon: 'The old town awaits this afternoon',
-    evening:   'An evening in the heart of history',
-  };
-  var staticPois = [
-    { name: 'Peristyle',               dist: '50 m'  },
-    { name: 'Riva Promenade',          dist: '100 m' },
-    { name: 'Cathedral of St Domnius', dist: '80 m'  },
-  ];
+
+  // ── Classify weather ──────────────────────────────────────────────────────
+  var hasWeather = !!wxCond;
+  var c = wxCond ? wxCond.toLowerCase() : '';
+  var isRainy  = c.includes('rain') || c.includes('drizzle') || c.includes('shower') || c.includes('storm');
+  var isHot    = !isRainy && wxTempC !== undefined && wxTempC >= 32;
+  var isSunny  = !isRainy && !isHot && (c === 'clear' || c.includes('sunny'));
+  var isCloudy = hasWeather && !isRainy && !isHot && !isSunny;
+
+  // ── Title ─────────────────────────────────────────────────────────────────
+  var title;
+  if (isRainy) {
+    title = 'A good day for covered sights';
+  } else if (isHot) {
+    title = tod === 'morning' ? 'Beat the heat — go early' : 'Best after sunset today';
+  } else if (isSunny) {
+    title = tod === 'morning'   ? 'A perfect morning for the old town'
+          : tod === 'afternoon' ? 'The old town in afternoon light'
+          : 'An evening walk through history';
+  } else if (isCloudy) {
+    title = tod === 'morning'   ? 'A comfortable morning in the Palace'
+          : tod === 'afternoon' ? 'The old town awaits this afternoon'
+          : 'An evening in the heart of history';
+  } else {
+    // No weather yet — time-of-day fallback
+    title = tod === 'morning'   ? 'A perfect morning for the old town'
+          : tod === 'afternoon' ? 'The old town awaits this afternoon'
+          : 'An evening in the heart of history';
+  }
+
+  // ── Subtitle ──────────────────────────────────────────────────────────────
+  var sub;
+  var tempPart  = (wxTempC !== undefined && !isNaN(wxTempC)) ? wxTempC + '\xb0' : '';
+  var condPart  = wxCond || '';
+  var condTemp  = [condPart, tempPart].filter(Boolean).join(', ');
+  var prefix    = condTemp ? condTemp + ' — ' : '';
+
+  if (isRainy) {
+    sub = prefix + 'Good choice for the Cellars, museums, and covered passages.';
+  } else if (isHot) {
+    sub = prefix + 'Better in the morning or after dark to avoid the heat.';
+  } else if (isSunny) {
+    sub = prefix + 'Best for open-air sights and the Riva promenade.';
+  } else if (isCloudy) {
+    sub = prefix + 'Comfortable for walking the Palace District all day.';
+  } else {
+    var todSub = {
+      morning:   'Best for open-air sights before the midday heat.',
+      afternoon: 'Good for shaded passages and the Riva waterfront.',
+      evening:   'The Riva and Peristyle come alive at night.',
+    };
+    sub = todSub[tod];
+  }
+
+  // ── POIs — swap for rainy weather ─────────────────────────────────────────
+  var staticPois = isRainy
+    ? [
+        { name: "Diocletian's Cellars",    dist: '70 m'  },
+        { name: 'City Museum',             dist: '150 m' },
+        { name: 'Cathedral of St Domnius', dist: '80 m'  },
+      ]
+    : [
+        { name: 'Peristyle',               dist: '50 m'  },
+        { name: 'Riva Promenade',          dist: '100 m' },
+        { name: 'Cathedral of St Domnius', dist: '80 m'  },
+      ];
+
   var poisHtml = staticPois.map(function (p) {
     return (
       '<div class="v2-today-poi-row" onclick="openModule(\'near-me\')">' +
@@ -2492,16 +2563,17 @@ function _v2RenderSplitToday() {
       '</div>'
     );
   }).join('');
+
   card.innerHTML =
     '<div class="v2-today-hd">' +
-      '<span class="v2-today-tag">Split Today &middot; Weather-Aware</span>' +
+      '<span class="v2-today-tag">Split Today &middot; Weather Picks</span>' +
       '<button class="v2-today-see-all" onclick="openModule(\'events\')">' +
         'See all <svg class="v2-icon v2-icon--xs"><use href="#ico-arrow-right"/></svg>' +
       '</button>' +
     '</div>' +
     '<div class="v2-today-mood">' +
-      '<div class="v2-today-mood__title">' + _v2Esc(titles[tod]) + '</div>' +
-      '<div class="v2-today-mood__sub">Explore the Diocletian Palace District</div>' +
+      '<div class="v2-today-mood__title">' + _v2Esc(title) + '</div>' +
+      '<div class="v2-today-mood__sub">' + sub + '</div>' +
     '</div>' +
     '<div class="v2-today-pois">' + poisHtml + '</div>';
 }
@@ -2550,6 +2622,31 @@ function _v2InitAskBubble() {
       dismissTip();
     }
   }, { once: true, capture: true });
+}
+
+// ── Populate events screen weather badge ──────────────────────────────────────
+// wxCond: condition string e.g. "Clear"  |  wxTempC: number
+function _v2UpdateEventsWeatherBadge(wxCond, wxTempC) {
+  var badge = document.getElementById('st-weather-badge');
+  if (!badge) return;
+  var parts = [];
+  if (wxCond && wxCond.trim()) parts.push(wxCond.trim());
+  if (wxTempC !== undefined && !isNaN(wxTempC)) parts.push(wxTempC + '\xb0');
+
+  // Friendly descriptor
+  if (parts.length) {
+    var c = (wxCond || '').toLowerCase();
+    var isRainy = c.includes('rain') || c.includes('drizzle') || c.includes('shower') || c.includes('storm');
+    var isHot   = !isRainy && wxTempC !== undefined && wxTempC >= 32;
+    var desc = isRainy ? 'Covered sights recommended'
+             : isHot   ? 'Go early or after sunset'
+             :            'Outdoor-friendly';
+    parts.push(desc);
+    badge.textContent = parts.join(' \xb7 ');
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 // ── Ask bubble tap handler ─────────────────────────────────────────────────────
