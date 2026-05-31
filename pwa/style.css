@@ -3246,3 +3246,713 @@ html, body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOME V2 — Olly Design System
+   Added tokens use --olly-* prefix to avoid collisions with existing --bg etc.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --olly-navy-deep:    #14222d;
+  --olly-navy:         #1a3445;
+  --olly-navy-mid:     #2a4a5c;
+  --olly-surface:      #f8f4ec;
+  --olly-surface-warm: #f1ebdc;
+  --olly-white:        #ffffff;
+  --olly-cream:        #e8d4a0;
+  --olly-cream-light:  #f5eed8;
+  --olly-text:         #14222d;
+  --olly-text-muted:   #4a5c68;
+  --olly-text-light:   #8a9ba8;
+  --olly-border:       #e2dbd0;
+  --olly-green:        #22c55e;
+  --olly-font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --olly-font-body:    'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --olly-font-mono:    'Geist Mono', 'SFMono-Regular', Consolas, 'Courier New', monospace;
+  --olly-page-pad:     20px;
+  --olly-gap:          10px;
+  --olly-radius:       16px;
+  --olly-radius-sm:    10px;
+  --olly-radius-lg:    24px;
+  --olly-shadow-sm:    0 1px 3px rgba(20,34,45,.06), 0 4px 12px rgba(20,34,45,.06);
+  --olly-shadow:       0 2px 8px rgba(20,34,45,.08), 0 12px 28px rgba(20,34,45,.08);
+  --olly-nav-h:        64px;
+}
+
+/* ── SVG icons ────────────────────────────────────────────────────────────── */
+.v2-icon {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.v2-icon--xs  { width: 14px; height: 14px; }
+.v2-icon--sm  { width: 18px; height: 18px; }
+.v2-icon--md  { width: 22px; height: 22px; }
+.v2-icon--lg  { width: 28px; height: 28px; }
+
+/* ── screen-home: ensure it scrolls correctly ─────────────────────────────── */
+#screen-home {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--olly-surface);
+}
+
+/* ── HERO ─────────────────────────────────────────────────────────────────── */
+.v2-hero {
+  background: linear-gradient(170deg, var(--olly-navy-deep) 0%, var(--olly-navy) 55%, var(--olly-navy-mid) 100%);
+  border-radius: 0 0 28px 28px;
+  overflow: hidden;
+  position: relative;
+  padding:
+    calc(env(safe-area-inset-top, 20px) + 20px)
+    var(--olly-page-pad)
+    0;
+}
+
+/* Subtle architectural grid */
+.v2-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(232,212,160,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232,212,160,.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events: none;
+}
+
+/* Cream radial glow top-right */
+.v2-hero::after {
+  content: '';
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(232,212,160,.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.v2-hero__inner {
+  position: relative;
+  z-index: 1;
+}
+
+.v2-hero__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 18px;
+}
+
+.v2-hero__greeting { flex: 1; min-width: 0; }
+
+/* Greeting heading — Fraunces display size (no guest name in production) */
+.v2-hero__display {
+  font-family: var(--olly-font-display);
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1.05;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.v2-hero__context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: rgba(255,255,255,.46);
+  font-family: var(--olly-font-body);
+}
+
+.v2-hero__at { color: rgba(255,255,255,.46); }
+
+/* ── Weather widget — collapsed pill ─────────────────────────────────────── */
+.v2-wx-pill {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  background: rgba(255,255,255,.09);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  padding: 9px 11px 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease;
+  margin-top: 2px;
+  min-width: 82px;
+  text-align: right;
+}
+.v2-wx-pill:active { background: rgba(255,255,255,.14); }
+
+.v2-wx-pill__main {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(255,255,255,.92);
+}
+
+.v2-wx-pill__temp {
+  font-family: var(--olly-font-display);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.v2-wx-pill__cond {
+  font-family: var(--olly-font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255,255,255,.72);
+}
+
+.v2-wx-pill__hl {
+  font-family: var(--olly-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: rgba(255,255,255,.40);
+}
+
+.v2-wx-pill__hint {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--olly-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(232,212,160,.55);
+  margin-top: 2px;
+}
+
+.v2-wx-chev { transition: transform 0.22s ease; }
+.v2-wx-pill--open .v2-wx-chev { transform: rotate(180deg); }
+
+/* ── Weather forecast panel ──────────────────────────────────────────────── */
+.v2-wx-forecast {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.28s ease, opacity 0.22s ease;
+  opacity: 0;
+}
+.v2-wx-forecast--open {
+  max-height: 110px;
+  opacity: 1;
+}
+
+.v2-wx-days {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 4px 14px;
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+
+.v2-wx-day {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.v2-wx-day__label {
+  font-family: var(--olly-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.40);
+}
+.v2-wx-day__label--today { color: var(--olly-cream); opacity: 0.80; }
+
+.v2-wx-day__icon { color: rgba(255,255,255,.70); }
+
+.v2-wx-day__temp {
+  font-family: var(--olly-font-display);
+  font-size: 16px;
+  font-weight: 400;
+  color: rgba(255,255,255,.88);
+  line-height: 1;
+}
+
+.v2-wx-day__hl {
+  font-family: var(--olly-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  color: rgba(255,255,255,.30);
+  white-space: nowrap;
+}
+
+/* Today column — subtle cream frame */
+.v2-wx-day--today {
+  background: rgba(232,212,160,.09);
+  border: 1px solid rgba(232,212,160,.20);
+  border-radius: 8px;
+  padding: 5px 3px 4px;
+  margin: -5px -3px -4px;
+}
+
+/* Room strip */
+.v2-hero__room {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  background: rgba(255,255,255,.06);
+  border-top: 1px solid rgba(255,255,255,.07);
+  margin: 0 calc(-1 * var(--olly-page-pad));
+  padding: 13px var(--olly-page-pad);
+  font-size: 13px;
+  color: rgba(255,255,255,.58);
+  font-family: var(--olly-font-body);
+  line-height: 1;
+}
+
+.v2-hero__sep { color: rgba(255,255,255,.20); }
+.v2-hero__co-icon { opacity: 0.50; margin-right: 2px; }
+
+/* ── Section shell ────────────────────────────────────────────────────────── */
+.v2-section { padding: 24px var(--olly-page-pad) 0; }
+
+.v2-section-hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.v2-section-title {
+  font-family: var(--olly-font-display);
+  font-size: 21px;
+  font-weight: 400;
+  color: var(--olly-text);
+  letter-spacing: -0.01em;
+}
+
+.v2-see-all {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  font-family: var(--olly-font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--olly-navy);
+  opacity: 0.55;
+  cursor: pointer;
+  padding: 4px 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Quick access tile grid ───────────────────────────────────────────────── */
+.v2-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--olly-gap);
+}
+
+.v2-tile {
+  background: var(--olly-white);
+  border-radius: var(--olly-radius);
+  padding: 16px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  border: 1px solid var(--olly-border);
+  box-shadow: var(--olly-shadow-sm);
+  transition: transform 0.12s ease, opacity 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  text-align: center;
+}
+.v2-tile:active { transform: scale(0.955); opacity: 0.85; }
+
+.v2-tile--concierge {
+  background: linear-gradient(145deg, var(--olly-navy) 0%, var(--olly-navy-deep) 100%);
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(20,34,45,.22);
+}
+
+.v2-tile__icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--olly-surface);
+  color: var(--olly-navy);
+  flex-shrink: 0;
+}
+.v2-tile--concierge .v2-tile__icon {
+  background: rgba(232,212,160,.16);
+  color: var(--olly-cream);
+}
+
+.v2-tile__label {
+  font-family: var(--olly-font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--olly-text);
+  line-height: 1.3;
+}
+.v2-tile--concierge .v2-tile__label { color: rgba(255,255,255,.88); }
+
+/* ── Steps from your door — horizontal POI scroll ─────────────────────────── */
+.v2-poi-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  margin: 0 calc(-1 * var(--olly-page-pad));
+  padding: 4px var(--olly-page-pad) 10px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.v2-poi-scroll::-webkit-scrollbar { display: none; }
+
+.v2-poi-card {
+  flex-shrink: 0;
+  width: 140px;
+  height: 186px;
+  border-radius: var(--olly-radius);
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.14s ease;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: var(--olly-shadow-sm);
+}
+.v2-poi-card:active { transform: scale(0.96); }
+
+.v2-poi-card__bg {
+  position: absolute;
+  inset: 0;
+}
+
+.v2-poi-card__dist {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(20,34,45,.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: rgba(255,255,255,.88);
+  font-family: var(--olly-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  border-radius: 100px;
+}
+
+.v2-poi-card__body {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 12px;
+  background: linear-gradient(to top, rgba(20,34,45,.92) 0%, transparent 100%);
+}
+
+.v2-poi-card__name {
+  font-family: var(--olly-font-display);
+  font-size: 15px;
+  font-weight: 400;
+  color: #ffffff;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.v2-poi-card__cat {
+  font-family: var(--olly-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(232,212,160,.78);
+}
+
+/* ── Split Today card ────────────────────────────────────────────────────── */
+.v2-today-card {
+  background: linear-gradient(148deg, var(--olly-navy-deep) 0%, #1e3a50 50%, var(--olly-navy-mid) 100%);
+  border-radius: var(--olly-radius-lg);
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(20,34,45,.18);
+}
+.v2-today-card::before {
+  content: '';
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 200px; height: 200px;
+  background: radial-gradient(ellipse, rgba(232,212,160,.07) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+.v2-today-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 18px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  position: relative;
+}
+
+.v2-today-tag {
+  font-family: var(--olly-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--olly-cream);
+  opacity: 0.78;
+}
+
+.v2-today-see-all {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-family: var(--olly-font-body);
+  color: rgba(255,255,255,.38);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.v2-today-mood {
+  padding: 14px 18px 6px;
+  position: relative;
+}
+
+.v2-today-mood__title {
+  font-family: var(--olly-font-display);
+  font-size: 23px;
+  font-weight: 400;
+  color: #ffffff;
+  line-height: 1.2;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.v2-today-mood__sub {
+  font-size: 13px;
+  color: rgba(255,255,255,.48);
+  font-family: var(--olly-font-body);
+}
+
+.v2-today-pois { padding: 10px 0 6px; position: relative; }
+
+.v2-today-poi-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 18px;
+  border-top: 1px solid rgba(255,255,255,.05);
+  cursor: pointer;
+  transition: background 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.v2-today-poi-row:first-child { border-top: none; }
+.v2-today-poi-row:active { background: rgba(255,255,255,.04); }
+
+.v2-today-poi-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--olly-cream);
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+
+.v2-today-poi-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255,255,255,.82);
+  font-family: var(--olly-font-body);
+}
+
+.v2-today-poi-dist {
+  font-family: var(--olly-font-mono);
+  font-size: 11px;
+  color: rgba(255,255,255,.30);
+}
+
+/* ── Whispers of the Palace card ─────────────────────────────────────────── */
+.v2-whispers-card {
+  background: var(--olly-navy-deep);
+  border-radius: var(--olly-radius-lg);
+  padding: 22px 20px 20px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.13s ease, opacity 0.13s ease;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 4px 20px rgba(20,34,45,.20);
+}
+.v2-whispers-card:active { transform: scale(0.985); opacity: 0.90; }
+
+.v2-whispers-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 0% 100%, rgba(42,74,92,.65) 0%, transparent 55%),
+    radial-gradient(ellipse at 100% 0%, rgba(26,52,69,.45) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.v2-whispers-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--olly-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--olly-cream);
+  opacity: 0.72;
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.v2-whispers-title {
+  font-family: var(--olly-font-display);
+  font-size: 27px;
+  font-weight: 400;
+  color: #ffffff;
+  line-height: 1.15;
+  margin-bottom: 9px;
+  position: relative;
+  letter-spacing: -0.01em;
+}
+
+.v2-whispers-sub {
+  font-size: 14px;
+  color: rgba(255,255,255,.48);
+  line-height: 1.55;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.v2-whispers-ft {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+}
+
+.v2-whispers-count {
+  font-family: var(--olly-font-mono);
+  font-size: 11px;
+  color: rgba(255,255,255,.30);
+}
+
+.v2-whispers-cta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--olly-cream);
+}
+
+/* ── Floating Ask bubble ──────────────────────────────────────────────────── */
+.v2-ask-wrap {
+  position: fixed;
+  bottom: calc(var(--olly-nav-h) + env(safe-area-inset-bottom, 0px) + 14px);
+  right: 20px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+
+@media (min-width: 481px) {
+  .v2-ask-wrap { right: calc(50% - 240px + 20px); }
+}
+
+.v2-ask-wrap > * { pointer-events: auto; }
+
+.v2-ask-bubble {
+  width: 56px;
+  height: 56px;
+  border-radius: 28%;
+  background: linear-gradient(145deg, var(--olly-navy) 0%, var(--olly-navy-deep) 100%);
+  border: 1px solid rgba(232,212,160,.18);
+  box-shadow:
+    0 4px 20px rgba(20,34,45,.40),
+    0 0 0 1px rgba(255,255,255,.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+  color: var(--olly-cream);
+}
+.v2-ask-bubble:active {
+  transform: scale(0.91);
+  box-shadow: 0 2px 8px rgba(20,34,45,.30);
+}
+
+.v2-ask-dot {
+  position: absolute;
+  bottom: -3px; right: -3px;
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  background: var(--olly-green);
+  border: 2.5px solid var(--olly-surface);
+}
+
+@keyframes v2DotPulse {
+  0%, 100% { transform: scale(1);    opacity: 1;   }
+  50%       { transform: scale(1.18); opacity: 0.75; }
+}
+.v2-ask-dot { animation: v2DotPulse 2.8s ease-in-out infinite; }
+
+.v2-ask-tip {
+  background: var(--olly-navy-deep);
+  color: rgba(255,255,255,.86);
+  font-size: 13px;
+  font-family: var(--olly-font-body);
+  line-height: 1.45;
+  padding: 10px 14px;
+  border-radius: var(--olly-radius-sm);
+  max-width: 210px;
+  text-align: right;
+  box-shadow: var(--olly-shadow);
+  border: 1px solid rgba(255,255,255,.08);
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  position: relative;
+}
+.v2-ask-tip::after {
+  content: '';
+  position: absolute;
+  bottom: -6px; right: 20px;
+  width: 12px; height: 12px;
+  background: var(--olly-navy-deep);
+  border-right: 1px solid rgba(255,255,255,.08);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  transform: rotate(45deg);
+}
+.v2-ask-tip--out {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(5px) scale(0.96);
+}

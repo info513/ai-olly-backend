@@ -1343,6 +1343,10 @@ async function fetchWelcomeData() {
       setText('splash-room-type', data.roomType);
       setText('wh-room-type', data.roomType);
       show('wh-sep');
+      // V2 room strip
+      setText('v2-rtype-display', data.roomType);
+      const v2Sep = document.getElementById('v2-sep-rtype');
+      if (v2Sep) v2Sep.style.display = '';
     }
     // Store Google Review URL for feedback screen
     if (data.googleReviewUrl) {
@@ -1404,6 +1408,7 @@ async function loadPois() {
     if (data.ok && Array.isArray(data.pois)) {
       poisData = data.pois;
       addPoiMarkersToMap();   // no-op if map not yet inited; called again from initCityMap
+      _v2RenderStepsFromDoor();
     }
   } catch (_) {
     // Silent fallback
@@ -1549,15 +1554,35 @@ async function fetchSplitTemperature() {
     );
     const data = await res.json();
 
-    // Current temperature (top-right corner)
+    // Current temperature (V1 legacy)
     const temp = Math.round(data?.current?.temperature_2m);
     if (!isNaN(temp)) {
       setText('wh-temp', temp + '°C');
       show('wh-weather');
     }
 
-    // 5-day forecast strip
+    // 5-day forecast strip (V1 legacy)
     if (data?.daily) renderWeatherForecast(data.daily);
+
+    // V2 weather pill
+    if (!isNaN(temp)) {
+      setText('v2-temp', temp + '°');
+      const wcode = data?.daily?.weathercode?.[0];
+      const condEl = document.getElementById('v2-wx-cond');
+      if (condEl) condEl.textContent = _v2WmoCondition(wcode);
+      const iconEl = document.getElementById('v2-wx-icon');
+      if (iconEl) {
+        const use = iconEl.querySelector('use');
+        if (use) use.setAttribute('href', '#' + _v2WmoIconId(wcode));
+      }
+    }
+    if (data?.daily) {
+      const max0 = Math.round(data.daily.temperature_2m_max[0]);
+      const min0 = Math.round(data.daily.temperature_2m_min[0]);
+      const hlEl = document.getElementById('v2-wx-hl');
+      if (hlEl) hlEl.textContent = 'H:' + max0 + ' · L:' + min0;
+      _v2RenderWeatherForecast(data.daily);
+    }
 
   } catch (_) { /* silent */ }
 }
@@ -1619,8 +1644,14 @@ function boot() {
   setText('splash-room-number', ROOM || '—');
   setText('room-number',        ROOM || '—');
 
-  // Home greeting
+  // Home greeting (V1 legacy hidden element)
   setText('wh-greeting', getGreeting());
+
+  // V2 hero
+  setText('v2-greeting',         getGreeting());
+  setText('v2-hotel-at',         'at ' + CONFIG.hotelName);
+  setText('v2-room-display',     ROOM ? 'Room ' + ROOM : 'Room —');
+  setText('v2-checkout-display', CONFIG.checkOut || '11:00');
 
   // Fetch temperature in background
   fetchSplitTemperature();
@@ -1646,6 +1677,11 @@ function boot() {
   setText('info-checkout',   CONFIG.checkOut   || '');
 
   if (!ROOM || !TOKEN) show('param-warning');
+
+  // V2 home cards (static content, safe to render immediately)
+  _v2RenderSplitToday();
+  _v2RenderWhispersCard();
+  _v2InitAskBubble();
 
   // Show splash screen first; guest taps "Enter" to proceed to home
   _activateScreen('app-splash');
@@ -2300,4 +2336,228 @@ async function submitFeedback() {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Send Feedback'; }
   }
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HOME V2 — helper functions
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── HTML escape ───────────────────────────────────────────────────────────────
+function _v2Esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── WMO weather code → condition string ───────────────────────────────────────
+function _v2WmoCondition(code) {
+  if (code === undefined || code === null) return 'Clear';
+  code = Number(code);
+  if (code === 0) return 'Clear';
+  if (code <= 2)  return 'Partly cloudy';
+  if (code === 3) return 'Overcast';
+  if (code <= 49) return 'Foggy';
+  if (code <= 59) return 'Drizzle';
+  if (code <= 69) return 'Rain';
+  if (code <= 79) return 'Snow';
+  if (code <= 82) return 'Showers';
+  if (code <= 84) return 'Heavy showers';
+  if (code <= 94) return 'Thunderstorm';
+  return 'Storm';
+}
+
+// ── WMO weather code → SVG icon id ────────────────────────────────────────────
+function _v2WmoIconId(code) {
+  if (code === undefined || code === null) return 'ico-sun';
+  code = Number(code);
+  if (code === 0) return 'ico-sun';
+  if (code <= 2)  return 'ico-cloud-sun';
+  if (code === 3) return 'ico-cloud';
+  if (code <= 59) return 'ico-cloud';
+  if (code <= 82) return 'ico-cloud-rain';
+  return 'ico-cloud-rain';
+}
+
+// ── Toggle weather forecast panel ─────────────────────────────────────────────
+var _v2WxOpen = false;
+
+function v2ToggleWeather() {
+  _v2WxOpen = !_v2WxOpen;
+  var panel = document.getElementById('v2-wx-forecast');
+  var pill  = document.getElementById('v2-wx-pill');
+  var hint  = document.querySelector('.v2-wx-pill__hint span');
+  if (panel) {
+    panel.classList.toggle('v2-wx-forecast--open', _v2WxOpen);
+    panel.setAttribute('aria-hidden', String(!_v2WxOpen));
+  }
+  if (pill) pill.classList.toggle('v2-wx-pill--open', _v2WxOpen);
+  if (hint) hint.textContent = _v2WxOpen ? 'Collapse' : 'Tap for 5-day';
+}
+
+// ── Render 5-day forecast columns from open-meteo daily data ──────────────────
+function _v2RenderWeatherForecast(daily) {
+  var container = document.getElementById('v2-wx-days');
+  if (!container) return;
+  var DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  container.innerHTML = daily.time.map(function (dateStr, i) {
+    var d = new Date(dateStr + 'T12:00:00');
+    var label    = DAY_NAMES[d.getDay()];
+    var isToday  = (i === 0);
+    var wrapCls  = 'v2-wx-day' + (isToday ? ' v2-wx-day--today' : '');
+    var labelCls = 'v2-wx-day__label' + (isToday ? ' v2-wx-day__label--today' : '');
+    var iconId   = _v2WmoIconId(daily.weathercode[i]);
+    var maxT     = Math.round(daily.temperature_2m_max[i]);
+    var minT     = Math.round(daily.temperature_2m_min[i]);
+    return (
+      '<div class="' + wrapCls + '">' +
+        '<span class="' + labelCls + '">' + label + '</span>' +
+        '<span class="v2-wx-day__icon">' +
+          '<svg class="v2-icon v2-icon--sm"><use href="#' + iconId + '"/></svg>' +
+        '</span>' +
+        '<span class="v2-wx-day__temp">' + maxT + '&deg;</span>' +
+        '<span class="v2-wx-day__hl">' + maxT + '&deg;&nbsp;' + minT + '&deg;</span>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+// ── Distance formatter ─────────────────────────────────────────────────────────
+function _v2FormatDist(m) {
+  if (!m || isNaN(m)) return '';
+  m = Number(m);
+  if (m < 1000) return m + ' m';
+  return (m / 1000).toFixed(1).replace('.0', '') + ' km';
+}
+
+// ── POI category → gradient ────────────────────────────────────────────────────
+var _V2_POI_GRADIENTS = {
+  'History':      'linear-gradient(155deg, #2c1a0e 0%, #5c3820 55%, #3a2510 100%)',
+  'Food & Drink': 'linear-gradient(155deg, #0a1a08 0%, #1c3818 100%)',
+  'Beaches':      'linear-gradient(155deg, #083050 0%, #0e4870 55%, #083850 100%)',
+  'Nature':       'linear-gradient(155deg, #0e2a10 0%, #1e4a20 100%)',
+  'Nightlife':    'linear-gradient(155deg, #1a0e2a 0%, #3a1060 100%)',
+  'Shopping':     'linear-gradient(155deg, #2a1a10 0%, #50301a 100%)',
+  'Culture':      'linear-gradient(155deg, #1a1020 0%, #3a2050 100%)',
+};
+
+// ── Render Steps from your door from live poisData ─────────────────────────────
+function _v2RenderStepsFromDoor() {
+  var scroll = document.getElementById('v2-poi-scroll');
+  if (!scroll) return;
+  var pois = (typeof poisData !== 'undefined' && Array.isArray(poisData)) ? poisData : [];
+  if (!pois.length) return;
+  scroll.innerHTML = pois.slice(0, 10).map(function (poi) {
+    var name = poi.name     || '';
+    var cat  = poi.category || '';
+    var dist = poi.dist     || '';
+    var bg   = _V2_POI_GRADIENTS[cat] || 'linear-gradient(155deg, #14222d 0%, #1a3445 100%)';
+    return (
+      '<div class="v2-poi-card" onclick="openModule(\'near-me\')">' +
+        '<div class="v2-poi-card__bg" style="background:' + bg + '"></div>' +
+        (dist ? '<div class="v2-poi-card__dist">' + _v2Esc(dist) + '</div>' : '') +
+        '<div class="v2-poi-card__body">' +
+          '<div class="v2-poi-card__name">' + _v2Esc(name) + '</div>' +
+          '<div class="v2-poi-card__cat">'  + _v2Esc(cat)  + '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+// ── Render Split Today card ────────────────────────────────────────────────────
+function _v2RenderSplitToday() {
+  var card = document.getElementById('v2-today-card');
+  if (!card) return;
+  var h   = new Date().getHours();
+  var tod = h < 12 ? 'morning' : (h < 17 ? 'afternoon' : 'evening');
+  var titles = {
+    morning:   'A perfect morning for the stones',
+    afternoon: 'The old town awaits this afternoon',
+    evening:   'An evening in the heart of history',
+  };
+  var staticPois = [
+    { name: 'Peristyle',               dist: '50 m'  },
+    { name: 'Riva Promenade',          dist: '100 m' },
+    { name: 'Cathedral of St Domnius', dist: '80 m'  },
+  ];
+  var poisHtml = staticPois.map(function (p) {
+    return (
+      '<div class="v2-today-poi-row" onclick="openModule(\'near-me\')">' +
+        '<div class="v2-today-poi-dot"></div>' +
+        '<div class="v2-today-poi-name">' + _v2Esc(p.name) + '</div>' +
+        '<div class="v2-today-poi-dist">' + p.dist + '</div>' +
+      '</div>'
+    );
+  }).join('');
+  card.innerHTML =
+    '<div class="v2-today-hd">' +
+      '<span class="v2-today-tag">Split Today &middot; Weather-Aware</span>' +
+      '<button class="v2-today-see-all" onclick="openModule(\'events\')">' +
+        'See all <svg class="v2-icon v2-icon--xs"><use href="#ico-arrow-right"/></svg>' +
+      '</button>' +
+    '</div>' +
+    '<div class="v2-today-mood">' +
+      '<div class="v2-today-mood__title">' + _v2Esc(titles[tod]) + '</div>' +
+      '<div class="v2-today-mood__sub">Explore the Diocletian Palace District</div>' +
+    '</div>' +
+    '<div class="v2-today-pois">' + poisHtml + '</div>';
+}
+
+// ── Render Whispers of the Palace card ────────────────────────────────────────
+function _v2RenderWhispersCard() {
+  var card = document.getElementById('v2-whispers-card');
+  if (!card) return;
+  card.innerHTML =
+    '<div class="v2-whispers-badge">' +
+      '<svg class="v2-icon v2-icon--xs"><use href="#ico-book-open"/></svg>' +
+      ' Cultural Series' +
+    '</div>' +
+    '<div class="v2-whispers-title">Whispers of the Palace</div>' +
+    '<div class="v2-whispers-sub">' +
+      'The story of Diocletian, Salona and the Palace that became a city.' +
+    '</div>' +
+    '<div class="v2-whispers-ft">' +
+      '<span class="v2-whispers-count">9 chapters</span>' +
+      '<span class="v2-whispers-cta">Enter the Palace ' +
+        '<svg class="v2-icon v2-icon--sm"><use href="#ico-arrow-right"/></svg>' +
+      '</span>' +
+    '</div>';
+}
+
+// ── Ask bubble tooltip init ────────────────────────────────────────────────────
+function _v2InitAskBubble() {
+  var tip = document.getElementById('v2-ask-tip');
+  if (!tip) return;
+  if (localStorage.getItem('olly_tooltip_seen')) {
+    tip.classList.add('v2-ask-tip--out');
+    return;
+  }
+  function dismissTip() {
+    tip.classList.add('v2-ask-tip--out');
+    localStorage.setItem('olly_tooltip_seen', 'true');
+  }
+  var autoDismiss = setTimeout(dismissTip, 6000);
+  tip.addEventListener('click', function () {
+    clearTimeout(autoDismiss);
+    dismissTip();
+  }, { once: true });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('#v2-ask-wrap')) {
+      clearTimeout(autoDismiss);
+      dismissTip();
+    }
+  }, { once: true, capture: true });
+}
+
+// ── Ask bubble tap handler ─────────────────────────────────────────────────────
+function _v2AskTap() {
+  var tip = document.getElementById('v2-ask-tip');
+  if (tip && !tip.classList.contains('v2-ask-tip--out')) {
+    tip.classList.add('v2-ask-tip--out');
+    localStorage.setItem('olly_tooltip_seen', 'true');
+  }
+  gotoRoot('ask');
 }
