@@ -3399,7 +3399,7 @@ function mapRouteRecord(rec) {
     duration:         pickFirstNonEmpty(f['Trajanje (min)'], f.Duration, f.Trajanje, f.trajanje, ''),
     shortDesc:        pickFirstNonEmpty(f['Short Description'], f['Kratki opis'], ''),
     longDesc:         pickFirstNonEmpty(f['Opis rute'], f.Description, f.Opis, f['Long Description'], f.opis, ''),
-    startPointName:   pickFirstNonEmpty(f['Start Point'], f['Početak'], f['Pocetak'], ''),
+    startPointName:   pickFirstNonEmpty(f['Početna točka (POI)'], f['Start Point'], f['Početak'], f['Pocetak'], ''),
     startPointCoords: hasStart ? { lat: startLat, lng: startLng } : null,
     poiIds:           Array.isArray(rawPois) ? rawPois : [],
     profile:          pickFirstNonEmpty(f['Guest Profile'], f['Profil gosta'], f.Profil, f.profil, ''),

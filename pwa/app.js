@@ -471,17 +471,30 @@ function _updateWelcomeMeta() {
 
 // ── City Map ──────────────────────────────────────────────────────────────
 
-// Map each POI category string to an emoji for the marker
+// Map each POI category string to an emoji for the marker.
+// Covers both English Airtable values (Culture, History, Religion, Square,
+// Viewpoint, Waterfront, Nature, Market, Park, Street) and legacy Croatian names.
 function categoryToEmoji(cat) {
   const c = (cat || '').toLowerCase();
   if (c.includes('plaža') || c.includes('beach') || c.includes('kupanje')) return '🏖';
   if (c.includes('restoran') || c.includes('restaurant'))                   return '🍽';
   if (c.includes('kafić') || c.includes('kava') || c.includes('cafe') ||
       c.includes('bar') || c.includes('lounge'))                            return '☕';
-  if (c.includes('crkva') || c.includes('palača') || c.includes('muzej') ||
-      c.includes('kulturno') || c.includes('landmark') ||
-      c.includes('history') || c.includes('museum'))                        return '🏛';
-  if (c.includes('park') || c.includes('priroda') || c.includes('garden')) return '🌿';
+  if (c.includes('religion') || c.includes('crkva') ||
+      c.includes('cathedral') || c.includes('chapel'))                      return '⛪';
+  if (c.includes('viewpoint') || c.includes('pogled') ||
+      c.includes('vidikovac'))                                               return '🔭';
+  if (c.includes('waterfront') || c.includes('promenade') ||
+      c.includes('harbour') || c.includes('marina') ||
+      c.includes('luka') || c.includes('obala'))                            return '🌊';
+  if (c.includes('square') || c.includes('trg'))                           return '🏟';
+  if (c.includes('street') || c.includes('ulica'))                         return '🚶';
+  if (c.includes('culture') || c.includes('crkva') || c.includes('palača') ||
+      c.includes('muzej') || c.includes('kulturno') ||
+      c.includes('landmark') || c.includes('history') ||
+      c.includes('museum'))                                                  return '🏛';
+  if (c.includes('park') || c.includes('priroda') ||
+      c.includes('nature') || c.includes('garden'))                         return '🌿';
   if (c.includes('kupovina') || c.includes('shop') ||
       c.includes('market') || c.includes('tržnica'))                        return '🛍';
   if (c.includes('trajekt') || c.includes('ferry') ||
@@ -1681,6 +1694,9 @@ function boot() {
   const receptionNote = document.getElementById('reception-note');
   if (receptionNote) receptionNote.textContent = CONFIG.reception;
 
+  // Near Me subtitle
+  setText('nm-hotel-subtitle', 'Find places near ' + (CONFIG.hotelName || 'the hotel') + '.');
+
   // Info screen
   setText('info-hotel-name', CONFIG.hotelName);
   setText('info-address',    CONFIG.address    || '');
@@ -2612,30 +2628,62 @@ function _v2FormatDist(m) {
   return (m / 1000).toFixed(1).replace('.0', '') + ' km';
 }
 
-// ── POI category → gradient ────────────────────────────────────────────────────
+// ── POI category → gradient (Steps from your door card backgrounds) ───────────
+// Covers Airtable English values: Culture, History, Religion, Square,
+// Viewpoint, Waterfront, Nature, Market, Park, Street + legacy names.
 var _V2_POI_GRADIENTS = {
   'History':      'linear-gradient(155deg, #2c1a0e 0%, #5c3820 55%, #3a2510 100%)',
+  'Culture':      'linear-gradient(155deg, #1a1020 0%, #3a2050 100%)',
+  'Religion':     'linear-gradient(155deg, #1a1428 0%, #2c2040 100%)',
+  'Square':       'linear-gradient(155deg, #1c1810 0%, #3a3218 100%)',
+  'Viewpoint':    'linear-gradient(155deg, #0a1824 0%, #0e2d40 100%)',
+  'Waterfront':   'linear-gradient(155deg, #082030 0%, #0e3850 55%, #0a2840 100%)',
+  'Nature':       'linear-gradient(155deg, #0e2a10 0%, #1e4a20 100%)',
+  'Park':         'linear-gradient(155deg, #0a2010 0%, #184030 100%)',
+  'Market':       'linear-gradient(155deg, #1a1000 0%, #3a2800 100%)',
+  'Street':       'linear-gradient(155deg, #181818 0%, #2e2e2e 100%)',
   'Food & Drink': 'linear-gradient(155deg, #0a1a08 0%, #1c3818 100%)',
   'Beaches':      'linear-gradient(155deg, #083050 0%, #0e4870 55%, #083850 100%)',
-  'Nature':       'linear-gradient(155deg, #0e2a10 0%, #1e4a20 100%)',
   'Nightlife':    'linear-gradient(155deg, #1a0e2a 0%, #3a1060 100%)',
   'Shopping':     'linear-gradient(155deg, #2a1a10 0%, #50301a 100%)',
-  'Culture':      'linear-gradient(155deg, #1a1020 0%, #3a2050 100%)',
 };
 
 // ── Render Steps from your door from live poisData ─────────────────────────────
+// Sort: Sort Order (non-zero first) → walking distance → name.
+// Clicking a card opens that POI's detail screen directly.
 function _v2RenderStepsFromDoor() {
   var scroll = document.getElementById('v2-poi-scroll');
   if (!scroll) return;
   var pois = (typeof poisData !== 'undefined' && Array.isArray(poisData)) ? poisData : [];
   if (!pois.length) return;
-  scroll.innerHTML = pois.slice(0, 10).map(function (poi) {
+
+  // Parse leading number from dist string ("0–5 min" → 0, "5–10 min" → 5, etc.)
+  function _distNum(d) {
+    var m = (d || '').match(/^(\d+)/);
+    return m ? parseInt(m[1], 10) : 999;
+  }
+
+  var sorted = pois.slice().sort(function (a, b) {
+    var ao = (a.sortOrder && a.sortOrder > 0) ? a.sortOrder : 999;
+    var bo = (b.sortOrder && b.sortOrder > 0) ? b.sortOrder : 999;
+    if (ao !== bo) return ao - bo;
+    var ad = _distNum(a.dist), bd = _distNum(b.dist);
+    if (ad !== bd) return ad - bd;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  scroll.innerHTML = sorted.slice(0, 10).map(function (poi) {
     var name = poi.name     || '';
     var cat  = poi.category || '';
     var dist = poi.dist     || '';
+    var id   = poi.id       || '';
     var bg   = _V2_POI_GRADIENTS[cat] || 'linear-gradient(155deg, #14222d 0%, #1a3445 100%)';
+    // Each card opens the specific POI detail; safe string — Airtable IDs are alphanumeric
+    var clickHandler = id
+      ? 'onclick="_openAlwaysOnPoi(\'' + id + '\')"'
+      : 'onclick="gotoRoot(\'city-map\')"';
     return (
-      '<div class="v2-poi-card" onclick="openModule(\'near-me\')">' +
+      '<div class="v2-poi-card" ' + clickHandler + '>' +
         '<div class="v2-poi-card__bg" style="background:' + bg + '"></div>' +
         (dist ? '<div class="v2-poi-card__dist">' + _v2Esc(dist) + '</div>' : '') +
         '<div class="v2-poi-card__body">' +
