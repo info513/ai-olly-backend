@@ -3709,6 +3709,75 @@ app.post('/api/pwa-events', async (req, res) => {
   }
 });
 
+// ── /api/pwa-split-today-events — Split Today Events table (grouped) ─────────
+//
+// Input:  GET (no auth required — public event listings)
+// Output: { ok, today: [], thisWeek: [], upcoming: [] }
+//         Each event: { id, name, date, endDate, time, location, category, description, link }
+// -------------------------
+app.get('/api/pwa-split-today-events', async (req, res) => {
+  try {
+    // Compute today's date in Europe/Zagreb timezone
+    const nowZagreb = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Zagreb' }));
+    const y = nowZagreb.getFullYear();
+    const m = String(nowZagreb.getMonth() + 1).padStart(2, '0');
+    const d = String(nowZagreb.getDate()).padStart(2, '0');
+    const todayStr = `${y}-${m}-${d}`;
+
+    // "This week" = next 6 days from today
+    const weekEndDate = new Date(nowZagreb);
+    weekEndDate.setDate(nowZagreb.getDate() + 6);
+    const wy = weekEndDate.getFullYear();
+    const wm = String(weekEndDate.getMonth() + 1).padStart(2, '0');
+    const wd = String(weekEndDate.getDate()).padStart(2, '0');
+    const weekEndStr = `${wy}-${wm}-${wd}`;
+
+    // Fetch all current/future events from Split Today Events table
+    // Include: events that start today or later, OR multi-day events that haven't ended yet
+    const recs = await airtableSelectAll('Split Today Events', {
+      filterByFormula: `OR({Datum}>="${todayStr}", AND({Datum kraj}!="", {Datum kraj}>="${todayStr}"))`,
+      sort: [{ field: 'Datum', direction: 'asc' }],
+      pageSize: 100,
+    });
+
+    const events = recs.map(r => ({
+      id:          r.id,
+      name:        r.fields['Naziv']      || '',
+      date:        r.fields['Datum']      || '',
+      endDate:     r.fields['Datum kraj'] || '',
+      time:        r.fields['Vrijeme']    || '',
+      location:    r.fields['Lokacija']   || '',
+      category:    r.fields['Kategorija'] || '',
+      description: r.fields['Opis']       || '',
+      link:        r.fields['Link']       || '',
+    }));
+
+    // Group into today / thisWeek / upcoming
+    const today = [], thisWeek = [], upcoming = [];
+
+    events.forEach(ev => {
+      const start = ev.date;
+      const end   = ev.endDate || ev.date;
+
+      if (start <= todayStr && end >= todayStr) {
+        // Event is active today (single-day or multi-day spanning today)
+        today.push(ev);
+      } else if (start > todayStr && start <= weekEndStr) {
+        // Starts later this week (within 6 days)
+        thisWeek.push(ev);
+      } else if (start > todayStr) {
+        // Further in the future
+        upcoming.push(ev);
+      }
+    });
+
+    return res.json({ ok: true, today, thisWeek, upcoming });
+  } catch (e) {
+    console.error('pwa-split-today-events error:', e);
+    res.status(500).json({ ok: false, today: [], thisWeek: [], upcoming: [] });
+  }
+});
+
 // ── /api/pwa-feedback — save guest feedback after checkout ───────────────────
 //
 // Input:  { slug, room, token, overall, room_score, staff, location, cleanliness, comment }

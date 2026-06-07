@@ -18,8 +18,9 @@ let servicesScrollY  = 0;    // saved scroll position for services list
 let poisData         = null; // loaded from /api/pwa-pois
 let routesData       = null; // loaded from /api/pwa-routes
 let partnersData     = null; // loaded from /api/pwa-partners (Concierge)
-let eventsData       = null; // loaded from /api/pwa-events
-let currentEvent     = null; // currently open event
+let eventsData           = null; // loaded from /api/pwa-events (legacy)
+let splitTodayEventsData = null; // loaded from /api/pwa-split-today-events { today, thisWeek, upcoming }
+let currentEvent         = null; // currently open event
 let currentService   = null;
 let currentPoi       = null;
 let currentRoute     = null;
@@ -94,8 +95,8 @@ function _activateScreen(name, direction = 'forward') {
     // Reset to Weather Picks tab on each open
     activeEventsTab = 'today';
     document.querySelectorAll('.st-tab').forEach((b, i) => b.classList.toggle('st-tab--active', i === 0));
-    if (!eventsData) loadEvents();
-    else renderEventsList();
+    if (!splitTodayEventsData) loadSplitTodayEvents();
+    renderEventsList();
     // Populate weather badge from whatever is already in the V2 pill
     const wxCondEl = document.getElementById('v2-wx-cond');
     const wxTempEl = document.getElementById('v2-temp');
@@ -1705,7 +1706,7 @@ function boot() {
     loadPois();
     loadRoutes();
     loadPartners();
-    loadEvents();
+    loadSplitTodayEvents();
   }
 
   // Register push notifications if permission already granted (returning guest)
@@ -1724,6 +1725,19 @@ document.addEventListener('DOMContentLoaded', boot);
 
 let activeEventsTab = 'today'; // 'today' | 'upcoming' | 'alwayson'
 
+// ── Load Split Today Events from new grouped endpoint ─────────────────────────
+async function loadSplitTodayEvents() {
+  try {
+    const r    = await fetch('/api/pwa-split-today-events');
+    const data = await r.json();
+    if (data.ok) {
+      splitTodayEventsData = { today: data.today || [], thisWeek: data.thisWeek || [], upcoming: data.upcoming || [] };
+      if (currentScreen === 'events' && activeEventsTab === 'upcoming') renderEventsList();
+    }
+  } catch (_) { /* silent */ }
+}
+
+// ── Legacy loadEvents (kept for openEventDetail compatibility) ─────────────────
 async function loadEvents() {
   try {
     const r = await fetch('/api/pwa-events', {
@@ -1753,56 +1767,187 @@ function _formatEventDate(dateStr) {
   return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+// ── Main render dispatcher ────────────────────────────────────────────────────
 function renderEventsList() {
-  const list    = document.getElementById('events-list');
-  const loading = document.getElementById('events-loading');
+  const list = document.getElementById('events-list');
   if (!list) return;
-
   hide('events-loading');
 
-  if (!eventsData) {
-    list.innerHTML = '';
-    return;
-  }
-
-  const todayStr = new Date().toISOString().slice(0, 10);
-
-  let filtered;
   if (activeEventsTab === 'today') {
-    filtered = eventsData.filter(ev => ev.tip === 'Event' && ev.date === todayStr);
+    _renderWeatherPicksTab(list);
   } else if (activeEventsTab === 'upcoming') {
-    filtered = eventsData.filter(ev => ev.tip === 'Event' && ev.date > todayStr);
+    _renderSplitEventsTab(list);
   } else {
-    filtered = eventsData.filter(ev => ev.tip === 'Always on');
+    _renderAlwaysOnTab(list);
+  }
+}
+
+// ── Short date formatter: "Tue 10 Jun" ───────────────────────────────────────
+function _v2FormatEventDateShort(dateStr) {
+  if (!dateStr) return '';
+  const d  = new Date(dateStr + 'T12:00:00');
+  const dy = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return dy[d.getDay()] + ' ' + d.getDate() + ' ' + mo[d.getMonth()];
+}
+
+// ── Weather Picks tab — weather-aware recommended places ──────────────────────
+function _renderWeatherPicksTab(list) {
+  const h   = new Date().getHours();
+  const tod = h < 12 ? 'morning' : (h < 17 ? 'afternoon' : 'evening');
+
+  const wxCondEl = document.getElementById('v2-wx-cond');
+  const wxTempEl = document.getElementById('v2-temp');
+  const wxCond   = (wxCondEl && wxCondEl.textContent.trim() && wxCondEl.textContent.trim() !== ' ') ? wxCondEl.textContent.trim() : '';
+  const wxTempN  = wxTempEl ? parseInt(wxTempEl.textContent) : NaN;
+
+  const c       = wxCond.toLowerCase();
+  const isRainy = c.includes('rain') || c.includes('drizzle') || c.includes('shower') || c.includes('storm');
+  const isHot   = !isRainy && !isNaN(wxTempN) && wxTempN >= 32;
+  const isSunny = !isRainy && !isHot && (c === 'clear' || c.includes('sunny'));
+
+  let contextHtml = '';
+  if (wxCond) {
+    let wxNote = isRainy ? 'Rain today — best for covered and indoor sights.'
+               : isHot   ? 'Very warm today — go early morning or after sunset.'
+               : isSunny ? 'Sunny and pleasant — ideal for open-air walks and the Riva.'
+               :            'Mild conditions — comfortable for exploring all day.';
+    const tempPart = !isNaN(wxTempN) ? ', ' + wxTempN + '°' : '';
+    contextHtml = `<div class="st-wx-context"><strong>${escHtml(wxCond)}${tempPart}</strong> &mdash; ${wxNote}</div>`;
   }
 
-  if (filtered.length === 0) {
-    const msgs = {
-      today:    'No weather-based picks are available right now. Reception can always suggest what makes sense today.',
-      upcoming: 'No upcoming events are listed at the moment. Reception will be happy to suggest what is happening nearby.',
-      alwayson: 'No permanent attractions listed yet.',
-    };
-    list.innerHTML = `<p style="color:var(--text-secondary);font-size:14px;padding:8px 0">${msgs[activeEventsTab]}</p>`;
+  const places = isRainy
+    ? [
+        { name: "Diocletian's Cellars",    cat: 'Underground',  dist: '70 m',   note: 'Good choice if it rains'        },
+        { name: 'City Museum',             cat: 'Museum',        dist: '150 m',  note: 'Covered · all weather'          },
+        { name: 'Cathedral of St Domnius', cat: 'Cathedral',     dist: '80 m',   note: 'Covered · all weather'          },
+        { name: 'Meštrović Gallery',       cat: 'Art museum',    dist: '1.2 km', note: 'Indoor gallery'                 },
+        { name: 'City Library',            cat: 'Culture',       dist: '600 m',  note: 'Quiet indoor option'            },
+      ]
+    : isHot
+    ? [
+        { name: 'Bačvice Beach',           cat: 'Beach',         dist: '800 m',  note: 'Better in the morning heat'     },
+        { name: 'Riva Promenade',          cat: 'Waterfront',    dist: '100 m',  note: 'Sea breeze, best early morning' },
+        { name: "Diocletian's Cellars",    cat: 'Underground',   dist: '70 m',   note: 'Underground and cool'           },
+        { name: 'Marjan Hill',             cat: 'Nature',        dist: '1.5 km', note: 'Shaded forest paths'            },
+        { name: 'Sustipan Sunset Point',   cat: 'Viewpoint',     dist: '600 m',  note: 'Easy walk from the hotel'       },
+      ]
+    : [
+        { name: 'Peristyle',               cat: 'Roman ruins',   dist: '50 m',   note: 'Easy walk from the hotel'       },
+        { name: 'Riva Promenade',          cat: 'Waterfront',    dist: '100 m',  note: 'Sunny walk along the sea'       },
+        { name: 'Cathedral of St Domnius', cat: 'Cathedral',     dist: '80 m',   note: 'Best seen in morning light'     },
+        { name: 'Golden Gate',             cat: 'Roman gate',    dist: '200 m',  note: 'Easy walk from the hotel'       },
+        { name: tod === 'evening' ? 'Sustipan Sunset Point' : 'Bačvice Beach',
+          cat:  tod === 'evening' ? 'Viewpoint'              : 'Beach',
+          dist: tod === 'evening' ? '600 m'                  : '800 m',
+          note: tod === 'evening' ? 'Ideal for sunset'       : 'Easy walk from the hotel' },
+      ];
+
+  const rowsHtml = places.map(p => `
+    <div class="st-wp-row" onclick="openModule('near-me')">
+      <div class="st-wp-row__body">
+        <div class="st-wp-row__name">${escHtml(p.name)}</div>
+        <div class="st-wp-row__note">${escHtml(p.note)}</div>
+      </div>
+      <div class="st-wp-row__right">
+        <span class="st-wp-row__cat">${escHtml(p.cat)}</span>
+        <span class="st-wp-row__dist">${p.dist}</span>
+      </div>
+    </div>`).join('');
+
+  list.innerHTML = contextHtml + `<div class="st-wp-list">${rowsHtml}</div>`;
+}
+
+// ── Events tab — grouped Split Today Events ───────────────────────────────────
+function _renderSplitEventsTab(list) {
+  if (!splitTodayEventsData) {
+    list.innerHTML = '<p class="st-empty">Loading events…</p>';
     return;
   }
 
-  // Map filtered items back to global eventsData indices for detail navigation
-  list.innerHTML = filtered.map(ev => {
-    const globalIdx = eventsData.indexOf(ev);
-    const showDate  = ev.tip === 'Event' && ev.date;
-    return `
-      <div class="ev-card" onclick="openEventDetail(${globalIdx})">
-        <div class="ev-card-header">
-          ${showDate ? `<div class="ev-card-date">${_formatEventDate(ev.date)}</div>` : ''}
-          <div class="ev-card-name">${escHtml(ev.name)}</div>
-        </div>
-        <div class="ev-card-body">
-          <div class="ev-card-desc">${escHtml(ev.description)}</div>
-          <div class="ev-card-arrow">Read more →</div>
-        </div>
+  const { today, thisWeek, upcoming } = splitTodayEventsData;
+
+  if (!today.length && !thisWeek.length && !upcoming.length) {
+    list.innerHTML = '<p class="st-empty">No upcoming events are listed at the moment. Reception will be happy to suggest what is happening nearby.</p>';
+    return;
+  }
+
+  function renderGroup(title, evs, emptyMsg) {
+    const cardsHtml = evs.length
+      ? evs.map(ev => _renderSplitEventCard(ev)).join('')
+      : `<p class="st-empty-sm">${emptyMsg}</p>`;
+    return `<div class="st-group"><div class="st-group-hd">${title}</div>${cardsHtml}</div>`;
+  }
+
+  list.innerHTML =
+    renderGroup('Today',     today,    'No special events listed for today. Reception will be happy to suggest what is happening nearby.') +
+    renderGroup('This Week', thisWeek, 'No listed events for the rest of this week.') +
+    renderGroup('Upcoming',  upcoming, 'No upcoming events are listed at the moment.');
+}
+
+function _renderSplitEventCard(ev) {
+  const dateLabel = ev.endDate && ev.endDate !== ev.date
+    ? _v2FormatEventDateShort(ev.date) + ' – ' + _v2FormatEventDateShort(ev.endDate)
+    : _v2FormatEventDateShort(ev.date);
+
+  const metaParts = [];
+  if (ev.time)     metaParts.push(`<span>${escHtml(ev.time)}</span>`);
+  if (ev.location) metaParts.push(`<span>${escHtml(ev.location)}</span>`);
+  const metaHtml = metaParts.join(' <span class="st2-dot">&middot;</span> ');
+
+  const linkAttr = ev.link ? ` data-link="${escHtml(ev.link)}" onclick="_v2OpenSplitEventLink(this)"` : '';
+  const cls      = ev.link ? 'st2-card' : 'st2-card st2-card--no-link';
+
+  return `
+    <div class="${cls}"${linkAttr}>
+      <div class="st2-card__hd">
+        ${ev.category ? `<span class="st2-card__cat">${escHtml(ev.category)}</span>` : ''}
+        <span class="st2-card__date">${dateLabel}</span>
       </div>
-    `;
-  }).join('');
+      <div class="st2-card__name">${escHtml(ev.name)}</div>
+      ${metaHtml ? `<div class="st2-card__meta">${metaHtml}</div>` : ''}
+      ${ev.description ? `<div class="st2-card__desc">${escHtml(ev.description)}</div>` : ''}
+      ${ev.link ? '<div class="st2-card__link">More info →</div>' : ''}
+    </div>`;
+}
+
+function _v2OpenSplitEventLink(el) {
+  const link = el.getAttribute('data-link');
+  if (link) _openExternal(link);
+}
+
+// ── Always On tab — hardcoded permanent Split highlights ──────────────────────
+function _renderAlwaysOnTab(list) {
+  const places = [
+    { name: "Diocletian's Palace",        cat: 'Roman site',     dist: '50 m',   desc: 'A living Roman palace turned city — the heart of Split.' },
+    { name: 'Peristyle',                  cat: 'Roman ruins',    dist: '50 m',   desc: 'Central courtyard of the Palace. Atmospheric at any hour.' },
+    { name: 'Cathedral of St. Domnius',   cat: 'Cathedral',      dist: '80 m',   desc: 'One of the oldest cathedrals in the world, built in a Roman mausoleum.' },
+    { name: "Diocletian's Cellars",       cat: 'Underground',    dist: '70 m',   desc: 'The basement of the Palace. Cool, well-preserved, and impressive.' },
+    { name: 'Riva Promenade',             cat: 'Waterfront',     dist: '100 m',  desc: "Split's waterfront promenade — the city's living room." },
+    { name: 'Golden Gate',                cat: 'Roman gate',     dist: '200 m',  desc: 'The most impressive of the four original Palace gates.' },
+    { name: 'Matejuška Harbour',          cat: 'Harbour',        dist: '300 m',  desc: 'A small fishing harbour with bars and a relaxed local feel.' },
+    { name: 'Green Market (Pazar)',        cat: 'Market',         dist: '400 m',  desc: 'Daily open-air market just outside the eastern Palace wall.' },
+    { name: 'Fish Market',                cat: 'Market',         dist: '350 m',  desc: 'Best early morning — fresh Adriatic catch daily.' },
+    { name: 'Bačvice Beach',              cat: 'Beach',          dist: '800 m',  desc: 'Famous for the picigin ball game. Sandy, shallow, and lively.' },
+    { name: 'Sustipan Sunset Point',      cat: 'Viewpoint',      dist: '600 m',  desc: 'The best spot in Split for a quiet sunset over the Adriatic.' },
+    { name: 'Marjan Hill',                cat: 'Nature & views', dist: '1.5 km', desc: 'Forested hill with sea views and peaceful walking paths.' },
+  ];
+
+  const rowsHtml = places.map(p => `
+    <div class="st-ao-item" onclick="openModule('near-me')">
+      <div class="st-ao-item__body">
+        <div class="st-ao-item__name">${escHtml(p.name)}</div>
+        <div class="st-ao-item__desc">${escHtml(p.desc)}</div>
+      </div>
+      <div class="st-ao-item__right">
+        <span class="st-ao-item__cat">${escHtml(p.cat)}</span>
+        <span class="st-ao-item__dist">${p.dist}</span>
+      </div>
+    </div>`).join('');
+
+  list.innerHTML =
+    '<p class="st-ao-intro">Permanent Split highlights — worth visiting any day, in any weather.</p>' +
+    `<div class="st-ao-list">${rowsHtml}</div>`;
 }
 
 function openEventDetail(idx) {
