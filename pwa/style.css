@@ -255,10 +255,11 @@ html, body {
 }
 
 .perm-card-icon {
-  font-size: 26px;
   line-height: 1;
   flex-shrink: 0;
   padding-top: 2px;
+  display: flex;
+  align-items: center;
 }
 
 .perm-card-body {
@@ -431,7 +432,7 @@ html, body {
   letter-spacing: 0.05em;
 }
 .wf-day--today .wf-label { color: rgba(255,255,255,0.85); }
-.wf-icon { font-size: 20px; line-height: 1; }
+.wf-icon { line-height: 1; display: flex; align-items: center; justify-content: center; }
 .wf-max {
   font-size: 13px;
   font-weight: 700;
@@ -521,7 +522,7 @@ html, body {
 }
 
 .action-label { flex: 1; text-align: left; }
-.action-icon  { font-size: 20px; }
+.action-icon  { display: flex; align-items: center; justify-content: center; width: 24px; }
 
 .soon-tag {
   font-size: 11px;
@@ -1117,7 +1118,6 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
 }
 
 .map-cat-panel-item-info {
@@ -1330,7 +1330,7 @@ html, body {
 
 .nm-card:active { background: var(--accent-light); transform: scale(0.96); }
 
-.nm-card-icon { font-size: 32px; line-height: 1; }
+.nm-card-icon { line-height: 1; display: flex; align-items: center; justify-content: center; }
 
 .nm-card-label {
   font-size: 14px;
@@ -1375,46 +1375,16 @@ html, body {
   background: linear-gradient(145deg, #112240 0%, #0e3a5c 45%, #1a2a4e 100%);
 }
 
-.screen-hero--events::after {
-  content: '🎭';
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0 32px;
-  font-size: 56px;
-  height: 100%;
-  opacity: 0.35;
-}
 
 .screen-hero--near-me {
   background: linear-gradient(145deg, #1a3028 0%, #0f2a20 50%, #1e3a2a 100%);
 }
 
-.screen-hero--near-me::after {
-  content: '🗺️';
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0 32px;
-  font-size: 56px;
-  height: 100%;
-  opacity: 0.35;
-}
 
 .screen-hero--help {
   background: linear-gradient(145deg, #3e2a1a 0%, #2c1f14 55%, #1e2e3e 100%);
 }
 
-.screen-hero--help::after {
-  content: '🛎️';
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0 32px;
-  font-size: 56px;
-  height: 100%;
-  opacity: 0.35;
-}
 
 /* ── Help hub ────────────────────────────────────────────────────────────── */
 
@@ -2360,8 +2330,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 48px;
   margin-bottom: 20px;
+  opacity: 0.85;
 }
 .ev-detail-name {
   font-family: var(--font-serif);
@@ -2430,9 +2400,10 @@ html, body {
 .conc-item:active { background: rgba(0,0,0,0.04); }
 
 .conc-item-icon {
-  font-size: 26px;
   width: 36px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
@@ -2535,7 +2506,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 48px;
+  opacity: 0.9;
 }
 
 .form-group {
@@ -2648,7 +2619,6 @@ html, body {
   border-radius: 50%;
   background: linear-gradient(135deg, var(--gold) 0%, #b8860b 100%);
   color: #fff;
-  font-size: 36px;
   display: flex;
   align-items: center;
   justify-content: center;

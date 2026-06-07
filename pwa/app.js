@@ -232,44 +232,115 @@ function renderRoomSection(section) {
   body.innerHTML = html;
 }
 
+// ── SVG Icon System ───────────────────────────────────────────────────────
+// Centralised map: icon name → SVG inner paths (24×24 viewBox, Feather/Lucide)
+const OLLY_ICONS = {
+  // Services & accommodation
+  bell:           `<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>`,
+  bed:            `<path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>`,
+  sparkle:        `<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>`,
+  coffee:         `<path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/>`,
+  car:            `<path d="M19 17H5v-8l2-4h10l2 4v8z"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/>`,
+  clipboard:      `<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h4"/>`,
+  star:           `<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>`,
+  // Transport
+  walking:        `<circle cx="12" cy="4" r="1"/><path d="m6.8 20 1.2-7 2 2 2-8"/><path d="m16 20-2-9"/><path d="M7.2 11.8 10 10l3.5 1.5"/>`,
+  bike:           `<circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/>`,
+  anchor:         `<circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="21"/><path d="M5 15H2a10 10 0 0 0 20 0h-3"/>`,
+  ferry:          `<path d="M2 21c0 0 3-2 10-2s10 2 10 2"/><path d="M2 14l10-3 10 3"/><path d="M5 14V9l7-4 7 4v5"/>`,
+  taxi:           `<path d="M10 2h4"/><path d="m21 8-2 2-1.5-3.7A2 2 0 0 0 15.646 5H8.4a2 2 0 0 0-1.903 1.257L5 10 3 8"/><path d="M7 14h.01"/><path d="M17 14h.01"/><rect width="18" height="8" x="3" y="10" rx="2"/><path d="M5 18v2"/><path d="M19 18v2"/>`,
+  bus:            `<path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/>`,
+  shuttle:        `<path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/>`,
+  // Places / POI
+  landmark:       `<line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/>`,
+  church:         `<path d="m18 7 4 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9l4-2"/><path d="M14 22v-4a2 2 0 0 0-4 0v4"/><path d="M18 22V5l-6-3-6 3v17"/><path d="M12 7v5"/><path d="M10 9h4"/>`,
+  binoculars:     `<circle cx="6" cy="16" r="4"/><circle cx="18" cy="16" r="4"/><path d="M14 16h-4"/><path d="M6 12V7l3-3h6l3 3v5"/><line x1="12" y1="4" x2="12" y2="7"/>`,
+  waves:          `<path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>`,
+  beach:          `<path d="M23 12a11.05 11.05 0 0 0-22 0zm-5 7a3 3 0 0 1-6 0v-7"/>`,
+  leaf:           `<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>`,
+  'shopping-bag': `<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>`,
+  music:          `<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>`,
+  'credit-card':  `<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>`,
+  pill:           `<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/>`,
+  'map-pin':      `<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>`,
+  // Meta & actions
+  map:            `<polygon points="3 6 3 22 10 18 17 22 21 18 21 2 17 6 10 2 3 6"/><line x1="10" y1="2" x2="10" y2="18"/><line x1="17" y1="6" x2="17" y2="22"/>`,
+  clock:          `<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>`,
+  alarm:          `<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="m5 3-3 3m20-3-3 3"/>`,
+  phone:          `<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.13 12 19.79 19.79 0 0 1 1.06 3.4 2 2 0 0 1 3.03 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.09 8.91A16 16 0 0 0 13 14.82l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21 16z"/>`,
+  alert:          `<path d="m10.29 3.86-8.47 14.67A2 2 0 0 0 3.54 21h16.92a2 2 0 0 0 1.72-3.47L13.71 2.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>`,
+  wifi:           `<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9A16 16 0 0 1 22.58 9"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>`,
+  snowflake:      `<line x1="12" y1="2" x2="12" y2="22"/><path d="m17 7-5-5-5 5"/><path d="m17 17-5 5-5-5"/><line x1="2" y1="12" x2="22" y2="12"/><path d="m7 7-5 5 5 5"/><path d="m17 7 5 5-5 5"/>`,
+  tv:             `<rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>`,
+  lock:           `<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>`,
+  utensils:       `<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><line x1="7" y1="2" x2="7" y2="11"/><path d="M21 15V2a5 5 0 0 0-5 5v6h3l-1 8h3l-1-8h1z"/>`,
+  wine:           `<path d="M8 22h8"/><path d="M7 10h10"/><path d="M12 15v7"/><path d="M12 15a5 5 0 0 0 5-5c0-2-.5-4-2-8H7c-1.5 4-2 6-2 8a5 5 0 0 0 5 5z"/>`,
+  moon:           `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`,
+  dollar:         `<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>`,
+  drama:          `<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>`,
+  kayak:          `<path d="M2 12h20"/><path d="m6 8-4 4 4 4"/><path d="m18 8 4 4-4 4"/><circle cx="12" cy="12" r="2"/>`,
+  history:        `<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>`,
+  parking:        `<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/>`,
+  cart:           `<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>`,
+  beer:           `<path d="M17 11h1a3 3 0 0 1 0 6h-1"/><path d="M9 12v6"/><path d="M13 12v6"/><path d="M14 7.5c-1 0-1.44.5-3 .5s-2-.5-3-.5-1.72.5-2.5.5a2.5 2.5 0 0 1 0-5c.78 0 1.57.5 2.5.5S9.44 3 11 3s2 .5 3 .5 1.5-.5 2-.5a2.5 2.5 0 0 1 0 5c-.5 0-1-.5-2-.5z"/><path d="M5 8v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8"/>`,
+  siren:          `<path d="M11.5 2h1v2h-1z"/><path d="M3.05 12.29A9 9 0 0 1 21 12"/><path d="M3 16h18v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m6.26 6.26 1.41 1.41"/><path d="m16.33 7.67 1.41-1.41"/>`,
+  ambulance:      `<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>`,
+  // Weather
+  'w-sun':        `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`,
+  'w-cloud-sun':  `<path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/><path d="M10.5 8.5a4 4 0 0 1 0 8H7a3 3 0 0 1 0-6h.5a4 4 0 0 1 3-2z"/>`,
+  'w-cloud':      `<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/>`,
+  'w-fog':        `<path d="M5 5h3m4 0h9M3 10h11m4 0h1M1 15h14m4 0h1M5 20h5m4 0h5"/>`,
+  'w-rain':       `<path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="8" y1="23" x2="8" y2="24"/><line x1="12" y1="18" x2="12" y2="20"/><line x1="12" y1="22" x2="12" y2="23"/><line x1="16" y1="19" x2="16" y2="21"/><line x1="16" y1="23" x2="16" y2="24"/>`,
+  'w-snow':       `<path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"/><line x1="8" y1="20" x2="8" y2="24"/><line x1="12" y1="20" x2="12" y2="24"/><line x1="16" y1="20" x2="16" y2="24"/>`,
+  'w-storm':      `<path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"/><polyline points="13 11 9 17 15 17 11 23"/>`,
+};
+
+// Returns an inline SVG string. size defaults to 20; color defaults to currentColor.
+function _icon(name, size, color) {
+  const sz   = size  || 20;
+  const col  = color || 'currentColor';
+  const body = OLLY_ICONS[name] || OLLY_ICONS['map-pin'];
+  return `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;vertical-align:middle;">${body}</svg>`;
+}
+
 // ── Hotel Services ────────────────────────────────────────────────────────
 
 function _routeIcon(type) {
   const t = (type || '').toLowerCase();
-  if (/cycl|bike/.test(t))       return '🚴';
-  if (/driv|car/.test(t))        return '🚗';
-  if (/boat|sea|kayak/.test(t))  return '⛵';
-  return '🚶';
+  if (/cycl|bike/.test(t))       return _icon('bike');
+  if (/driv|car/.test(t))        return _icon('car');
+  if (/boat|sea|kayak/.test(t))  return _icon('anchor');
+  return _icon('walking');
 }
 
 const SERVICE_GROUPS = [
-  { id: 'arrival', icon: '🛎', label: 'Arrival & Reception',
+  { id: 'arrival', icon: 'bell', label: 'Arrival & Reception',
     keywords: ['reception', 'check-in', 'check in', 'check out', 'check-out',
                'late arrival', 'luggage', 'contact', 'direct booking',
                'booking & offers', 'booking and offers', 'r1', 'tourist tax',
                'invoice', 'payment', 'front desk', 'concierge'] },
-  { id: 'room', icon: '🛏', label: 'Room Comfort',
+  { id: 'room', icon: 'bed', label: 'Room Comfort',
     keywords: ['room feature', 'room/communication', 'air condition', 'television', ' tv',
                'safe', 'smart glass', 'minibar', 'pillow', 'blanket',
                'room service', 'room layout', 'room view', 'twin bed',
                'extra bed', 'family room', 'rooms & booking', 'rooms and booking',
                'family & booking', 'family and booking', 'family & comfort',
                'family and comfort', 'family comfort'] },
-  { id: 'housekeeping', icon: '✨', label: 'Housekeeping & Laundry',
+  { id: 'housekeeping', icon: 'sparkle', label: 'Housekeeping & Laundry',
     keywords: ['housekeep', 'laundry', 'towel', 'linen', 'clean',
                'do not disturb', 'fabric softener', 'washing not', 'drying not'] },
-  { id: 'food', icon: '☕', label: 'Breakfast & Food',
+  { id: 'food', icon: 'coffee', label: 'Breakfast & Food',
     keywords: ['food and beverage', 'food & beverage', 'beverage', 'breakfast',
                'dietary', 'kids breakfast', 'room breakfast', 'local food',
                'drink', 'meal', 'dining', 'where locals eat'] },
-  { id: 'transport', icon: '🚗', label: 'Transport & Parking',
+  { id: 'transport', icon: 'car', label: 'Transport & Parking',
     keywords: ['parking', 'airport', 'taxi', 'ferry', 'bus station',
                'boat tour', 'island trip', 'private transport', 'transfer', 'shuttle'] },
-  { id: 'policies', icon: '📋', label: 'Policies & Safety',
+  { id: 'policies', icon: 'clipboard', label: 'Policies & Safety',
     keywords: ['house rule', 'safety', 'security', 'emergency', 'fire',
                'smoking', 'pet policy', 'quiet hour', 'cooking not',
                'key policy', 'cctv', 'rule', 'policy', 'payment method'] },
-  { id: 'experiences', icon: '🌟', label: 'Local Experiences',
+  { id: 'experiences', icon: 'star', label: 'Local Experiences',
     keywords: ['fun and relax', 'fun & relax', 'one day in split', 'sunset',
                'beach', 'private tour', 'rainy day', 'souvenir',
                'authentic', 'local experience', 'split guide', 'restaurant',
@@ -314,7 +385,7 @@ function renderServicesList() {
   container.innerHTML = `<div class="section-list">${
     serviceCategories.map((entry, idx) => `
       <div class="section-item" onclick="openServicesCategory(${idx})">
-        <span>${entry.icon}</span>
+        ${_icon(entry.icon)}
         <span>${escHtml(entry.cat)}</span>
         <span class="section-arrow">&#8250;</span>
       </div>`).join('')
@@ -330,7 +401,7 @@ function openServicesCategory(idx) {
     container.innerHTML = `<div class="section-list">${
       entry.items.map(({ s, i }) => `
         <div class="section-item" onclick="openServiceDetail(${i})">
-          <span>${entry.icon}</span>
+          ${_icon(entry.icon)}
           <span>${escHtml(s.naziv || '')}</span>
           <span class="section-arrow">&#8250;</span>
         </div>`).join('')
@@ -471,45 +542,45 @@ function _updateWelcomeMeta() {
 
 // ── City Map ──────────────────────────────────────────────────────────────
 
-// Map each POI category string to an emoji for the marker.
+// Map each POI category string to an icon name (used with _icon()).
 // Covers both English Airtable values (Culture, History, Religion, Square,
 // Viewpoint, Waterfront, Nature, Market, Park, Street) and legacy Croatian names.
-function categoryToEmoji(cat) {
+function _categoryIcon(cat) {
   const c = (cat || '').toLowerCase();
-  if (c.includes('plaža') || c.includes('beach') || c.includes('kupanje')) return '🏖';
-  if (c.includes('restoran') || c.includes('restaurant'))                   return '🍽';
+  if (c.includes('plaža') || c.includes('beach') || c.includes('kupanje')) return 'beach';
+  if (c.includes('restoran') || c.includes('restaurant'))                   return 'utensils';
   if (c.includes('kafić') || c.includes('kava') || c.includes('cafe') ||
-      c.includes('bar') || c.includes('lounge'))                            return '☕';
+      c.includes('bar') || c.includes('lounge'))                            return 'coffee';
   if (c.includes('religion') || c.includes('crkva') ||
-      c.includes('cathedral') || c.includes('chapel'))                      return '⛪';
+      c.includes('cathedral') || c.includes('chapel'))                      return 'church';
   if (c.includes('viewpoint') || c.includes('pogled') ||
-      c.includes('vidikovac'))                                               return '🔭';
+      c.includes('vidikovac'))                                               return 'binoculars';
   if (c.includes('waterfront') || c.includes('promenade') ||
       c.includes('harbour') || c.includes('marina') ||
-      c.includes('luka') || c.includes('obala'))                            return '🌊';
-  if (c.includes('square') || c.includes('trg'))                           return '🏟';
-  if (c.includes('street') || c.includes('ulica'))                         return '🚶';
+      c.includes('luka') || c.includes('obala'))                            return 'waves';
+  if (c.includes('square') || c.includes('trg'))                           return 'landmark';
+  if (c.includes('street') || c.includes('ulica'))                         return 'walking';
   if (c.includes('culture') || c.includes('crkva') || c.includes('palača') ||
       c.includes('muzej') || c.includes('kulturno') ||
       c.includes('landmark') || c.includes('history') ||
-      c.includes('museum'))                                                  return '🏛';
+      c.includes('museum'))                                                  return 'landmark';
   if (c.includes('park') || c.includes('priroda') ||
-      c.includes('nature') || c.includes('garden'))                         return '🌿';
+      c.includes('nature') || c.includes('garden'))                         return 'leaf';
   if (c.includes('kupovina') || c.includes('shop') ||
-      c.includes('market') || c.includes('tržnica'))                        return '🛍';
+      c.includes('market') || c.includes('tržnica'))                        return 'shopping-bag';
   if (c.includes('trajekt') || c.includes('ferry') ||
-      c.includes('prijevoz') || c.includes('transport'))                    return '⛴';
-  if (c.includes('noćni') || c.includes('night') || c.includes('club'))    return '🎵';
-  if (c.includes('atm') || c.includes('bankomat'))                         return '🏧';
-  if (c.includes('ljekarna') || c.includes('pharmacy'))                    return '💊';
-  return '📍';
+      c.includes('prijevoz') || c.includes('transport'))                    return 'ferry';
+  if (c.includes('noćni') || c.includes('night') || c.includes('club'))    return 'music';
+  if (c.includes('atm') || c.includes('bankomat'))                         return 'credit-card';
+  if (c.includes('ljekarna') || c.includes('pharmacy'))                    return 'pill';
+  return 'map-pin';
 }
 
 function createPoiIcon(category) {
-  const emoji = categoryToEmoji(category);
+  const ico = _categoryIcon(category);
   return L.divIcon({
     className: '',
-    html: `<div style="width:34px;height:34px;background:#fff;border:2.5px solid #c9a227;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 2px 10px rgba(0,0,0,0.22);cursor:pointer;">${emoji}</div>`,
+    html: `<div style="width:34px;height:34px;background:#fff;border:2.5px solid #c9a227;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,0.22);cursor:pointer;">${_icon(ico, 17, '#2c1f14')}</div>`,
     iconSize: [34, 34],
     iconAnchor: [17, 17],
   });
@@ -517,10 +588,10 @@ function createPoiIcon(category) {
 
 // Selected state — larger, dark background, gold ring, pulse animation via CSS class
 function createPoiIconSelected(category) {
-  const emoji = categoryToEmoji(category);
+  const ico = _categoryIcon(category);
   return L.divIcon({
     className: 'poi-marker-selected',
-    html: `<div style="width:42px;height:42px;background:#2c1f14;border:3px solid #c9a227;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 0 0 6px rgba(201,162,39,0.25),0 4px 16px rgba(0,0,0,0.4);cursor:pointer;">${emoji}</div>`,
+    html: `<div style="width:42px;height:42px;background:#2c1f14;border:3px solid #c9a227;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 6px rgba(201,162,39,0.25),0 4px 16px rgba(0,0,0,0.4);cursor:pointer;">${_icon(ico, 22, '#f5edd8')}</div>`,
     iconSize: [42, 42],
     iconAnchor: [21, 21],
   });
@@ -563,7 +634,7 @@ function initCityMap() {
   // Hotel marker — distinctive star in dark circle
   const hotelIcon = L.divIcon({
     className: '',
-    html: '<div style="width:38px;height:38px;background:#2c1f14;border:3px solid #f5edd8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 3px 12px rgba(0,0,0,0.45);">⭐</div>',
+    html: `<div style="width:38px;height:38px;background:#2c1f14;border:3px solid #f5edd8;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,0.45);">${_icon('star', 20, '#f5edd8')}</div>`,
     iconSize: [38, 38],
     iconAnchor: [19, 19],
   });
@@ -620,7 +691,7 @@ function buildMapFilterChips() {
   cats.forEach(cat => {
     const chip = document.createElement('button');
     chip.className = 'map-filter-chip';
-    chip.textContent = categoryToEmoji(cat) + '\u2009' + cat;
+    chip.innerHTML = _icon(_categoryIcon(cat), 14) + '\u2009' + escHtml(cat);
     chip.dataset.cat = cat;
     chip.onclick = () => filterMapPois(cat);
     bar.appendChild(chip);
@@ -661,15 +732,14 @@ function openMapCategoryPanel(category) {
   const listEl   = document.getElementById('map-cat-panel-list');
   if (!panel || !titleEl || !listEl) return;
 
-  const emoji = categoryToEmoji(category);
-  titleEl.textContent = emoji + '\u2009' + category;
+  titleEl.innerHTML = _icon(_categoryIcon(category), 18) + '\u2009' + escHtml(category);
 
   const items = poiMarkers.filter(({ poi }) => poi.category === category);
 
   listEl.innerHTML = items.length
     ? items.map(({ poi, idx }) => `
         <div class="map-cat-panel-item" onclick="panToPoiAndShowCard(${idx})">
-          <div class="map-cat-panel-icon">${categoryToEmoji(poi.category)}</div>
+          <div class="map-cat-panel-icon">${_icon(_categoryIcon(poi.category), 20)}</div>
           <div class="map-cat-panel-item-info">
             <div class="map-cat-panel-item-name">${escHtml(poi.name)}</div>
             <div class="map-cat-panel-item-meta">${[poi.dist, poi.visit].filter(Boolean).join(' \u00b7 ') || ''}</div>
@@ -735,11 +805,12 @@ function _populatePoiDetail(poi) {
   setText('poi-category', poi.category);
   setText('poi-name', poi.name);
 
-  // Meta line: 📍 distance  ·  🕐 visit duration
+  // Meta line: pin distance  ·  clock visit duration
   const parts = [];
-  if (poi.dist)  parts.push('📍 ' + poi.dist);
-  if (poi.visit) parts.push('🕐 ' + poi.visit);
-  setText('poi-meta', parts.join('   ·   '));
+  if (poi.dist)  parts.push(_icon('map-pin', 14) + ' ' + poi.dist);
+  if (poi.visit) parts.push(_icon('clock', 14) + ' ' + poi.visit);
+  const metaEl = document.getElementById('poi-meta');
+  if (metaEl) metaEl.innerHTML = parts.join('<span style="opacity:0.4;padding:0 6px;">·</span>');
 
   setText('poi-short-desc', poi.shortDesc);
   setText('poi-long-desc', poi.longDesc);
@@ -894,7 +965,7 @@ function initRouteMap() {
   // Start marker — hotel star
   const startIcon = L.divIcon({
     className: '',
-    html: '<div style="width:32px;height:32px;background:#2c1f14;border:2.5px solid #f5edd8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.35);">⭐</div>',
+    html: `<div style="width:32px;height:32px;background:#2c1f14;border:2.5px solid #f5edd8;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.35);">${_icon('star', 16, '#f5edd8')}</div>`,
     iconSize: [32, 32],
     iconAnchor: [16, 16],
   });
@@ -941,12 +1012,12 @@ function navigateToRouteStart() {
 
 // ── Near Me ───────────────────────────────────────────────────────────────
 const NM_CATEGORIES = [
-  { id: 'landmarks',   label: 'Landmarks',          icon: '🏛', query: 'landmarks+historic+sites' },
-  { id: 'beach',       label: 'Beach',               icon: '🏖', query: 'beach' },
-  { id: 'pharmacy',    label: 'Pharmacy',             icon: '💊', query: 'pharmacy' },
-  { id: 'atm',         label: 'ATM',                  icon: '🏧', query: 'ATM' },
-  { id: 'supermarket', label: 'Supermarket',          icon: '🛒', query: 'supermarket' },
-  { id: 'transport',   label: 'Ferry / Bus / Taxi',   icon: '🚌', query: 'ferry+bus+stop+taxi' },
+  { id: 'landmarks',   label: 'Landmarks',          icon: 'landmark',     query: 'landmarks+historic+sites' },
+  { id: 'beach',       label: 'Beach',               icon: 'beach',        query: 'beach' },
+  { id: 'pharmacy',    label: 'Pharmacy',             icon: 'pill',         query: 'pharmacy' },
+  { id: 'atm',         label: 'ATM',                  icon: 'credit-card',  query: 'ATM' },
+  { id: 'supermarket', label: 'Supermarket',          icon: 'cart',         query: 'supermarket' },
+  { id: 'transport',   label: 'Ferry / Bus / Taxi',   icon: 'bus',          query: 'ferry+bus+stop+taxi' },
 ];
 
 function openNearMeCategory(catId) {
@@ -1527,16 +1598,16 @@ function getGreeting() {
 }
 
 function _wmoIcon(code) {
-  if (code === 0)               return '☀️';
-  if (code <= 2)                return '🌤️';
-  if (code <= 3)                return '☁️';
-  if (code <= 48)               return '🌫️';
-  if (code <= 57)               return '🌦️';
-  if (code <= 67)               return '🌧️';
-  if (code <= 77)               return '❄️';
-  if (code <= 82)               return '🌦️';
-  if (code <= 86)               return '🌨️';
-  return '⛈️';
+  if (code === 0)               return _icon('w-sun',       20, '#f5c842');
+  if (code <= 2)                return _icon('w-cloud-sun', 20, '#c9a227');
+  if (code <= 3)                return _icon('w-cloud',     20, '#a0aab4');
+  if (code <= 48)               return _icon('w-fog',       20, '#a0aab4');
+  if (code <= 57)               return _icon('w-rain',      20, '#7ab0d0');
+  if (code <= 67)               return _icon('w-rain',      20, '#5090b0');
+  if (code <= 77)               return _icon('w-snow',      20, '#c0d8f0');
+  if (code <= 82)               return _icon('w-rain',      20, '#7ab0d0');
+  if (code <= 86)               return _icon('w-snow',      20, '#c0d8f0');
+  return _icon('w-storm', 20, '#9080c0');
 }
 
 function renderWeatherForecast(daily) {
@@ -1994,22 +2065,22 @@ function openEventDetail(idx) {
   currentEvent = eventsData[idx];
   if (!currentEvent) return;
 
-  // Hero emoji based on keywords
+  // Hero icon based on event keywords
   const name = currentEvent.name.toLowerCase();
-  let emoji = '🎭';
-  if (name.includes('wine') || name.includes('tasting'))                              emoji = '🍷';
-  else if (name.includes('kayak') || name.includes('swim') || name.includes('sea'))   emoji = '🚣';
-  else if (name.includes('music') || name.includes('concert') || name.includes('festival') || name.includes('singing')) emoji = '🎶';
-  else if (name.includes('food') || name.includes('market') || name.includes('beer')) emoji = '🍻';
-  else if (name.includes('palace') || name.includes('diocletian') || name.includes('history')) emoji = '🏛️';
-  else if (name.includes('tour'))                                                      emoji = '🗺️';
-  else if (name.includes('beach') || name.includes('bačvice'))                        emoji = '🏖️';
-  else if (name.includes('marjan') || name.includes('hill') || name.includes('park')) emoji = '🌿';
-  else if (name.includes('market') || name.includes('pazar'))                         emoji = '🛒';
-  else if (name.includes('riva') || name.includes('promenade'))                       emoji = '🌊';
-  else if (name.includes('night'))                                                     emoji = '🌙';
+  let evIcon = 'drama';
+  if (name.includes('wine') || name.includes('tasting'))                              evIcon = 'wine';
+  else if (name.includes('kayak') || name.includes('swim') || name.includes('sea'))   evIcon = 'kayak';
+  else if (name.includes('music') || name.includes('concert') || name.includes('festival') || name.includes('singing')) evIcon = 'music';
+  else if (name.includes('food') || name.includes('market') || name.includes('beer')) evIcon = 'beer';
+  else if (name.includes('palace') || name.includes('diocletian') || name.includes('history')) evIcon = 'history';
+  else if (name.includes('tour'))                                                      evIcon = 'map';
+  else if (name.includes('beach') || name.includes('bačvice'))                        evIcon = 'beach';
+  else if (name.includes('marjan') || name.includes('hill') || name.includes('park')) evIcon = 'leaf';
+  else if (name.includes('market') || name.includes('pazar'))                         evIcon = 'shopping-bag';
+  else if (name.includes('riva') || name.includes('promenade'))                       evIcon = 'waves';
+  else if (name.includes('night'))                                                     evIcon = 'moon';
 
-  document.getElementById('ev-detail-hero').textContent = emoji;
+  document.getElementById('ev-detail-hero').innerHTML = _icon(evIcon, 48, '#f5edd8');
   setText('ev-detail-name', currentEvent.name);
   setText('ev-detail-date', _formatEventDate(currentEvent.date));
   setText('ev-detail-desc', currentEvent.description);
@@ -2054,7 +2125,7 @@ function renderConciergeRestaurants() {
   }
   el.innerHTML = partnersData.map((p, i) => `
     <div class="conc-item" onclick="openRestaurantDetail(${i})">
-      <span class="conc-item-icon">🍽</span>
+      <span class="conc-item-icon">${_icon('utensils')}</span>
       <div class="conc-item-body">
         <div class="conc-item-title">${escHtml(p.name)}</div>
         <div class="conc-item-sub">${[p.cuisine, p.price].filter(Boolean).map(escHtml).join(' · ')}</div>
@@ -2074,8 +2145,8 @@ function openRestaurantDetail(idx) {
 
   // Meta badges
   const badges = [];
-  if (p.price)      badges.push(`<span class="rest-badge">💰 ${escHtml(p.price)}</span>`);
-  if (p.atmosphere) badges.push(`<span class="rest-badge">✨ ${escHtml(p.atmosphere)}</span>`);
+  if (p.price)      badges.push(`<span class="rest-badge">${_icon('dollar', 14)}&nbsp;${escHtml(p.price)}</span>`);
+  if (p.atmosphere) badges.push(`<span class="rest-badge">${_icon('sparkle', 14)}&nbsp;${escHtml(p.atmosphere)}</span>`);
   const metaEl = document.getElementById('rest-detail-meta');
   if (metaEl) metaEl.innerHTML = badges.join('');
 
@@ -2085,9 +2156,9 @@ function openRestaurantDetail(idx) {
   const infoEl = document.getElementById('rest-detail-info');
   if (infoEl) {
     const rows = [];
-    if (p.hours)   rows.push(`<div class="section-item" style="cursor:default;"><span>🕐 Hours</span><span style="color:var(--text-muted);font-size:14px;">${escHtml(p.hours)}</span></div>`);
-    if (p.address) rows.push(`<div class="section-item" style="cursor:default;"><span>📍 Address</span><span style="color:var(--text-muted);font-size:14px;">${escHtml(p.address)}</span></div>`);
-    if (p.mapsUrl) rows.push(`<div class="section-item" onclick="_openExternal('${escHtml(p.mapsUrl)}')"><span>🗺 Open in Maps</span><span class="section-arrow">›</span></div>`);
+    if (p.hours)   rows.push(`<div class="section-item" style="cursor:default;"><span>${_icon('clock', 16)}&nbsp;Hours</span><span style="color:var(--text-muted);font-size:14px;">${escHtml(p.hours)}</span></div>`);
+    if (p.address) rows.push(`<div class="section-item" style="cursor:default;"><span>${_icon('map-pin', 16)}&nbsp;Address</span><span style="color:var(--text-muted);font-size:14px;">${escHtml(p.address)}</span></div>`);
+    if (p.mapsUrl) rows.push(`<div class="section-item" onclick="_openExternal('${escHtml(p.mapsUrl)}')"><span>${_icon('map', 16)}&nbsp;Open in Maps</span><span class="section-arrow">›</span></div>`);
     infoEl.innerHTML = rows.join('') || '<div style="padding:12px 0;color:var(--text-muted);font-size:14px;">Contact reception for details.</div>';
   }
 
@@ -2116,15 +2187,14 @@ function openConciergeForm(type) {
 }
 
 function _buildConciergeForm(type) {
-  const titles = { taxi: 'Taxi Request', boat: 'Boat Transfer', shuttle: 'Airport Shuttle', restaurant: 'Reserve a Table', wakeup: 'Wake-up Call' };
-  const icons  = { taxi: '🚕', boat: '⛵', shuttle: '🚐', restaurant: '🍽', wakeup: '⏰' };
-  const emojis = { taxi: '🚕', boat: '⛵', shuttle: '🚐', restaurant: '🍽', wakeup: '⏰' };
+  const titles    = { taxi: 'Taxi Request', boat: 'Boat Transfer', shuttle: 'Airport Shuttle', restaurant: 'Reserve a Table', wakeup: 'Wake-up Call' };
+  const formIcons = { taxi: 'taxi', boat: 'anchor', shuttle: 'shuttle', restaurant: 'utensils', wakeup: 'alarm' };
 
   setText('conc-form-title', titles[type] || 'Request');
 
-  // Hero emoji
+  // Hero icon
   const hero = document.getElementById('conc-form-hero');
-  if (hero) hero.textContent = emojis[type] || '🛎';
+  if (hero) hero.innerHTML = _icon(formIcons[type] || 'bell', 48, '#f5edd8');
 
   // Extra fields depending on type
   const fieldsEl = document.getElementById('conc-form-fields');
