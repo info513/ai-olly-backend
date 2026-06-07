@@ -3379,6 +3379,8 @@ function mapPoiRecord(rec) {
     dist:      pickFirstNonEmpty(f['Udaljenost od hotela'], f['Distance from Hotel'], f.Udaljenost, f.udaljenost, ''),
     coords:    hasCoords ? { lat, lng } : null,
     nav,
+    alwaysOn:  !!(f['Always On']),
+    sortOrder: typeof f['Sort Order'] === 'number' ? f['Sort Order'] : (parseInt(f['Sort Order'] || '0') || 0),
   };
 }
 

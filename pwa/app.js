@@ -1916,38 +1916,62 @@ function _v2OpenSplitEventLink(el) {
   if (link) _openExternal(link);
 }
 
-// ── Always On tab — hardcoded permanent Split highlights ──────────────────────
+// ── Always On tab — curated evergreen POIs from Airtable ─────────────────────
 function _renderAlwaysOnTab(list) {
-  const places = [
-    { name: "Diocletian's Palace",        cat: 'Roman site',     dist: '50 m',   desc: 'A living Roman palace turned city — the heart of Split.' },
-    { name: 'Peristyle',                  cat: 'Roman ruins',    dist: '50 m',   desc: 'Central courtyard of the Palace. Atmospheric at any hour.' },
-    { name: 'Cathedral of St. Domnius',   cat: 'Cathedral',      dist: '80 m',   desc: 'One of the oldest cathedrals in the world, built in a Roman mausoleum.' },
-    { name: "Diocletian's Cellars",       cat: 'Underground',    dist: '70 m',   desc: 'The basement of the Palace. Cool, well-preserved, and impressive.' },
-    { name: 'Riva Promenade',             cat: 'Waterfront',     dist: '100 m',  desc: "Split's waterfront promenade — the city's living room." },
-    { name: 'Golden Gate',                cat: 'Roman gate',     dist: '200 m',  desc: 'The most impressive of the four original Palace gates.' },
-    { name: 'Matejuška Harbour',          cat: 'Harbour',        dist: '300 m',  desc: 'A small fishing harbour with bars and a relaxed local feel.' },
-    { name: 'Green Market (Pazar)',        cat: 'Market',         dist: '400 m',  desc: 'Daily open-air market just outside the eastern Palace wall.' },
-    { name: 'Fish Market',                cat: 'Market',         dist: '350 m',  desc: 'Best early morning — fresh Adriatic catch daily.' },
-    { name: 'Bačvice Beach',              cat: 'Beach',          dist: '800 m',  desc: 'Famous for the picigin ball game. Sandy, shallow, and lively.' },
-    { name: 'Sustipan Sunset Point',      cat: 'Viewpoint',      dist: '600 m',  desc: 'The best spot in Split for a quiet sunset over the Adriatic.' },
-    { name: 'Marjan Hill',                cat: 'Nature & views', dist: '1.5 km', desc: 'Forested hill with sea views and peaceful walking paths.' },
-  ];
+  // If POIs not yet loaded, show a brief loading state and trigger load
+  if (!poisData) {
+    list.innerHTML = '<p class="st-empty">Loading permanent highlights…</p>';
+    loadPois().then(() => {
+      if (activeEventsTab === 'alwayson') _renderAlwaysOnTab(list);
+    }).catch(() => {});
+    return;
+  }
 
-  const rowsHtml = places.map(p => `
-    <div class="st-ao-item" onclick="openModule('near-me')">
+  const available = poisData
+    .filter(p => p.alwaysOn)
+    .sort((a, b) => {
+      if (a.sortOrder && b.sortOrder) return a.sortOrder - b.sortOrder;
+      if (a.sortOrder) return -1;
+      if (b.sortOrder) return 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+  if (!available.length) {
+    list.innerHTML =
+      '<p class="st-ao-intro">Permanent Split highlights — worth visiting any day, in any weather.</p>' +
+      '<p class="st-empty-sm">No permanent highlights available.</p>';
+    return;
+  }
+
+  const rowsHtml = available.map(poi => {
+    const dist = poi.dist ? `<span class="st-ao-item__dist">${escHtml(poi.dist)}</span>` : '';
+    const cat  = poi.category ? `<span class="st-ao-item__cat">${escHtml(poi.category)}</span>` : '';
+    const desc = poi.shortDesc || '';
+    return `
+    <div class="st-ao-item" onclick="_openAlwaysOnPoi('${poi.id}')">
       <div class="st-ao-item__body">
-        <div class="st-ao-item__name">${escHtml(p.name)}</div>
-        <div class="st-ao-item__desc">${escHtml(p.desc)}</div>
+        <div class="st-ao-item__name">${escHtml(poi.name)}</div>
+        ${desc ? `<div class="st-ao-item__desc">${escHtml(desc)}</div>` : ''}
       </div>
       <div class="st-ao-item__right">
-        <span class="st-ao-item__cat">${escHtml(p.cat)}</span>
-        <span class="st-ao-item__dist">${p.dist}</span>
+        ${cat}
+        ${dist}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   list.innerHTML =
     '<p class="st-ao-intro">Permanent Split highlights — worth visiting any day, in any weather.</p>' +
     `<div class="st-ao-list">${rowsHtml}</div>`;
+}
+
+// Open POI detail when tapping an Always On item
+function _openAlwaysOnPoi(poiId) {
+  const poi = (poisData || []).find(p => p.id === poiId);
+  if (!poi) { openModule('near-me'); return; }
+  currentPoi = poi;
+  _populatePoiDetail(poi);
+  pushScreen('poi-detail');
 }
 
 function openEventDetail(idx) {
