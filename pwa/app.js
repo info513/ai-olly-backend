@@ -2737,7 +2737,7 @@ function _v2RenderWhispersCard() {
       'The story of Diocletian, Salona and the Palace that became a city.' +
     '</div>' +
     '<div class="v2-whispers-ft">' +
-      '<span class="v2-whispers-count">9 chapters</span>' +
+      '<span class="v2-whispers-count">12 chapters</span>' +
       '<span class="v2-whispers-cta">Enter the Palace ' +
         '<svg class="v2-icon v2-icon--sm"><use href="#ico-arrow-right"/></svg>' +
       '</span>' +
