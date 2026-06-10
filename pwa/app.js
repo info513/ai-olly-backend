@@ -54,6 +54,10 @@ function _activateScreen(name, direction = 'forward') {
   window.scrollTo(0, 0);
   updateBottomNav(name);
 
+  // Hide floating ask bubble when on the ask screen itself; restore when leaving
+  const askWrap = document.getElementById('v2-ask-wrap');
+  if (askWrap) askWrap.hidden = (name === 'ask');
+
   // Leaflet invalidation — must happen after the element is visible
   if (name === 'city-map' && cityMapObj) {
     setTimeout(() => cityMapObj.invalidateSize(), 120);
@@ -1931,7 +1935,7 @@ function _renderWeatherPicksTab(list) {
       ];
 
   const rowsHtml = places.map(p => `
-    <div class="st-wp-row" onclick="openModule('near-me')">
+    <div class="st-wp-row" onclick="_openWeatherPickPoi(${JSON.stringify(p.name)})">
       <div class="st-wp-row__body">
         <div class="st-wp-row__name">${escHtml(p.name)}</div>
         <div class="st-wp-row__note">${escHtml(p.note)}</div>
@@ -2055,6 +2059,38 @@ function _renderAlwaysOnTab(list) {
 // Open POI detail when tapping an Always On item
 function _openAlwaysOnPoi(poiId) {
   const poi = (poisData || []).find(p => p.id === poiId);
+  if (!poi) { openModule('near-me'); return; }
+  currentPoi = poi;
+  _populatePoiDetail(poi);
+  pushScreen('poi-detail');
+}
+
+// Find a POI by fuzzy name match — used by Weather Picks to open POI details
+function _findPoiByName(query) {
+  if (!poisData || !query) return null;
+  const q = query.toLowerCase().trim();
+  // 1. Exact match
+  let m = poisData.find(p => p.name && p.name.toLowerCase().trim() === q);
+  if (m) return m;
+  // 2. POI name (3+ chars) is a substring of the query
+  m = poisData.find(p => p.name && p.name.length > 3 && q.includes(p.name.toLowerCase()));
+  if (m) return m;
+  // 3. Query is a substring of the POI name
+  m = poisData.find(p => p.name && p.name.toLowerCase().includes(q));
+  if (m) return m;
+  // 4. First significant word (3+ chars, not a stop word) matches POI name
+  const stopWords = new Set(['the', 'of', 'st', 'a', 'an', 'and', 'at', 'in']);
+  const firstWord = q.split(/[\s'']+/).find(w => w.length >= 3 && !stopWords.has(w));
+  if (firstWord) {
+    m = poisData.find(p => p.name && p.name.toLowerCase().includes(firstWord));
+    if (m) return m;
+  }
+  return null;
+}
+
+// Open a Weather Picks place — uses POI lookup with fallback to near-me
+function _openWeatherPickPoi(name) {
+  const poi = _findPoiByName(name);
   if (!poi) { openModule('near-me'); return; }
   currentPoi = poi;
   _populatePoiDetail(poi);

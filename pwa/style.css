@@ -1359,7 +1359,7 @@ html, body {
 
 .nm-maps-result { display: flex; flex-direction: column; gap: 12px; }
 
-/* ── Screen hero banner (Split Today, Near Me, Help & Requests) ──────────── */
+/* ── Screen hero banner (Split Today, Near Me, Help, and content heroes) ─── */
 
 .screen-hero {
   width: 100%;
@@ -1369,22 +1369,66 @@ html, body {
   background-position: center;
   border-radius: 0 0 20px 20px;
   overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
-.screen-hero--events {
-  background: linear-gradient(145deg, #112240 0%, #0e3a5c 45%, #1a2a4e 100%);
+.screen-hero--events   { background: linear-gradient(145deg, #112240 0%, #0e3a5c 45%, #1a2a4e 100%); }
+.screen-hero--near-me  { background: linear-gradient(145deg, #1a3028 0%, #0f2a20 50%, #1e3a2a 100%); }
+.screen-hero--help     { background: linear-gradient(145deg, #3e2a1a 0%, #2c1f14 55%, #1e2e3e 100%); }
+
+/* Content heroes — swap background-image: url(…) when photos are ready */
+.screen-hero--room-guide  { background: linear-gradient(145deg, #1e2a3a 0%, #16202e 50%, #2a1f14 100%); }
+.screen-hero--services    { background: linear-gradient(145deg, #2c1f14 0%, #1e1610 50%, #1a2030 100%); }
+.screen-hero--concierge   { background: linear-gradient(145deg, #1a1028 0%, #2c1f14 55%, #1a2a20 100%); }
+.screen-hero--routes      { background: linear-gradient(145deg, #0f2820 0%, #1a3830 50%, #112240 100%); }
+.screen-hero--info        { background: linear-gradient(145deg, #1a1810 0%, #2c1f14 55%, #1a2030 100%); }
+
+/* Hero text content — bottom-aligned */
+.screen-hero__content {
+  position: relative;
+  z-index: 2;
+  padding: 0 24px 20px;
 }
 
-
-.screen-hero--near-me {
-  background: linear-gradient(145deg, #1a3028 0%, #0f2a20 50%, #1e3a2a 100%);
+.screen-hero__content::before {
+  content: '';
+  position: absolute;
+  inset: -60px 0 0 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 100%);
+  pointer-events: none;
 }
 
-
-.screen-hero--help {
-  background: linear-gradient(145deg, #3e2a1a 0%, #2c1f14 55%, #1e2e3e 100%);
+.screen-hero__tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 5px;
+  position: relative;
 }
 
+.screen-hero__title {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  margin-bottom: 5px;
+  position: relative;
+}
+
+.screen-hero__sub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.68);
+  line-height: 1.45;
+  max-width: 280px;
+  position: relative;
+}
 
 /* ── Help hub ────────────────────────────────────────────────────────────── */
 
@@ -1803,8 +1847,16 @@ html, body {
 }
 
 .screen-header--chat {
-  padding-bottom: 6px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* Chat screen title — serif, slightly larger */
+.screen-header--chat .screen-title {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  letter-spacing: -0.01em;
 }
 
 .chat-clear-btn {
@@ -1978,9 +2030,9 @@ html, body {
   display: flex;
   gap: 10px;
   align-items: center;
-  padding: 10px 16px;
-  padding-bottom: calc(68px + max(10px, env(safe-area-inset-bottom)));
-  background: var(--surface);
+  padding: 12px 16px;
+  padding-bottom: calc(68px + max(12px, env(safe-area-inset-bottom)));
+  background: var(--surface-warm);
   border-top: 1px solid var(--border);
 }
 
