@@ -318,18 +318,23 @@ function _routeIcon(type) {
 }
 
 const SERVICE_GROUPS = [
-  { id: 'arrival', icon: 'bell', label: 'Arrival & Reception',
-    keywords: ['reception', 'check-in', 'check in', 'check out', 'check-out',
-               'late arrival', 'luggage', 'contact', 'direct booking',
-               'booking & offers', 'booking and offers', 'r1', 'tourist tax',
-               'invoice', 'payment', 'front desk', 'concierge'] },
+  { id: 'arrival', icon: 'bell', label: 'Arrival & Departure',
+    keywords: ['check-in', 'check in', 'check out', 'check-out', 'late check',
+               'early check', 'luggage', 'tourist tax', 'invoice', 'payment',
+               'r1 receipt', 'key policy', 'front desk', 'direct booking',
+               'booking & offers', 'booking and offers', 'arrival & departure'] },
+  { id: 'guest-services', icon: 'star', label: 'Guest Services',
+    keywords: ['beauty', 'complimentary', 'gift voucher', 'special occasion',
+               'anniversary', 'birthday', 'book club', 'additional service',
+               'welcome drink', 'luggage storage', 'premium service',
+               'concierge service', 'personalised', 'personalized', 'guest service'] },
   { id: 'room', icon: 'bed', label: 'Room Comfort',
     keywords: ['room feature', 'room/communication', 'air condition', 'television', ' tv',
                'safe', 'smart glass', 'minibar', 'pillow', 'blanket',
                'room service', 'room layout', 'room view', 'twin bed',
                'extra bed', 'family room', 'rooms & booking', 'rooms and booking',
                'family & booking', 'family and booking', 'family & comfort',
-               'family and comfort', 'family comfort'] },
+               'family and comfort', 'family comfort', 'room comfort'] },
   { id: 'housekeeping', icon: 'sparkle', label: 'Housekeeping & Laundry',
     keywords: ['housekeep', 'laundry', 'towel', 'linen', 'clean',
                'do not disturb', 'fabric softener', 'washing not', 'drying not'] },
@@ -343,12 +348,7 @@ const SERVICE_GROUPS = [
   { id: 'policies', icon: 'clipboard', label: 'Policies & Safety',
     keywords: ['house rule', 'safety', 'security', 'emergency', 'fire',
                'smoking', 'pet policy', 'quiet hour', 'cooking not',
-               'key policy', 'cctv', 'rule', 'policy', 'payment method'] },
-  { id: 'experiences', icon: 'star', label: 'Local Experiences',
-    keywords: ['fun and relax', 'fun & relax', 'one day in split', 'sunset',
-               'beach', 'private tour', 'rainy day', 'souvenir',
-               'authentic', 'local experience', 'split guide', 'restaurant',
-               'where to eat', 'event'] },
+               'cctv', 'rule', 'policy', 'payment method'] },
 ];
 
 function _mapServiceToGroup(s) {
