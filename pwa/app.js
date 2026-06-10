@@ -156,12 +156,13 @@ function renderRoomGuideSections() {
 
 function openRoomGuideSection(section) {
   const sectionMap = {
-    wifi:     'WiFi',
-    ac:       'Air Conditioning',
-    tv:       'TV',
-    safe:     'Safe',
-    features: 'Room Features',
-    notes:    'Room Notes',
+    wifi:        'WiFi',
+    ac:          'Air Conditioning',
+    tv:          'TV',
+    safe:        'Safe',
+    smartglass:  'Smart Glass Window',
+    features:    'Room Features',
+    notes:       'Room Notes',
   };
   setText('rg-section-title', sectionMap[section] || section);
   renderRoomSection(section);
@@ -215,6 +216,11 @@ function renderRoomSection(section) {
     html += text
       ? `<div class="rg-content-block"><div class="rg-content-text">${escHtml(text)}</div></div>`
       : `<div class="rg-content-block"><p class="rg-content-text">Safe instructions are not available. Please contact Reception.</p></div>`;
+  } else if (section === 'smartglass') {
+    const text = roomGuideData.smartGlass || '';
+    html += text
+      ? `<div class="rg-content-block"><div class="rg-content-text">${escHtml(text)}</div></div>`
+      : `<div class="rg-content-block"><p class="rg-content-text">Your room is equipped with a smart glass window system. Use the wall switch to change between clear and private mode. If you need help, please contact Reception.</p></div>`;
   } else if (section === 'features') {
     const text = roomGuideData.roomFeatures || '';
     html += text
@@ -329,12 +335,9 @@ const SERVICE_GROUPS = [
                'welcome drink', 'luggage storage', 'premium service',
                'concierge service', 'personalised', 'personalized', 'guest service'] },
   { id: 'room', icon: 'bed', label: 'Room Comfort',
-    keywords: ['room feature', 'room/communication', 'air condition', 'television', ' tv',
-               'safe', 'smart glass', 'minibar', 'pillow', 'blanket',
-               'room service', 'room layout', 'room view', 'twin bed',
-               'extra bed', 'family room', 'rooms & booking', 'rooms and booking',
-               'family & booking', 'family and booking', 'family & comfort',
-               'family and comfort', 'family comfort', 'room comfort'] },
+    keywords: ['room feature', 'room/communication', 'television', ' tv',
+               'safe', 'minibar', 'pillow', 'blanket', 'room service',
+               'in-room comfort', 'room comfort'] },
   { id: 'housekeeping', icon: 'sparkle', label: 'Housekeeping & Laundry',
     keywords: ['housekeep', 'laundry', 'towel', 'linen', 'clean',
                'do not disturb', 'fabric softener', 'washing not', 'drying not'] },
