@@ -1269,11 +1269,40 @@ html, body {
 /* ── POI / Stop detail hero ──────────────────────────────────────────────── */
 
 .poi-hero {
-  height: 200px;
-  background: linear-gradient(135deg, #2a1f3d 0%, #1a3040 60%, #1e2820 100%);
+  width: 100%;
+  height: 190px;
   flex-shrink: 0;
+  background: linear-gradient(135deg, #2a1f3d 0%, #1a3040 60%, #1e2820 100%);
   background-size: cover;
   background-position: center;
+  border-radius: 0 0 20px 20px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* Category label overlaid on the gradient/photo */
+.poi-hero__label {
+  position: relative;
+  z-index: 2;
+  padding: 0 24px 16px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+/* Scrim so label is readable over photos */
+.poi-hero__label::before {
+  content: '';
+  position: absolute;
+  inset: -40px 0 0 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.35) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* ── Route stop list item ────────────────────────────────────────────────── */
@@ -1375,16 +1404,45 @@ html, body {
   justify-content: flex-end;
 }
 
-.screen-hero--events   { background: linear-gradient(145deg, #112240 0%, #0e3a5c 45%, #1a2a4e 100%); }
-.screen-hero--near-me  { background: linear-gradient(145deg, #1a3028 0%, #0f2a20 50%, #1e3a2a 100%); }
-.screen-hero--help     { background: linear-gradient(145deg, #3e2a1a 0%, #2c1f14 55%, #1e2e3e 100%); }
-
-/* Content heroes — swap background-image: url(…) when photos are ready */
-.screen-hero--room-guide  { background: linear-gradient(145deg, #1e2a3a 0%, #16202e 50%, #2a1f14 100%); }
-.screen-hero--services    { background: linear-gradient(145deg, #2c1f14 0%, #1e1610 50%, #1a2030 100%); }
-.screen-hero--concierge   { background: linear-gradient(145deg, #1a1028 0%, #2c1f14 55%, #1a2a20 100%); }
-.screen-hero--routes      { background: linear-gradient(145deg, #0f2820 0%, #1a3830 50%, #112240 100%); }
-.screen-hero--info        { background: linear-gradient(145deg, #1a1810 0%, #2c1f14 55%, #1a2030 100%); }
+/*
+ * Hero variants — all use placeholder gradients now.
+ * To add a photo later, set the --hero-img variable and update background:
+ *   background: linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), var(--hero-img);
+ *   background-size: cover; background-position: center;
+ */
+.screen-hero--events,
+.screen-hero--split-today {
+  --hero-img: none;
+  background: linear-gradient(145deg, #112240 0%, #0e3a5c 45%, #1a2a4e 100%);
+}
+.screen-hero--near-me  {
+  --hero-img: none;
+  background: linear-gradient(145deg, #1a3028 0%, #0f2a20 50%, #1e3a2a 100%);
+}
+.screen-hero--help     {
+  --hero-img: none;
+  background: linear-gradient(145deg, #3e2a1a 0%, #2c1f14 55%, #1e2e3e 100%);
+}
+.screen-hero--room-guide  {
+  --hero-img: none;
+  background: linear-gradient(145deg, #1e2a3a 0%, #16202e 50%, #2a1f14 100%);
+}
+.screen-hero--services    {
+  --hero-img: none;
+  background: linear-gradient(145deg, #2c1f14 0%, #1e1610 50%, #1a2030 100%);
+}
+.screen-hero--concierge   {
+  --hero-img: none;
+  background: linear-gradient(145deg, #1a1028 0%, #2c1f14 55%, #1a2a20 100%);
+}
+.screen-hero--routes      {
+  --hero-img: none;
+  background: linear-gradient(145deg, #0f2820 0%, #1a3830 50%, #112240 100%);
+}
+.screen-hero--info        {
+  --hero-img: none;
+  background: linear-gradient(145deg, #1a1810 0%, #2c1f14 55%, #1a2030 100%);
+}
 
 /* Hero text content — bottom-aligned */
 .screen-hero__content {

@@ -835,6 +835,10 @@ function _populatePoiDetail(poi) {
       'Culture':      'linear-gradient(135deg, #1a1020 0%, #3a2050 100%)',
     };
     hero.style.background = gradients[poi.category] || 'linear-gradient(135deg, #1a1a2e 0%, #2e2e4a 100%)';
+    // Category label overlaid on gradient/photo
+    hero.innerHTML = poi.category
+      ? `<div class="poi-hero__label">${escHtml(poi.category)}</div>`
+      : '';
   }
 }
 

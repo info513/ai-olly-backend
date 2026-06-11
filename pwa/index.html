@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="manifest" href="/pwa/manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="style.css?v=v17">
+  <link rel="stylesheet" href="style.css?v=v18">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
   <script>
     // Register service worker for push notifications
@@ -313,7 +313,13 @@
       <button class="back-btn" onclick="popScreen()">&larr; Back</button>
       <div class="screen-title">Split Today</div>
     </div>
-    <div class="screen-hero screen-hero--events" role="img" aria-label="Split today events"></div>
+    <div class="screen-hero screen-hero--events" role="img" aria-label="Split Today">
+      <div class="screen-hero__content">
+        <p class="screen-hero__tag">Split Today</p>
+        <h2 class="screen-hero__title">Split Today</h2>
+        <p class="screen-hero__sub">Weather-aware ideas, events and places to enjoy today.</p>
+      </div>
+    </div>
 
     <!-- Screen intro: subtitle + weather badge (badge populated by JS) -->
     <div class="st-screen-intro">
@@ -451,7 +457,7 @@
       <div class="screen-hero__content">
         <p class="screen-hero__tag">Hotel</p>
         <h2 class="screen-hero__title">Hotel Services</h2>
-        <p class="screen-hero__sub">Everything the hotel can help you with during your stay.</p>
+        <p class="screen-hero__sub">Breakfast, luggage, comfort and guest services during your stay.</p>
       </div>
     </div>
 
@@ -683,7 +689,13 @@
       <div class="screen-title">Near Me</div>
     </div>
 
-    <div class="screen-hero screen-hero--near-me" role="img" aria-label="Explore Split"></div>
+    <div class="screen-hero screen-hero--near-me" role="img" aria-label="Map & Near Me">
+      <div class="screen-hero__content">
+        <p class="screen-hero__tag">Explore Split</p>
+        <h2 class="screen-hero__title">Map &amp; Near Me</h2>
+        <p class="screen-hero__sub">Useful places around the hotel, from landmarks to practical stops.</p>
+      </div>
+    </div>
 
     <div class="screen-body">
       <p class="screen-subtitle" id="nm-hotel-subtitle">Find places near the hotel.</p>
@@ -744,7 +756,13 @@
       <div class="screen-title">Help &amp; Requests</div>
     </div>
 
-    <div class="screen-hero screen-hero--help" role="img" aria-label="We're here to help"></div>
+    <div class="screen-hero screen-hero--help" role="img" aria-label="Help & Requests">
+      <div class="screen-hero__content">
+        <p class="screen-hero__tag">We're here to help</p>
+        <h2 class="screen-hero__title">Help &amp; Requests</h2>
+        <p class="screen-hero__sub">Send a request to the hotel team or report something you need help with.</p>
+      </div>
+    </div>
 
     <div class="screen-body">
       <p class="screen-subtitle">How can we help you today?</p>
@@ -949,7 +967,7 @@
       <div class="screen-hero__content">
         <p class="screen-hero__tag">Antique Split</p>
         <h2 class="screen-hero__title">Hotel Info</h2>
-        <p class="screen-hero__sub">Contact, location and practical hotel information.</p>
+        <p class="screen-hero__sub">Contact, location and practical information about your stay.</p>
       </div>
     </div>
 
@@ -1288,7 +1306,7 @@
   </div>
 
   <script src="config.js"></script>
-  <script src="whispers-data.js?v=v17"></script>
-  <script src="app.js?v=v17"></script>
+  <script src="whispers-data.js?v=v18"></script>
+  <script src="app.js?v=v18"></script>
 </body>
 </html>
