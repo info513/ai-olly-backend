@@ -1994,8 +1994,11 @@ function _renderWeatherPicksTab(list) {
           note: tod === 'evening' ? 'Ideal for sunset'       : 'Easy walk from the hotel' },
       ];
 
-  const rowsHtml = places.map(p => `
-    <div class="st-wp-row" onclick="_openWeatherPickPoi(${JSON.stringify(p.name)})">
+  const rowsHtml = places.map(p => {
+    // &quot; so JSON double-quotes don't break the HTML attribute delimiter
+    const safeArg = JSON.stringify(p.name).replace(/"/g, '&quot;');
+    return `
+    <div class="st-wp-row" onclick="_openWeatherPickPoi(${safeArg})">
       <div class="st-wp-row__body">
         <div class="st-wp-row__name">${escHtml(p.name)}</div>
         <div class="st-wp-row__note">${escHtml(p.note)}</div>
@@ -2004,7 +2007,8 @@ function _renderWeatherPicksTab(list) {
         <span class="st-wp-row__cat">${escHtml(p.cat)}</span>
         <span class="st-wp-row__dist">${p.dist}</span>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   list.innerHTML = contextHtml + `<div class="st-wp-list">${rowsHtml}</div>`;
 }
@@ -2162,6 +2166,8 @@ const WEATHER_PICK_POI_ALIASES = {
   'Riva Promenade':           'The Riva (Waterfront)',
   'Cathedral of St Domnius':  'Cathedral of St. Domnius',
   "Diocletian's Cellars":     'The Substructures',
+  'The Substructures':        'The Substructures',
+  'Golden Gate':              'The Golden Gate',
 };
 
 // Find a POI by fuzzy name match — used by Weather Picks to open POI details
@@ -2978,7 +2984,8 @@ function _v2RenderSplitToday(wxCond, wxTempC) {
       ];
 
   var poisHtml = staticPois.map(function (p) {
-    var safeArg = JSON.stringify(p.name);  // handles apostrophes safely
+    // JSON.stringify for apostrophe safety; &quot; so double-quotes don't break the HTML attribute
+    var safeArg = JSON.stringify(p.name).replace(/"/g, '&quot;');
     return (
       '<div class="v2-today-poi-row" onclick="_openWeatherPickPoi(' + safeArg + ')">' +
         '<div class="v2-today-poi-dot"></div>' +
