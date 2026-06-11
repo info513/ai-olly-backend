@@ -37,8 +37,16 @@ let selectedPoiEntry = null; // currently highlighted marker entry
 
 // ── Navigation stack ──────────────────────────────────────────────────────
 const ROOT_SCREENS        = new Set(['home', 'city-map', 'ask', 'info']);
-// Screens that show the bottom nav but are not "root" (no active tab highlight)
-const VISIBLE_NAV_SCREENS = new Set([...ROOT_SCREENS, 'poi-detail']);
+// Screens where the bottom nav is hidden (splash/consent only)
+const HIDDEN_NAV_SCREENS  = new Set(['app-splash', 'permissions']);
+// Map non-root screens to which tab should appear active
+const NAV_ACTIVE_MAP = {
+  'poi-detail':       'city-map',
+  'near-me':          'city-map',
+  'near-me-results':  'city-map',
+  'city-map-welcome': 'city-map',
+  'route-map':        'city-map',
+};
 let currentScreen  = 'home';
 let navStack       = [];
 
@@ -136,10 +144,10 @@ function gotoRoot(name) {
 function updateBottomNav(name) {
   const nav = document.getElementById('bottom-nav');
   if (!nav) return;
-  nav.hidden = !VISIBLE_NAV_SCREENS.has(name);
+  nav.hidden = HIDDEN_NAV_SCREENS.has(name);
+  const activeTab = NAV_ACTIVE_MAP[name] || name;
   nav.querySelectorAll('.bottom-nav-item').forEach(btn => {
-    // Active only on root screens; on overlay screens (poi-detail) no tab is highlighted
-    btn.classList.toggle('bottom-nav-item--active', btn.dataset.screen === name);
+    btn.classList.toggle('bottom-nav-item--active', btn.dataset.screen === activeTab);
   });
 }
 

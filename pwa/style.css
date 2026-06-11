@@ -465,10 +465,8 @@ html, body {
   text-align: center;
 }
 
-/* Root screens need bottom padding for the floating nav dock */
-.screen--root .screen-body { padding-bottom: 96px; }
-/* POI detail also shows the nav dock */
-#screen-poi-detail .screen-body { padding-bottom: 96px; }
+/* All guest screens need bottom padding for the fixed tab bar */
+.screen-body { padding-bottom: calc(var(--olly-nav-h) + env(safe-area-inset-bottom, 0px) + 12px); }
 
 /* ── Warning banner ──────────────────────────────────────────────────────── */
 
@@ -540,22 +538,21 @@ html, body {
 
 /* ── Bottom navigation ───────────────────────────────────────────────────── */
 
-/* ── Bottom navigation — premium floating navy dock ──────────────────────── */
+/* ── Bottom navigation — full-width fixed tab bar ──────────────────────── */
 .bottom-nav {
   position: fixed;
-  left: 50%;
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
-  width: calc(100% - 24px);
-  max-width: 440px;
-  min-width: 240px;
-  padding: 5px 5px;
-  background: var(--olly-navy-deep);
-  border-radius: 22px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--olly-surface);
+  border-top: 1px solid var(--olly-border);
   display: flex;
   align-items: stretch;
   z-index: 200;
-  box-shadow: 0 4px 24px rgba(20,34,45,.40), 0 1px 0 rgba(255,255,255,.05) inset;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .bottom-nav-item {
@@ -567,20 +564,18 @@ html, body {
   gap: 3px;
   background: none;
   border: none;
-  border-radius: 17px;
   font-size: 10px;
   font-weight: 500;
-  color: rgba(232,212,160,.4);
+  color: var(--olly-text-muted);
   cursor: pointer;
-  padding: 8px 4px;
+  padding: 10px 4px;
   -webkit-tap-highlight-color: transparent;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: color 0.15s ease;
 }
-.bottom-nav-item:active { opacity: 0.75; }
+.bottom-nav-item:active { opacity: 0.65; }
 
 .bottom-nav-item--active {
-  background: rgba(232,212,160,.13);
-  color: var(--olly-cream);
+  color: var(--olly-navy);
 }
 
 .bottom-nav-icon {
@@ -915,7 +910,7 @@ html, body {
 #city-map-leaflet {
   position: absolute;
   top: 0; left: 0; right: 0;
-  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--olly-nav-h) + env(safe-area-inset-bottom, 0px));
   height: auto;
   width: 100%;
   z-index: 1;
@@ -998,7 +993,7 @@ html, body {
 .poi-mini-card {
   position: absolute;
   left: 0; right: 0;
-  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--olly-nav-h) + env(safe-area-inset-bottom, 0px));
   background: var(--surface);
   border-radius: 22px 22px 0 0;
   padding: 8px 24px 24px;
@@ -1071,7 +1066,7 @@ html, body {
 .map-category-panel {
   position: absolute;
   left: 0; right: 0;
-  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--olly-nav-h) + env(safe-area-inset-bottom, 0px));
   max-height: 62vh;
   background: var(--surface);
   border-radius: 22px 22px 0 0;
@@ -2231,7 +2226,7 @@ html, body {
   gap: 10px;
   align-items: center;
   padding: 12px 16px;
-  padding-bottom: calc(68px + max(12px, env(safe-area-inset-bottom)));
+  padding-bottom: calc(var(--olly-nav-h) + max(12px, env(safe-area-inset-bottom)));
   background: var(--surface-warm);
   border-top: 1px solid var(--border);
 }
@@ -3528,7 +3523,7 @@ html, body {
   --olly-radius-lg:    24px;
   --olly-shadow-sm:    0 1px 3px rgba(20,34,45,.06), 0 4px 12px rgba(20,34,45,.06);
   --olly-shadow:       0 2px 8px rgba(20,34,45,.08), 0 12px 28px rgba(20,34,45,.08);
-  --olly-nav-h:        64px;
+  --olly-nav-h:        56px;
 }
 
 /* ── SVG icons ────────────────────────────────────────────────────────────── */

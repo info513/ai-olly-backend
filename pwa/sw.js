@@ -1,7 +1,7 @@
 // Service Worker — Hotel Antique Split PWA
 // Handles push notifications for Concierge request updates
 
-const CACHE_NAME = 'antique-split-v25';
+const CACHE_NAME = 'antique-split-v26';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(self.skipWaiting());
