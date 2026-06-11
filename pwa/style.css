@@ -1511,6 +1511,62 @@ html, body {
   background: linear-gradient(145deg, #1a1810 0%, #2c1f14 55%, #1a2030 100%);
 }
 
+/*
+ * POI detail hero variants — category-based gradients.
+ * To add a real photo later:
+ *   --hero-img: url('/pwa/imgs/poi-name.jpg');
+ *   background: linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)), var(--hero-img);
+ *   background-size: cover; background-position: center;
+ */
+.screen-hero--poi {
+  --hero-img: none;
+  background: linear-gradient(145deg, #1a1a2e 0%, #252540 50%, #1e2030 100%);
+}
+.screen-hero--poi-history {
+  --hero-img: none;
+  background: linear-gradient(145deg, #2a1a0e 0%, #3e2410 50%, #201808 100%);
+}
+.screen-hero--poi-culture {
+  --hero-img: none;
+  background: linear-gradient(145deg, #1a1020 0%, #2c1c42 50%, #1e1630 100%);
+}
+.screen-hero--poi-waterfront {
+  --hero-img: none;
+  background: linear-gradient(145deg, #0c1e3c 0%, #0e3050 50%, #10284a 100%);
+}
+.screen-hero--poi-nature {
+  --hero-img: none;
+  background: linear-gradient(145deg, #0e2a10 0%, #1a3c18 50%, #0e2818 100%);
+}
+.screen-hero--poi-market {
+  --hero-img: none;
+  background: linear-gradient(145deg, #2c1e0a 0%, #3c2a10 50%, #241808 100%);
+}
+.screen-hero--poi-beaches {
+  --hero-img: none;
+  background: linear-gradient(145deg, #0e1c38 0%, #0e3060 55%, #1480a8 100%);
+}
+.screen-hero--poi-nightlife {
+  --hero-img: none;
+  background: linear-gradient(145deg, #1a0e2a 0%, #2c1050 50%, #1c0c3e 100%);
+}
+.screen-hero--poi-shopping {
+  --hero-img: none;
+  background: linear-gradient(145deg, #2a1a10 0%, #3c2818 50%, #201410 100%);
+}
+.screen-hero--poi-viewpoint {
+  --hero-img: none;
+  background: linear-gradient(145deg, #182030 0%, #22303e 50%, #162838 100%);
+}
+.screen-hero--poi-square {
+  --hero-img: none;
+  background: linear-gradient(145deg, #201c18 0%, #2e2010 50%, #1c1820 100%);
+}
+.screen-hero--poi-food {
+  --hero-img: none;
+  background: linear-gradient(145deg, #1a2a0e 0%, #243c12 50%, #182808 100%);
+}
+
 /* Hero text content — bottom-aligned */
 .screen-hero__content {
   position: relative;

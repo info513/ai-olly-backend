@@ -808,39 +808,66 @@ function openPoiDetail() {
 }
 
 function _populatePoiDetail(poi) {
-  setText('poi-category', poi.category);
-  setText('poi-name', poi.name);
+  // ── Hero ───────────────────────────────────────────────────────────────────────
+  // Category → CSS variant class (gradient defined in style.css)
+  const POI_HERO_CAT_CLASS = {
+    'History':      'screen-hero--poi-history',
+    'Culture':      'screen-hero--poi-culture',
+    'Waterfront':   'screen-hero--poi-waterfront',
+    'Nature':       'screen-hero--poi-nature',
+    'Market':       'screen-hero--poi-market',
+    'Beaches':      'screen-hero--poi-beaches',
+    'Nightlife':    'screen-hero--poi-nightlife',
+    'Shopping':     'screen-hero--poi-shopping',
+    'Viewpoint':    'screen-hero--poi-viewpoint',
+    'Square':       'screen-hero--poi-square',
+    'Food & Drink': 'screen-hero--poi-food',
+  };
+  // Category → fallback subtitle when POI has no shortDesc
+  const POI_CAT_SUBTITLES = {
+    'History':    'Historic place within walking distance from Antique Split.',
+    'Culture':    'Cultural point of interest near the historic centre of Split.',
+    'Waterfront': 'Seaside promenade and open-air meeting point in central Split.',
+    'Market':     'Local market area with everyday Split atmosphere.',
+    'Viewpoint':  'Scenic viewpoint and peaceful place for a short walk.',
+    'Nature':     'Green or seaside area suitable for a calmer break.',
+    'Square':     'Historic city square and local meeting point.',
+    'Beaches':    'Sandy and pebble beaches within easy reach of the hotel.',
+    'Nightlife':  'Bars and venues for evenings out in central Split.',
+    'Shopping':   'Local shops and boutiques near the historic centre.',
+    'Food & Drink': 'Restaurants, cafes and bars near the historic centre.',
+  };
 
-  // Meta line: pin distance  ·  clock visit duration
+  const hero = document.getElementById('poi-detail-hero');
+  if (hero) {
+    // Apply category variant; clear any inline style left from a previous POI
+    hero.className = 'screen-hero ' + (POI_HERO_CAT_CLASS[poi.category] || 'screen-hero--poi');
+    hero.style.background = '';
+  }
+
+  // Populate hero text elements
+  const heroTag   = document.getElementById('poi-hero-tag');
+  const heroTitle = document.getElementById('poi-hero-title');
+  const heroSub   = document.getElementById('poi-hero-sub');
+  if (heroTag)   heroTag.textContent   = poi.category || '';
+  if (heroTitle) heroTitle.textContent = poi.name     || '';
+  if (heroSub) {
+    heroSub.textContent = poi.shortDesc
+      || POI_CAT_SUBTITLES[poi.category]
+      || 'Point of interest near Antique Split.';
+  }
+
+  // ── Body ───────────────────────────────────────────────────────────────────────
+  // Meta line: pin distance · clock visit duration
   const parts = [];
   if (poi.dist)  parts.push(_icon('map-pin', 14) + ' ' + poi.dist);
   if (poi.visit) parts.push(_icon('clock', 14) + ' ' + poi.visit);
   const metaEl = document.getElementById('poi-meta');
   if (metaEl) metaEl.innerHTML = parts.join('<span style="opacity:0.4;padding:0 6px;">·</span>');
 
-  setText('poi-short-desc', poi.shortDesc);
   setText('poi-long-desc', poi.longDesc);
   const navBtn = document.getElementById('poi-nav-btn');
   if (navBtn) navBtn.href = poi.nav || '#';
-
-  // Hero — category-based gradient placeholder (swap with real image when available)
-  const hero = document.getElementById('poi-detail-hero');
-  if (hero) {
-    const gradients = {
-      'History':      'linear-gradient(135deg, #2a1a0e 0%, #4a2c10 100%)',
-      'Food & Drink': 'linear-gradient(135deg, #1a2a0e 0%, #2d4a15 100%)',
-      'Beaches':      'linear-gradient(135deg, #0e2040 0%, #1040a0 60%, #20a0c0 100%)',
-      'Nature':       'linear-gradient(135deg, #0e2a10 0%, #1e4a20 100%)',
-      'Nightlife':    'linear-gradient(135deg, #1a0e2a 0%, #3a1060 100%)',
-      'Shopping':     'linear-gradient(135deg, #2a1a10 0%, #50301a 100%)',
-      'Culture':      'linear-gradient(135deg, #1a1020 0%, #3a2050 100%)',
-    };
-    hero.style.background = gradients[poi.category] || 'linear-gradient(135deg, #1a1a2e 0%, #2e2e4a 100%)';
-    // Category label overlaid on gradient/photo
-    hero.innerHTML = poi.category
-      ? `<div class="poi-hero__label">${escHtml(poi.category)}</div>`
-      : '';
-  }
 }
 
 // Opens an external URL reliably in PWA standalone mode on iOS/Android.
