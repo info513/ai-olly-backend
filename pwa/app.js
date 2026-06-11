@@ -36,7 +36,9 @@ let poiMarkers       = [];   // { marker, poi, idx } — for category filtering
 let selectedPoiEntry = null; // currently highlighted marker entry
 
 // ── Navigation stack ──────────────────────────────────────────────────────
-const ROOT_SCREENS = new Set(['home', 'city-map', 'ask', 'info']);
+const ROOT_SCREENS        = new Set(['home', 'city-map', 'ask', 'info']);
+// Screens that show the bottom nav but are not "root" (no active tab highlight)
+const VISIBLE_NAV_SCREENS = new Set([...ROOT_SCREENS, 'poi-detail']);
 let currentScreen  = 'home';
 let navStack       = [];
 
@@ -134,9 +136,9 @@ function gotoRoot(name) {
 function updateBottomNav(name) {
   const nav = document.getElementById('bottom-nav');
   if (!nav) return;
-  const isRoot = ROOT_SCREENS.has(name);
-  nav.hidden = !isRoot;
+  nav.hidden = !VISIBLE_NAV_SCREENS.has(name);
   nav.querySelectorAll('.bottom-nav-item').forEach(btn => {
+    // Active only on root screens; on overlay screens (poi-detail) no tab is highlighted
     btn.classList.toggle('bottom-nav-item--active', btn.dataset.screen === name);
   });
 }
@@ -166,7 +168,24 @@ function openRoomGuideSection(section) {
     features:    'Room Features',
     notes:       'Room Notes',
   };
-  setText('rg-section-title', sectionMap[section] || section);
+  const RG_SUBTITLES = {
+    wifi:       'Network and connection details for your room.',
+    ac:         'How to adjust comfort settings in your room.',
+    tv:         'How to use the television and available channels.',
+    safe:       'How to use the in-room safe box.',
+    smartglass: 'How to switch between clear and private glass mode.',
+    features:   'Practical details and comfort features in your room.',
+    notes:      'Room-specific notes for your stay.',
+  };
+  const title = sectionMap[section] || section;
+  setText('rg-section-title', title);  // legacy ID kept for compat
+
+  // Populate hero
+  const heroTitle = document.getElementById('rg-hero-title');
+  const heroSub   = document.getElementById('rg-hero-sub');
+  if (heroTitle) heroTitle.textContent = title;
+  if (heroSub)   heroSub.textContent   = RG_SUBTITLES[section] || 'Useful information for your room.';
+
   renderRoomSection(section);
   pushScreen('room-guide-section');
 }
@@ -427,7 +446,8 @@ function openServiceDetail(idx) {
   servicesScrollY = window.scrollY;
 
   const cats = Array.isArray(currentService.kategorija) ? currentService.kategorija.join(', ') : '';
-  setText('svc-category', cats);
+  // Legacy IDs kept for backward compat (no longer in HTML but setText is a no-op when missing)
+  setText('svc-category',     cats);
   setText('svc-title',        currentService.naziv || '');
   setText('svc-screen-title', currentService.naziv || '');
 
@@ -436,6 +456,34 @@ function openServiceDetail(idx) {
   const cleanDesc   = _stripUrls(rawOpisDesc).trim();
   const descEl = document.getElementById('svc-desc');
   if (descEl) descEl.innerHTML = _renderMarkdown(cleanDesc);
+
+  // ── Hero ──────────────────────────────────────────────────────────────────
+  const SVC_CAT_SUBTITLES = {
+    'Breakfast':      'Morning dining details for your stay.',
+    'Luggage':        'Luggage storage and assistance.',
+    'Shuttle':        'Transfer and shuttle services.',
+    'Arrival':        'Arrival and check-in assistance.',
+    'Departure':      'Departure and check-out assistance.',
+    'Guest Services': 'Additional comfort services during your stay.',
+    'Room Service':   'In-room delivery and assistance.',
+    'Wellness':       'Relaxation and wellness services.',
+    'Emergency':      'Emergency and urgent assistance contacts.',
+    'Parking':        'Vehicle parking information.',
+    'Tours':          'Guided tours and excursion arrangements.',
+  };
+  const firstCat = Array.isArray(currentService.kategorija) ? currentService.kategorija[0] : '';
+  const heroTitle = document.getElementById('svc-hero-title');
+  const heroSub   = document.getElementById('svc-hero-sub');
+  const heroTag   = document.getElementById('svc-hero-tag');
+  if (heroTitle) heroTitle.textContent = currentService.naziv || '';
+  if (heroTag)   heroTag.textContent   = firstCat || 'Hotel Service';
+  if (heroSub) {
+    // Use first sentence of description (plain text, max 100 chars), or category fallback
+    const plainFirst = cleanDesc.replace(/[#*_>`]/g, '').split(/[.\n]/)[0].trim().slice(0, 100);
+    heroSub.textContent = plainFirst
+      || SVC_CAT_SUBTITLES[firstCat]
+      || 'Hotel service available at Antique Split.';
+  }
 
   // Booking URL button — detect https link in opis (not wa.me)
   const bookingUrl = _extractFirstUrl(rawOpisDesc, ['wa.me']);
@@ -3159,7 +3207,9 @@ function _buildPreviewMenuHTML() {
 }
 
 function _initHomeMenu() {
-  if (!menuPreviewEnabled) return;  // default path — keep static HTML tiles
+  // Premium 2-column card menu is now the default.
+  // Pass ?menuClassic=1 to fall back to the original 3-column tile grid.
+  if (params.get('menuClassic') === '1') return;
   var section = document.getElementById('home-menu-section');
   if (!section) return;
   section.innerHTML = _buildPreviewMenuHTML();

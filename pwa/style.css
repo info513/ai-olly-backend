@@ -465,8 +465,10 @@ html, body {
   text-align: center;
 }
 
-/* Root screens need bottom padding for the nav bar */
-.screen--root .screen-body { padding-bottom: 88px; }
+/* Root screens need bottom padding for the floating nav dock */
+.screen--root .screen-body { padding-bottom: 96px; }
+/* POI detail also shows the nav dock */
+#screen-poi-detail .screen-body { padding-bottom: 96px; }
 
 /* ── Warning banner ──────────────────────────────────────────────────────── */
 
@@ -538,22 +540,22 @@ html, body {
 
 /* ── Bottom navigation ───────────────────────────────────────────────────── */
 
+/* ── Bottom navigation — premium floating navy dock ──────────────────────── */
 .bottom-nav {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 68px;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  background: var(--surface);
-  border-top: 1px solid var(--border);
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 440px;
+  min-width: 240px;
+  padding: 5px 5px;
+  background: var(--olly-navy-deep);
+  border-radius: 22px;
   display: flex;
   align-items: stretch;
-  justify-content: space-around;
-  z-index: 100;
-  max-width: 480px;
-  margin: 0 auto;
-  box-shadow: 0 -4px 20px rgba(44,31,20,0.07);
+  z-index: 200;
+  box-shadow: 0 4px 24px rgba(20,34,45,.40), 0 1px 0 rgba(255,255,255,.05) inset;
 }
 
 .bottom-nav-item {
@@ -565,22 +567,35 @@ html, body {
   gap: 3px;
   background: none;
   border: none;
-  border-top: 2px solid transparent;
-  font-size: 11px;
+  border-radius: 17px;
+  font-size: 10px;
   font-weight: 500;
-  color: var(--text-muted);
+  color: rgba(232,212,160,.4);
   cursor: pointer;
-  padding: 0;
+  padding: 8px 4px;
   -webkit-tap-highlight-color: transparent;
-  transition: color 0.18s, border-color 0.18s;
+  transition: color 0.15s ease, background 0.15s ease;
 }
+.bottom-nav-item:active { opacity: 0.75; }
 
 .bottom-nav-item--active {
-  color: var(--accent);
-  border-top-color: var(--gold);
+  background: rgba(232,212,160,.13);
+  color: var(--olly-cream);
 }
 
-.bottom-nav-icon { font-size: 22px; line-height: 1; }
+.bottom-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+
+.bottom-nav-label {
+  font-family: var(--olly-font-body, sans-serif);
+  font-size: 10px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
 
 /* ── Guide card grid ─────────────────────────────────────────────────────── */
 
@@ -877,11 +892,7 @@ html, body {
 
 /* ── Service detail hero ─────────────────────────────────────────────────── */
 
-.svc-hero {
-  height: 180px;
-  background: linear-gradient(135deg, #3e2a1a 0%, #2c1f14 55%, #1e3040 100%);
-  flex-shrink: 0;
-}
+/* .svc-hero is now replaced by .screen-hero.screen-hero--service-detail */
 
 /* Emergency call button */
 .action-btn--emergency {
@@ -1509,6 +1520,14 @@ html, body {
 .screen-hero--info        {
   --hero-img: none;
   background: linear-gradient(145deg, #1a1810 0%, #2c1f14 55%, #1a2030 100%);
+}
+.screen-hero--service-detail {
+  --hero-img: none;
+  background: linear-gradient(145deg, #2c1e0e 0%, #3e2c18 50%, #1e1a28 100%);
+}
+.screen-hero--room-detail {
+  --hero-img: none;
+  background: linear-gradient(145deg, #1a1e2c 0%, #1e2c3e 50%, #2c2014 100%);
 }
 
 /*

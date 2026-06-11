@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="manifest" href="/pwa/manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="style.css?v=v24">
+  <link rel="stylesheet" href="style.css?v=v25">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
   <script>
     // Register service worker for push notifications
@@ -89,6 +89,15 @@
     <path d="M12 2v2M4.22 4.22l1.42 1.42M20 12h2M18.36 5.64l1.42-1.42"/>
     <circle cx="12" cy="8" r="3"/>
     <path d="M20 15h-1.26A8 8 0 107 21h13a4 4 0 000-6z"/>
+  </symbol>
+  <symbol id="ico-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+    <polyline points="9 22 9 12 15 12 15 22"/>
+  </symbol>
+  <symbol id="ico-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="12" y1="16" x2="12" y2="12"/>
+    <line x1="12" y1="8" x2="12.01" y2="8"/>
   </symbol>
 </svg>
 <!-- ── end SVG sprites ───────────────────────────────────────────────────── -->
@@ -431,7 +440,15 @@
 
     <div class="screen-header">
       <button class="back-btn" onclick="popScreen()">&larr; Back</button>
-      <div id="rg-section-title" class="screen-title">Section</div>
+    </div>
+
+    <!-- Premium hero — tag · section name · subtitle -->
+    <div class="screen-hero screen-hero--room-detail" id="rg-hero">
+      <div class="screen-hero__content">
+        <p class="screen-hero__tag" id="rg-hero-tag">Room Guide</p>
+        <h2 class="screen-hero__title" id="rg-hero-title"></h2>
+        <p class="screen-hero__sub" id="rg-hero-sub"></p>
+      </div>
     </div>
 
     <div class="screen-body">
@@ -493,15 +510,18 @@
 
     <div class="screen-header">
       <button class="back-btn" onclick="popScreen()">&larr; Back</button>
-      <div id="svc-screen-title" class="screen-title"></div>
     </div>
 
-    <!-- Placeholder image / hero -->
-    <div class="svc-hero" id="svc-hero"></div>
+    <!-- Premium hero — tag · service name · subtitle -->
+    <div class="screen-hero screen-hero--service-detail" id="svc-hero">
+      <div class="screen-hero__content">
+        <p class="screen-hero__tag" id="svc-hero-tag">Hotel Service</p>
+        <h2 class="screen-hero__title" id="svc-hero-title"></h2>
+        <p class="screen-hero__sub" id="svc-hero-sub"></p>
+      </div>
+    </div>
 
     <div class="screen-body">
-      <div id="svc-category" class="detail-category"></div>
-      <h2 id="svc-title" class="detail-title"></h2>
       <div id="svc-desc" class="detail-section-text"></div>
       <div class="detail-actions" id="svc-actions">
         <!-- Emergency numbers — shown only for emergency services -->
@@ -1284,20 +1304,28 @@
   <!-- ── Bottom Navigation ──────────────────────────────────────────────── -->
   <nav id="bottom-nav" class="bottom-nav" hidden>
     <button class="bottom-nav-item" data-screen="home" onclick="gotoRoot('home')">
-      <span class="bottom-nav-icon">⌂</span>
-      <span>Home</span>
+      <span class="bottom-nav-icon">
+        <svg class="v2-icon v2-icon--sm"><use href="#ico-home"/></svg>
+      </span>
+      <span class="bottom-nav-label">Home</span>
     </button>
     <button class="bottom-nav-item" data-screen="city-map" onclick="openCityMapWelcome()">
-      <span class="bottom-nav-icon">◎</span>
-      <span>Map</span>
+      <span class="bottom-nav-icon">
+        <svg class="v2-icon v2-icon--sm"><use href="#ico-nearme"/></svg>
+      </span>
+      <span class="bottom-nav-label">Map</span>
     </button>
     <button class="bottom-nav-item" data-screen="ask" onclick="gotoRoot('ask')">
-      <span class="bottom-nav-icon">✦</span>
-      <span>Ask Dioclea</span>
+      <span class="bottom-nav-icon">
+        <svg class="v2-icon v2-icon--sm"><use href="#ico-sparkle"/></svg>
+      </span>
+      <span class="bottom-nav-label">Ask Dioclea</span>
     </button>
     <button class="bottom-nav-item" data-screen="info" onclick="gotoRoot('info')">
-      <span class="bottom-nav-icon">ⓘ</span>
-      <span>Info</span>
+      <span class="bottom-nav-icon">
+        <svg class="v2-icon v2-icon--sm"><use href="#ico-info"/></svg>
+      </span>
+      <span class="bottom-nav-label">Info</span>
     </button>
   </nav>
 
@@ -1315,7 +1343,7 @@
   </div>
 
   <script src="config.js"></script>
-  <script src="whispers-data.js?v=v24"></script>
-  <script src="app.js?v=v24"></script>
+  <script src="whispers-data.js?v=v25"></script>
+  <script src="app.js?v=v25"></script>
 </body>
 </html>
