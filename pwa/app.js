@@ -2070,6 +2070,15 @@ function _openAlwaysOnPoi(poiId) {
   pushScreen('poi-detail');
 }
 
+// Alias map: Home card display name → canonical Airtable POI name
+// Used by _openWeatherPickPoi so known naming differences don't break links.
+const WEATHER_PICK_POI_ALIASES = {
+  'Peristyle':                'Peristyle (Peristil)',
+  'Riva Promenade':           'The Riva (Waterfront)',
+  'Cathedral of St Domnius':  'Cathedral of St. Domnius',
+  "Diocletian's Cellars":     'The Substructures',
+};
+
 // Find a POI by fuzzy name match — used by Weather Picks to open POI details
 function _findPoiByName(query) {
   if (!poisData || !query) return null;
@@ -2093,9 +2102,10 @@ function _findPoiByName(query) {
   return null;
 }
 
-// Open a Weather Picks place — uses POI lookup with fallback to near-me
+// Open a Weather Picks place — applies alias map then fuzzy POI lookup, fallback to near-me
 function _openWeatherPickPoi(name) {
-  const poi = _findPoiByName(name);
+  const resolved = WEATHER_PICK_POI_ALIASES[name] || name;
+  const poi = _findPoiByName(resolved);
   if (!poi) { openModule('near-me'); return; }
   currentPoi = poi;
   _populatePoiDetail(poi);
@@ -2883,8 +2893,9 @@ function _v2RenderSplitToday(wxCond, wxTempC) {
       ];
 
   var poisHtml = staticPois.map(function (p) {
+    var safeArg = JSON.stringify(p.name);  // handles apostrophes safely
     return (
-      '<div class="v2-today-poi-row" onclick="openModule(\'near-me\')">' +
+      '<div class="v2-today-poi-row" onclick="_openWeatherPickPoi(' + safeArg + ')">' +
         '<div class="v2-today-poi-dot"></div>' +
         '<div class="v2-today-poi-name">' + _v2Esc(p.name) + '</div>' +
         '<div class="v2-today-poi-dist">' + p.dist + '</div>' +
