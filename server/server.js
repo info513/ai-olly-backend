@@ -11,7 +11,7 @@ import cors from 'cors';
 import Airtable from 'airtable';
 import OpenAI from 'openai';
 import webpush from 'web-push';
-import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion, isMaintenanceReportQuestion, isRoomNumberQuestion, isExtraTowelsQuestion, isIdentityQuestion } from './classify.js';
+import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion, isMaintenanceReportQuestion, isRoomNumberQuestion, isExtraTowelsQuestion, isIdentityQuestion, isCapabilitiesQuestion } from './classify.js';
 import { timingSafeEqual, randomBytes } from 'node:crypto';
 import { asArray, isEmptyArray, fieldHasAny, valuesToStrings, matchesHotelSlug, allowForWeb, allowForPWA } from './filters.js';
 
@@ -2716,6 +2716,17 @@ app.post('/api/pwa-ask', async (req, res) => {
         ok: true,
         answer: 'I was created as Dioclea, the digital concierge for Antique Split, to assist guests with practical hotel information, local guidance and requests during their stay.',
         meta: { hotelSlug, roomNumber, deterministic: 'identity', ms: Date.now() - started },
+      });
+    }
+
+    // ✅ -1c) Deterministic: capabilities / help scope ("What can you help me with?")
+    // Returns a short stable answer that always includes "Reception" (eval F-003).
+    // Prevents LLM variance where the model forgets to mention Reception.
+    if (isCapabilitiesQuestion(question)) {
+      return res.json({
+        ok: true,
+        answer: 'I can help you with hotel information, room guidance, local recommendations and requests during your stay. For anything that needs human assistance, I can guide you to Reception.',
+        meta: { hotelSlug, roomNumber, deterministic: 'capabilities', ms: Date.now() - started },
       });
     }
 

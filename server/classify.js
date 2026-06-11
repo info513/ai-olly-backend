@@ -708,3 +708,23 @@ export function isIdentityQuestion(question) {
     (q.includes('tko') && q.includes('napravio'))               // HR: "tko te je napravio"
   );
 }
+
+// ── isCapabilitiesQuestion ────────────────────────────────────────────────────
+// Fires when a guest asks what the assistant can help with or what it knows.
+// "What can you help me with?", "What can you do?", "How can you help?",
+// "What do you know?", "What can Dioclea help with?"
+// Returns a short deterministic answer that always mentions Reception (eval F-003).
+export function isCapabilitiesQuestion(question) {
+  const q = normalizeText(question);
+  return (
+    (q.includes('what') && q.includes('can') && q.includes('help'))       ||  // "what can you help me with"
+    (q.includes('how') && q.includes('can') && q.includes('help'))        ||  // "how can you help me"
+    (q.includes('what') && q.includes('can') && q.includes('do'))         ||  // "what can you do"
+    (q.includes('what') && q.includes('can') && q.includes('dioclea'))    ||  // "what can Dioclea help with"
+    (q.includes('what') && q.includes('do') && q.includes('know'))        ||  // "what do you know"
+    (q.includes('what') && q.includes('do') && q.includes('help'))        ||  // "what do you help with"
+    (q.includes('kako') && q.includes('pomoci'))                           ||  // HR: "kako mi možeš pomoći"
+    (q.includes('sto') && q.includes('mozes'))                             ||  // HR: "što možeš"
+    (q.includes('cemu') && q.includes('sluzis'))                               // HR: "čemu služiš"
+  );
+}
