@@ -3,10 +3,12 @@
 // services, routes, near me, ask, requests and contact.
 
 // ── URL params ────────────────────────────────────────────────────────────
-const params = new URLSearchParams(window.location.search);
-const SLUG   = params.get('slug')  || '';
-const ROOM   = params.get('room')  || '';
-const TOKEN  = params.get('token') || '';
+const params             = new URLSearchParams(window.location.search);
+const SLUG               = params.get('slug')  || '';
+const ROOM               = params.get('room')  || '';
+const TOKEN              = params.get('token') || '';
+// Preview flags — safe to expose; only change visual rendering, never data
+const menuPreviewEnabled = params.get('menuPreview') === '1';
 
 // ── Module state ──────────────────────────────────────────────────────────
 let GOOGLE_REVIEW_URL = ''; // set from /api/pwa-welcome response
@@ -1873,6 +1875,9 @@ function boot() {
   _v2RenderWhispersCard();
   _v2InitAskBubble();
 
+  // Optional preview menu — replaces tile grid when ?menuPreview=1 is set
+  _initHomeMenu();
+
   // Show splash screen first; guest taps "Enter" to proceed to home
   _activateScreen('app-splash');
 
@@ -3115,4 +3120,47 @@ function _v2AskTap() {
     localStorage.setItem('olly_tooltip_seen', 'true');
   }
   gotoRoot('ask');
+}
+
+// ── Home Menu Preview (menuPreview=1 only) ────────────────────────────────────
+// Renders a premium 2-column card layout instead of the default 3-column tile
+// grid. Fires from boot() after the rest of the home screen is initialised.
+// Without ?menuPreview=1, this function is a no-op and the static HTML tiles
+// remain exactly as authored.
+
+const _PREVIEW_MENU_ITEMS = [
+  { icon: 'ico-bed',      title: 'Room Guide',       sub: 'Room details, WiFi, TV, Safe',          module: 'room-guide' },
+  { icon: 'ico-services', title: 'Hotel Services',   sub: 'Breakfast, luggage, comfort',            module: 'services'   },
+  { icon: 'ico-nearme',   title: 'Map & Near Me',    sub: 'Places around the hotel',                module: 'near-me'    },
+  { icon: 'ico-routes',   title: 'Routes',           sub: 'Curated walks in Split',                 module: 'routes'     },
+  { icon: 'ico-bell',     title: 'Concierge',        sub: 'Human assistance & arrangements',        module: 'concierge', accent: true },
+  { icon: 'ico-help',     title: 'Help & Requests',  sub: 'Send a request to reception',            module: 'help'       },
+];
+
+function _buildPreviewMenuHTML() {
+  const cards = _PREVIEW_MENU_ITEMS.map(function (item) {
+    const accentCls = item.accent ? ' home-menu-preview-card--accent' : '';
+    return (
+      '<div class="home-menu-preview-card' + accentCls + '" onclick="openModule(\'' + item.module + '\')">' +
+        '<div class="home-menu-preview-top">' +
+          '<div class="home-menu-preview-icon">' +
+            '<svg class="v2-icon v2-icon--sm"><use href="#' + item.icon + '"/></svg>' +
+          '</div>' +
+          '<div class="home-menu-preview-chevron">' +
+            '<svg class="v2-icon v2-icon--xs"><use href="#ico-arrow-right"/></svg>' +
+          '</div>' +
+        '</div>' +
+        '<div class="home-menu-preview-title">' + item.title + '</div>' +
+        '<div class="home-menu-preview-subtitle">' + item.sub + '</div>' +
+      '</div>'
+    );
+  }).join('');
+  return '<div class="home-menu-preview">' + cards + '</div>';
+}
+
+function _initHomeMenu() {
+  if (!menuPreviewEnabled) return;  // default path — keep static HTML tiles
+  var section = document.getElementById('home-menu-section');
+  if (!section) return;
+  section.innerHTML = _buildPreviewMenuHTML();
 }
