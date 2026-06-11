@@ -878,24 +878,55 @@ function renderRoutesList() {
     container.innerHTML = '<p style="color:var(--text-muted);font-size:14px;padding:16px 0;">No routes available at this time.</p>';
     return;
   }
-  container.innerHTML = `<div class="section-list">${
-    routesData.map((r, i) => {
+
+  // Group routes by type/category for premium section headers
+  const groups = [];
+  const seen   = new Map(); // type \u2192 group index
+  routesData.forEach((r, i) => {
+    const cat = r.type || '';
+    if (!seen.has(cat)) {
+      seen.set(cat, groups.length);
+      groups.push({ cat, routes: [] });
+    }
+    groups[seen.get(cat)].routes.push({ r, i });
+  });
+
+  let html = '';
+  groups.forEach(({ cat, routes }) => {
+    // Category hero banner
+    const meta = ROUTE_CATEGORY_META[cat] || {};
+    const cls  = meta.cls || 'route-cat-hero--default';
+    const sub  = meta.sub || (cat ? 'Curated routes in this category.' : 'Curated walks from Antique Split.');
+    const title = cat || 'Routes';
+    html += `
+      <div class="route-cat-hero ${escHtml(cls)}">
+        <div class="route-cat-hero__content">
+          <p class="route-cat-hero__tag">Route Category</p>
+          <h3 class="route-cat-hero__title">${escHtml(title)}</h3>
+          <p class="route-cat-hero__sub">${escHtml(sub)}</p>
+        </div>
+      </div>`;
+    // Route items for this category
+    html += `<div class="section-list" style="margin-bottom:4px;">`;
+    routes.forEach(({ r, i }) => {
       const icon = _routeIcon(r.type);
       const subParts = [];
-      if (r.type)     subParts.push(escHtml(r.type));
       if (r.duration) subParts.push('\u23f1 ' + escHtml(r.duration));
-      const sub = subParts.join(' \u00b7 ');
-      return `
+      const itemSub = subParts.join(' \u00b7 ');
+      html += `
         <div class="section-item" onclick="openRouteDetail(${i})">
           <span>${icon}</span>
           <span class="section-item-body">
             <span>${escHtml(r.name)}</span>
-            ${sub ? `<span class="section-item-sub">${sub}</span>` : ''}
+            ${itemSub ? `<span class="section-item-sub">${itemSub}</span>` : ''}
           </span>
           <span class="section-arrow">\u203a</span>
         </div>`;
-    }).join('')
-  }</div>`;
+    });
+    html += `</div>`;
+  });
+
+  container.innerHTML = html;
 }
 
 function openRouteDetail(idx) {
@@ -909,6 +940,29 @@ function openRouteDetail(idx) {
   setText('route-desc',         currentRoute.longDesc || '');
   setText('route-start',
     currentRoute.startPointName ? 'Start: ' + currentRoute.startPointName : '');
+
+  // ── Populate premium detail hero ────────────────────────────────────────────
+  const heroEl    = document.getElementById('route-detail-hero');
+  const heroTitle = document.getElementById('route-hero-title');
+  const heroSub   = document.getElementById('route-hero-sub');
+  const heroTag   = document.getElementById('route-hero-tag');
+  if (heroTitle) heroTitle.textContent = currentRoute.name || '';
+  if (heroTag)   heroTag.textContent   = currentRoute.type || 'Route';
+  if (heroSub) {
+    const sub = currentRoute.shortDesc
+      || (currentRoute.longDesc ? currentRoute.longDesc.slice(0, 120).trimEnd() + (currentRoute.longDesc.length > 120 ? '…' : '') : '')
+      || 'Curated route experience from Antique Split.';
+    heroSub.textContent = sub;
+  }
+  // Tint the hero gradient to match the route category if known
+  if (heroEl) {
+    const meta = ROUTE_CATEGORY_META[currentRoute.type || ''];
+    if (meta && meta.cls) {
+      heroEl.className = 'screen-hero screen-hero--route-detail';
+      // Subtle: apply category-matched tint via inline style override
+      // (real per-route images will replace this later)
+    }
+  }
 
   // POI list — route.poiIds are Airtable record IDs; look up in poisData
   const poisContainer = document.getElementById('route-pois-list');
@@ -2070,6 +2124,36 @@ function _openAlwaysOnPoi(poiId) {
   _populatePoiDetail(poi);
   pushScreen('poi-detail');
 }
+
+// Route category metadata — title, subtitle and CSS class for each category hero.
+// Category names match the "Tip rute" (route type) field values from Airtable.
+// To swap in a real photo later: set --hero-img on the variant class in style.css.
+const ROUTE_CATEGORY_META = {
+  'Romantic Split': {
+    sub: 'Quiet corners, sea views and atmospheric walks for a slower Split experience.',
+    cls: 'route-cat-hero--romantic',
+  },
+  'Local Taste & Traditions': {
+    sub: 'Food, markets and local habits that reveal the everyday character of Split.',
+    cls: 'route-cat-hero--local',
+  },
+  'History & Heritage': {
+    sub: "Palace walls, ancient streets and stories from Split's layered past.",
+    cls: 'route-cat-hero--history',
+  },
+  'Split by Night': {
+    sub: 'Evening walks, relaxed atmosphere and places that come alive after sunset.',
+    cls: 'route-cat-hero--night',
+  },
+  'Inside the Palace': {
+    sub: "A closer look at the living heart of Diocletian's Palace.",
+    cls: 'route-cat-hero--palace',
+  },
+  'Relax & Green Split': {
+    sub: 'Calmer places, seaside walks and green corners near the city centre.',
+    cls: 'route-cat-hero--relax',
+  },
+};
 
 // Alias map: Home card display name → canonical Airtable POI name
 // Used by _openWeatherPickPoi so known naming differences don't break links.

@@ -1259,12 +1259,75 @@ html, body {
 
 .route-dot { margin: 0 2px; opacity: 0.4; }
 
-/* Route detail hero */
-.route-hero {
-  height: 200px;
-  background: linear-gradient(135deg, #1e3040 0%, #2c3e20 100%);
+/* ── Route category hero banner — compact premium header in routes list ─────── */
+
+.route-cat-hero {
+  width: 100%;
+  min-height: 114px;
   flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+  border-radius: 14px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  margin-top: 18px;
+  margin-bottom: 4px;
 }
+.route-cat-hero:first-child { margin-top: 0; }
+
+.route-cat-hero__content {
+  position: relative;
+  z-index: 2;
+  padding: 0 18px 14px;
+}
+.route-cat-hero__content::before {
+  content: '';
+  position: absolute;
+  inset: -50px 0 0 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.route-cat-hero__tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 3px;
+  position: relative;
+}
+
+.route-cat-hero__title {
+  font-family: var(--font-serif);
+  font-size: 21px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  margin-bottom: 4px;
+  position: relative;
+}
+
+.route-cat-hero__sub {
+  font-size: 12px;
+  color: rgba(255,255,255,0.62);
+  line-height: 1.4;
+  max-width: 270px;
+  position: relative;
+}
+
+/* Category gradient variants — swap with --hero-img later */
+.route-cat-hero--romantic  { --hero-img: none; background: linear-gradient(145deg, #28102e 0%, #1a0e22 50%, #1e1e3c 100%); }
+.route-cat-hero--local     { --hero-img: none; background: linear-gradient(145deg, #281a0e 0%, #1a1208 50%, #201c0e 100%); }
+.route-cat-hero--history   { --hero-img: none; background: linear-gradient(145deg, #1a1226 0%, #200e22 50%, #261408 100%); }
+.route-cat-hero--night     { --hero-img: none; background: linear-gradient(145deg, #060616 0%, #0e0e28 50%, #080e18 100%); }
+.route-cat-hero--palace    { --hero-img: none; background: linear-gradient(145deg, #1e1208 0%, #160e06 50%, #1c1006 100%); }
+.route-cat-hero--relax     { --hero-img: none; background: linear-gradient(145deg, #081812 0%, #0c1e12 50%, #0e1c10 100%); }
+.route-cat-hero--default   { --hero-img: none; background: linear-gradient(145deg, #0f2820 0%, #1a3830 50%, #112240 100%); }
 
 /* ── POI / Stop detail hero ──────────────────────────────────────────────── */
 
@@ -1438,6 +1501,10 @@ html, body {
 .screen-hero--routes      {
   --hero-img: none;
   background: linear-gradient(145deg, #0f2820 0%, #1a3830 50%, #112240 100%);
+}
+.screen-hero--route-detail {
+  --hero-img: none;
+  background: linear-gradient(145deg, #1e3040 0%, #162c34 50%, #2a2010 100%);
 }
 .screen-hero--info        {
   --hero-img: none;
