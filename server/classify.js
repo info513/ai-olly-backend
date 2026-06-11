@@ -685,3 +685,26 @@ export function isExtraTowelsQuestion(question) {
     q.includes('rucnici')     // HR: towels plural (no diacritic)
   );
 }
+
+// ── isIdentityQuestion ───────────────────────────────────────────────────────
+// Fires when a guest asks about the origin or creator of the AI assistant.
+// "Who made you?", "Who created you?", "Who built you?", "What is Dioclea?"
+// Returns a deterministic, stable answer that always includes "Antique Split"
+// and "assist guests" — required by eval F-005.
+//
+// Croatian: "tko te je stvorio" = "who created you"; "tko si ti" = "who are you"
+export function isIdentityQuestion(question) {
+  const q = normalizeText(question);
+  return (
+    (q.includes('who') && q.includes('made you'))           ||  // "who made you"
+    (q.includes('who') && q.includes('created you'))        ||  // "who created you"
+    (q.includes('who') && q.includes('built you'))          ||  // "who built you"
+    (q.includes('who') && q.includes('behind you'))         ||  // "who is behind you"
+    (q.includes('who') && q.includes('made') && q.includes('dioclea')) ||
+    q.includes('who are you made by')                       ||  // "who are you made by"
+    q.includes('what is dioclea')                           ||  // "what is Dioclea"
+    q.includes('who is dioclea')                            ||  // "who is Dioclea"
+    (q.includes('tko') && q.includes('stvorio'))            ||  // HR: "tko te je stvorio"
+    (q.includes('tko') && q.includes('napravio'))               // HR: "tko te je napravio"
+  );
+}

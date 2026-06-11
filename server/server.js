@@ -11,7 +11,7 @@ import cors from 'cors';
 import Airtable from 'airtable';
 import OpenAI from 'openai';
 import webpush from 'web-push';
-import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion, isMaintenanceReportQuestion, isRoomNumberQuestion, isExtraTowelsQuestion } from './classify.js';
+import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion, isMaintenanceReportQuestion, isRoomNumberQuestion, isExtraTowelsQuestion, isIdentityQuestion } from './classify.js';
 import { timingSafeEqual, randomBytes } from 'node:crypto';
 import { asArray, isEmptyArray, fieldHasAny, valuesToStrings, matchesHotelSlug, allowForWeb, allowForPWA } from './filters.js';
 
@@ -2705,6 +2705,17 @@ app.post('/api/pwa-ask', async (req, res) => {
         ok: true,
         answer: renderEmergencyAnswer(hotelRec, lang, question),
         meta: { hotelSlug, roomNumber, deterministic: 'emergency', ms: Date.now() - started },
+      });
+    }
+
+    // ✅ -1b) Deterministic: identity / persona ("Who made you?", "Who created you?")
+    // Returns a stable answer always including "Antique Split" and "assist guests".
+    // Must fire before GPT to prevent non-deterministic persona responses (eval F-005).
+    if (isIdentityQuestion(question)) {
+      return res.json({
+        ok: true,
+        answer: 'I was created as Dioclea, the digital concierge for Antique Split, to assist guests with practical hotel information, local guidance and requests during their stay.',
+        meta: { hotelSlug, roomNumber, deterministic: 'identity', ms: Date.now() - started },
       });
     }
 
