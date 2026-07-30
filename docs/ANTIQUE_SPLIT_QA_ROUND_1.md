@@ -160,5 +160,34 @@ Spelling normalized (controlled / satellite / Wi-Fi). Bullets use "• ". "Room 
 
 ---
 
+## Batch 1 — DONE (verified 2026-07-30)
+
+All B-section items (R-TYPE, R-FEAT, R-NOTE, R-SG, R-WIN, R-HEAT, R-AC, R-BED, R-VIEW) and G5 (spelling) are **DONE**. E-section U3 (hide Smart Glass when absent) and the room-guide part of U1 (bullet rendering) **DONE** via commit `4318bb2`.
+
+Airtable records changed (ROOM GUIDE): rec F Az2YGmW6Jecct (101), rec3qHDdoXOMpXn0q (102), rec0lHP301GragCLj (201), recNpT3t70mVawqrA (202), recdpPa3vO3ji5cc7 (203), recHKG7eyKJVgESID (301), recs7uTBMo9FpypxA (302), recROKEUVvzUt9TaD (303). New field created: `Smart Glass` (fldNMMbJHEPvzQOIL). Old values recoverable from git/session history.
+
+| Room | Type | Smart Glass | Window | Underfloor | Extra Bed | View | Room Guide | AI (data) |
+|---|---|---|---|---|---|---|---|---|
+| 101 | Deluxe Ground Floor | Yes (switch above sink) | Sideways, no tilt | Yes (+AC note) | Yes €40 | Cathedral, **no Peristyle** | ✅ | ✅ via context |
+| 102 | **Comfort Ground Floor** (fixed) | No (tile hidden) | Sideways, no tilt | Yes (+AC note) | — | — | ✅ | ✅ |
+| 201 | Deluxe Room | Yes | Open + tilt | Yes (+AC note) | — | Cathedral + Peristyle | ✅ | ✅ |
+| 202 | Superior Room | No (tile hidden) | Open + tilt | Yes (+AC note) | Yes €40 | — | ✅ | ✅ |
+| 203 | Standard Room | No (tile hidden) | Open + tilt | Yes (+AC note) | — | — | ✅ | ✅ |
+| 301 | Deluxe Room | Yes | Open + tilt | **No** (no AC note) | — | Cathedral + Peristyle | ✅ | ✅ |
+| 302 | Superior Room | No (tile hidden) | Open + tilt | **No** (no AC note) | Yes €40 + baby cot | — | ✅ | ✅ |
+| 303 | **Standard Room** (fixed) | No (tile hidden) | Open + tilt | **No** (no AC note) | — | — | ✅ | ✅ |
+
+Live verification: API returns per-room `smartGlass` (201 populated, 102 empty); 102 room type = "Comfort Ground Floor"; PWA hides Smart Glass tile for 102 and renders Room Features as a bullet list (screenshots taken). AC underfloor note present in 101/102/201/202/203, absent in 301/302/303. QR tokens untouched.
+
+> **AI (data)** = correct because Ask Dioclea reads these ROOM GUIDE fields via `buildRoomContext`. A live per-room Q&A pass (Batch 4 manual test set) + `npm run eval:prod` remain to be run.
+
+## Still OPEN
+- Batch 2 (Hotel Services content: S1–S12) — requires editing SERVICES records.
+- Batch 3 remainder: service-detail renderer (U1 for services), remove duplicated dark-brown short description under detail heroes (U2).
+- Batch 4: live per-room Ask Dioclea test set + policy checks (check-out 11:00, key fob, business invoice, transfer-first arrival) + `npm run eval:prod`.
+- Batch 5: Map (taxi removal, Ferry/Bus split, Pharmacy duty locations), Concierge Dining, Hotel Info address from HOTELI.
+- Global G1–G4, G6.
+- Tests to run: `npm run eval:prod`, `npm run lint:content`, `TENANT_SLUG=antique-split npm run validate:tenant`.
+
 ## Change log
-- 2026-07-30: Ledger created; field map + Batch-1 target values authored. Applied R-TYPE (102, 303) Room Type + AI Welcome corrections to Airtable (see Batch 1 progress). Remaining Batch 1 fields + Batches 2–5 OPEN.
+- 2026-07-30: Ledger created; field map + Batch-1 target values authored. **Batch 1 implemented and verified** (8 ROOM GUIDE records + new Smart Glass field + code commit `4318bb2`). Docs committed `8de9c45`. Batches 2–5 OPEN.
