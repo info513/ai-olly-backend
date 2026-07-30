@@ -1197,12 +1197,15 @@ function navigateToRouteStart() {
 
 // ── Near Me ───────────────────────────────────────────────────────────────
 const NM_CATEGORIES = [
-  { id: 'landmarks',   label: 'Landmarks',          icon: 'landmark',     query: 'landmarks+historic+sites' },
-  { id: 'beach',       label: 'Beach',               icon: 'beach',        query: 'beach' },
-  { id: 'pharmacy',    label: 'Pharmacy',             icon: 'pill',         query: 'pharmacy' },
-  { id: 'atm',         label: 'ATM',                  icon: 'credit-card',  query: 'ATM' },
-  { id: 'supermarket', label: 'Supermarket',          icon: 'cart',         query: 'supermarket' },
-  { id: 'transport',   label: 'Ferry / Bus / Taxi',   icon: 'bus',          query: 'ferry+bus+stop+taxi' },
+  { id: 'landmarks',   label: 'Landmarks',    icon: 'landmark',     query: 'landmarks+historic+sites' },
+  { id: 'beach',       label: 'Beach',        icon: 'beach',        query: 'beach' },
+  { id: 'pharmacy',    label: 'Pharmacy',     icon: 'pill',         query: 'pharmacy' },
+  { id: 'atm',         label: 'ATM',          icon: 'credit-card',  query: 'ATM' },
+  { id: 'supermarket', label: 'Supermarket',  icon: 'cart',         query: 'supermarket' },
+  // Ferry and Bus are separate categories; generic taxi search removed (arrival guidance
+  // routes taxi through Reception — no arbitrary local taxi companies surfaced).
+  { id: 'ferry',       label: 'Ferry Port',   icon: 'ferry',        query: 'ferry+port+Split' },
+  { id: 'bus',         label: 'Bus Station',  icon: 'bus',          query: 'bus+station+Split' },
 ];
 
 function openNearMeCategory(catId) {
@@ -1219,9 +1222,15 @@ function renderNearMeResults(cat) {
   if (!container) return;
   const { lat, lng } = CONFIG.hotelCoords;
   const mapsUrl = `https://www.google.com/maps/search/${cat.query}/@${lat},${lng},16z`;
+  // Pharmacy: surface the hotel's known duty-pharmacy locations (names only — no
+  // invented street numbers). Reception confirms which pharmacy is on duty today.
+  const pharmacyNote = cat.id === 'pharmacy'
+    ? `<p class="nm-note">Duty (out-of-hours) pharmacies in Split are usually at <strong>Osječka ulica</strong> and near <strong>Super Konzum</strong>. Please ask Reception to confirm which pharmacy is on duty today.</p>`
+    : '';
   container.innerHTML = `
     <div class="nm-maps-result">
       <p class="screen-subtitle">Nearest ${escHtml(cat.label.toLowerCase())} near the hotel.</p>
+      ${pharmacyNote}
       <a href="${mapsUrl}" target="_blank" rel="noopener" class="action-btn action-btn--primary action-btn--block">
         Open in Google Maps
       </a>
@@ -2412,10 +2421,16 @@ async function loadPartners() {
 function renderConciergeRestaurants() {
   const el = document.getElementById('conc-restaurants-list');
   if (!el) return;
+  const label = document.getElementById('conc-dining-label');
+  // Hide the whole Dining section until there is verified partner content.
   if (!partnersData || !partnersData.length) {
-    el.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:14px;">No partner restaurants available at this time.</div>';
+    el.innerHTML = '';
+    el.hidden = true;
+    if (label) label.hidden = true;
     return;
   }
+  el.hidden = false;
+  if (label) label.hidden = false;
   el.innerHTML = partnersData.map((p, i) => `
     <div class="conc-item" onclick="openRestaurantDetail(${i})">
       <span class="conc-item-icon">${_icon('utensils')}</span>

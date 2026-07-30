@@ -819,6 +819,18 @@ html, body {
 #svc-desc .svc-list li.svc-price::before { display: none; }
 #svc-desc .svc-price-val { color: var(--accent, #2c1f14); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+/* Near Me — informational note (e.g. duty pharmacy locations) */
+.nm-note {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text, #4a4038);
+  background: rgba(158, 114, 40, 0.08);
+  border: 1px solid rgba(158, 114, 40, 0.18);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 0 0 16px;
+}
+
 .rg-wifi-password {
   font-family: monospace;
   font-size: 20px;
