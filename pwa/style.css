@@ -781,6 +781,44 @@ html, body {
   background: var(--gold, #9e7228);
 }
 
+/* Structured service-detail content (from _renderMarkdown) */
+#svc-desc p { font-size: 15px; line-height: 1.65; margin: 0 0 12px; }
+#svc-desc p:last-child { margin-bottom: 0; }
+#svc-desc .svc-heading {
+  font-family: var(--font-serif, 'Cormorant Garamond', serif);
+  font-size: 19px;
+  font-weight: 600;
+  margin: 20px 0 8px;
+  color: var(--accent, #2c1f14);
+}
+#svc-desc .svc-heading:first-child { margin-top: 0; }
+#svc-desc .svc-list { list-style: none; margin: 0 0 12px; padding: 0; }
+#svc-desc .svc-list li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 15px;
+  line-height: 1.55;
+  margin-bottom: 7px;
+}
+#svc-desc .svc-list li::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 9px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold, #9e7228);
+}
+#svc-desc .svc-list li.svc-price {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-left: 0;
+}
+#svc-desc .svc-list li.svc-price::before { display: none; }
+#svc-desc .svc-price-val { color: var(--accent, #2c1f14); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
 .rg-wifi-password {
   font-family: monospace;
   font-size: 20px;

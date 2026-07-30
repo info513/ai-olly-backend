@@ -489,11 +489,19 @@ function openServiceDetail(idx) {
   setText('svc-title',        currentService.naziv || '');
   setText('svc-screen-title', currentService.naziv || '');
 
-  // Description — strip URLs then render as markdown
+  // Description — strip URLs, dedupe hero/body, render as structured content
   const rawOpisDesc = currentService.opis || '';
   const cleanDesc   = _stripUrls(rawOpisDesc).trim();
+  const _firstLine  = cleanDesc.split('\n')[0].trim();
+  const _firstIsBullet = /^([-•*]|\d+\.)\s/.test(_firstLine);
+  // Hero subtitle candidate: a complete, non-bullet opening line (shown in the hero).
+  const heroFromBody = (!_firstIsBullet && _firstLine.length >= 8 && _firstLine.length <= 110)
+    ? _firstLine.replace(/[#*_>`]/g, '').trim() : '';
+  // Body: drop the opening line when it is already shown as the hero subtitle (no duplication).
+  let bodyDesc = cleanDesc;
+  if (heroFromBody) bodyDesc = cleanDesc.slice(cleanDesc.indexOf(_firstLine) + _firstLine.length).replace(/^[\s\n]+/, '');
   const descEl = document.getElementById('svc-desc');
-  if (descEl) descEl.innerHTML = _renderMarkdown(cleanDesc);
+  if (descEl) descEl.innerHTML = _renderMarkdown(bodyDesc);
 
   // ── Hero ──────────────────────────────────────────────────────────────────
   const SVC_CAT_SUBTITLES = {
@@ -516,9 +524,7 @@ function openServiceDetail(idx) {
   if (heroTitle) heroTitle.textContent = currentService.naziv || '';
   if (heroTag)   heroTag.textContent   = firstCat || 'Hotel Service';
   if (heroSub) {
-    // Use first sentence of description (plain text, max 100 chars), or category fallback
-    const plainFirst = cleanDesc.replace(/[#*_>`]/g, '').split(/[.\n]/)[0].trim().slice(0, 100);
-    heroSub.textContent = plainFirst
+    heroSub.textContent = heroFromBody
       || SVC_CAT_SUBTITLES[firstCat]
       || 'Hotel service available at Antique Split.';
   }
@@ -1711,9 +1717,16 @@ function show(id)             { const el = document.getElementById(id); if (el) 
 function setHidden(id, state) { const el = document.getElementById(id); if (el) el.hidden = state; }
 function setText(id, text)    { const el = document.getElementById(id); if (el) el.textContent = text; }
 
-// Strip all URLs from a text string
+// Strip all URLs from a text string, preserving paragraph/line structure.
+// Collapses runs of spaces/tabs only (NOT newlines) so bullet lists and
+// headings survive for the structured renderer.
 function _stripUrls(text) {
-  return (text || '').replace(/https?:\/\/[^\s]+/g, '').replace(/\s{2,}/g, ' ').trim();
+  return (text || '')
+    .replace(/https?:\/\/[^\s]+/g, '')
+    .replace(/[ \t]{2,}/g, ' ')   // collapse spaces/tabs, keep newlines
+    .replace(/[ \t]+\n/g, '\n')   // trim trailing spaces on each line
+    .replace(/\n{3,}/g, '\n\n')   // cap consecutive blank lines at one
+    .trim();
 }
 
 // Extract first URL from text, optionally skipping domains in the exclude list
@@ -1724,32 +1737,52 @@ function _extractFirstUrl(text, excludeDomains = []) {
 
 // Lightweight markdown → HTML renderer for service descriptions.
 // Supports: **bold**, *italic*, - bullet lists, --- separator, paragraphs.
+// Reusable structured-content renderer for Airtable free text.
+// Handles: paragraphs, single line breaks, "• / - / *" bullet lists, section
+// headings (ALL-CAPS, "Title:", or short Title-Case section labels), price rows
+// ("Item — 3,00 €"), and horizontal rules. Prevents wall-of-text; not record-specific.
 function _renderMarkdown(text) {
   if (!text) return '';
+  const lines = text.split('\n');
+  let html = '';
+  let listOpen = false;
+  const closeList = () => { if (listOpen) { html += '</ul>'; listOpen = false; } };
 
-  // Split into blocks by double newline (paragraphs / list groups)
-  const blocks = text.split(/\n{2,}/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) { closeList(); continue; }
+    if (/^-{3,}$/.test(line)) { closeList(); html += '<hr>'; continue; }
 
-  return blocks.map(block => {
-    const lines = block.split('\n');
-
-    // Bullet list block — lines starting with - • * or digits
-    const isList = lines.every(l => /^\s*([-•*]|\d+\.)\s/.test(l.trim()) || l.trim() === '');
-    if (isList && lines.some(l => l.trim())) {
-      const items = lines
-        .filter(l => l.trim())
-        .map(l => `<li>${_inlineMarkdown(l.replace(/^\s*([-•*]|\d+\.)\s*/, ''))}</li>`)
-        .join('');
-      return `<ul>${items}</ul>`;
+    // Bullet / numbered list item
+    if (/^([-•*]|\d+\.)\s+/.test(line)) {
+      if (!listOpen) { html += '<ul class="svc-list">'; listOpen = true; }
+      const item = line.replace(/^([-•*]|\d+\.)\s+/, '');
+      // Price row: "Label — 3,00 €" → align label and price
+      const price = item.match(/^(.*\S)\s+[—-]\s+([\d.,]+\s*€|€\s*[\d.,]+)$/);
+      html += price
+        ? `<li class="svc-price"><span>${_inlineMarkdown(price[1])}</span><span class="svc-price-val">${_inlineMarkdown(price[2])}</span></li>`
+        : `<li>${_inlineMarkdown(item)}</li>`;
+      continue;
     }
 
-    // Horizontal rule
-    if (/^-{3,}$/.test(block.trim())) return '<hr>';
+    closeList();
 
-    // Regular paragraph — join lines with <br> for single newlines
-    const html = lines.map(l => _inlineMarkdown(l)).join('<br>');
-    return `<p>${html}</p>`;
-  }).join('');
+    // Heading detection
+    const next = (lines[i + 1] || '').trim();
+    const isHeading =
+      /^#{1,6}\s/.test(line) ||
+      (/^[A-ZÀ-Ý0-9][A-ZÀ-Ý0-9 &'()/+-]*$/.test(line) && line.length <= 32) ||  // ALL-CAPS section
+      /:$/.test(line) ||                                                          // "Instructions:"
+      (line.length <= 40 && /^[A-ZÀ-Ý]/.test(line) && !/[.!?,;]$/.test(line) && !/[.!?]/.test(line)); // short Title-Case label
+    if (isHeading) {
+      const h = line.replace(/^#{1,6}\s*/, '').replace(/:$/, '');
+      html += `<h4 class="svc-heading">${_inlineMarkdown(h)}</h4>`;
+    } else {
+      html += `<p>${_inlineMarkdown(line)}</p>`;
+    }
+  }
+  closeList();
+  return html;
 }
 
 function _inlineMarkdown(text) {
