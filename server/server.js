@@ -947,6 +947,7 @@ function mapRoomGuideRecord(rec) {
     napomene: pickFirstNonEmpty(f.Napomene, ''),
     aiWelcome: pickFirstNonEmpty(f['AI WELCOME'], ''),
     roomFeatures: pickFirstNonEmpty(f['Room features/Communication'], ''),
+    smartGlass: pickFirstNonEmpty(f['Smart Glass'], ''),
     aiMasterPrompt: pickFirstNonEmpty(f['AI Master prompt'], ''),
     qrLink: pickFirstNonEmpty(f['QR LINK'], ''),
     // Access token — set per check-in, cleared at check-out.
@@ -1784,6 +1785,7 @@ function buildRoomContext(roomGuide) {
   const parts = [];
   if (roomGuide.naziv)          parts.push(`Room: ${roomGuide.naziv}`);
   if (roomGuide.roomFeatures)   parts.push(`Room features: ${roomGuide.roomFeatures}`);
+  if (roomGuide.smartGlass)     parts.push(`Smart glass window: ${roomGuide.smartGlass}`);
   if (roomGuide.wifi)           parts.push(`WiFi: ${roomGuide.wifi}`);
   if (roomGuide.klimaUpute)     parts.push(`AC instructions: ${roomGuide.klimaUpute}`);
   if (roomGuide.tvUpute)        parts.push(`TV instructions: ${roomGuide.tvUpute}`);
@@ -3314,6 +3316,7 @@ app.post('/api/pwa-room-guide', async (req, res) => {
       tvUpute:      roomGuide?.tvUpute      ?? '',
       sefUpute:     roomGuide?.sefUpute     ?? '',
       roomFeatures: roomGuide?.roomFeatures ?? '',
+      smartGlass:   roomGuide?.smartGlass   ?? '',
       napomene:     roomGuide?.napomene     ?? '',
       aiWelcome:    roomGuide?.aiWelcome    ?? '',
     });

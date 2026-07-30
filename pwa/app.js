@@ -164,6 +164,34 @@ function renderRoomGuideSections() {
   } else {
     show('rg-loading');
   }
+  // Room-specific: only show the Smart Glass tile for rooms that actually have it.
+  // Rooms without smart glass have an empty 'Smart Glass' field — never show a generic claim.
+  const sgTile = document.getElementById('rg-tile-smartglass');
+  if (sgTile) {
+    const hasSmartGlass = !!(roomGuideData && roomGuideData.smartGlass && roomGuideData.smartGlass.trim());
+    sgTile.hidden = !hasSmartGlass;
+  }
+}
+
+// Render structured Airtable text (paragraphs, "• " bullet lines) as clean HTML.
+// Bullet lines become a <ul>; other lines become paragraphs. Prevents wall-of-text.
+function renderStructuredText(raw) {
+  const lines = String(raw || '').split('\n').map(l => l.trim());
+  let html = '';
+  let inList = false;
+  for (const line of lines) {
+    if (!line) { if (inList) { html += '</ul>'; inList = false; } continue; }
+    const isBullet = /^[•\-\*]\s+/.test(line);
+    if (isBullet) {
+      if (!inList) { html += '<ul class="rg-list">'; inList = true; }
+      html += `<li>${escHtml(line.replace(/^[•\-\*]\s+/, ''))}</li>`;
+    } else {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<p class="rg-content-text">${escHtml(line)}</p>`;
+    }
+  }
+  if (inList) html += '</ul>';
+  return html;
 }
 
 function openRoomGuideSection(section) {
@@ -233,32 +261,34 @@ function renderRoomSection(section) {
   } else if (section === 'ac') {
     const text = roomGuideData.klimaUpute || '';
     html += text
-      ? `<div class="rg-content-block"><div class="rg-content-text">${escHtml(text)}</div></div>`
+      ? `<div class="rg-content-block">${renderStructuredText(text)}</div>`
       : `<div class="rg-content-block"><p class="rg-content-text">Air conditioning instructions are not available. Please contact Reception.</p></div>`;
   } else if (section === 'tv') {
     const text = roomGuideData.tvUpute || '';
     html += text
-      ? `<div class="rg-content-block"><div class="rg-content-text">${escHtml(text)}</div></div>`
+      ? `<div class="rg-content-block">${renderStructuredText(text)}</div>`
       : `<div class="rg-content-block"><p class="rg-content-text">TV instructions are not available. Please contact Reception.</p></div>`;
   } else if (section === 'safe') {
     const text = roomGuideData.sefUpute || '';
     html += text
-      ? `<div class="rg-content-block"><div class="rg-content-text">${escHtml(text)}</div></div>`
+      ? `<div class="rg-content-block">${renderStructuredText(text)}</div>`
       : `<div class="rg-content-block"><p class="rg-content-text">Safe instructions are not available. Please contact Reception.</p></div>`;
   } else if (section === 'smartglass') {
     const text = roomGuideData.smartGlass || '';
+    // Room-specific only — no generic fallback. Rooms without smart glass never reach
+    // this screen (the tile is hidden in renderRoomGuideSections).
     html += text
-      ? `<div class="rg-content-block"><div class="rg-content-text">${escHtml(text)}</div></div>`
-      : `<div class="rg-content-block"><p class="rg-content-text">Your room is equipped with a smart glass window system. Use the wall switch to change between clear and private mode. If you need help, please contact Reception.</p></div>`;
+      ? `<div class="rg-content-block">${renderStructuredText(text)}</div>`
+      : `<div class="rg-content-block"><p class="rg-content-text">This room does not have a smart glass window. If you need help, please contact Reception.</p></div>`;
   } else if (section === 'features') {
     const text = roomGuideData.roomFeatures || '';
     html += text
-      ? `<div class="rg-content-block"><div class="rg-content-text">${escHtml(text)}</div></div>`
+      ? `<div class="rg-content-block">${renderStructuredText(text)}</div>`
       : `<div class="rg-content-block"><p class="rg-content-text">Room feature details are not listed for this room.</p></div>`;
   } else if (section === 'notes') {
     const text = roomGuideData.napomene || '';
     html += text
-      ? `<div class="rg-content-block"><div class="rg-content-text">${escHtml(text)}</div></div>`
+      ? `<div class="rg-content-block">${renderStructuredText(text)}</div>`
       : `<div class="rg-content-block"><p class="rg-content-text">No additional notes for this room.</p></div>`;
   }
 

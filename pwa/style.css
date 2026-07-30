@@ -755,6 +755,31 @@ html, body {
   line-height: 1.65;
   white-space: pre-line;
 }
+.rg-content-text + .rg-content-text { margin-top: 10px; }
+
+.rg-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.rg-list li {
+  position: relative;
+  padding-left: 20px;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 9px;
+}
+.rg-list li:last-child { margin-bottom: 0; }
+.rg-list li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 10px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold, #9e7228);
+}
 
 .rg-wifi-password {
   font-family: monospace;
