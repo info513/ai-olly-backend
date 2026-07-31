@@ -255,6 +255,14 @@ Local `/api/pwa-ask` against localhost:8080 (LOCAL ONLY — never production). R
 ### Google My Maps — requirements (report only)
 To replace the current Google Maps *search* links (Beaches/Landmarks) with a curated hotel map, the hotel must provide: (1) a published **Google My Maps** map (Share → "Anyone with the link") and its **map ID / embed URL**; (2) confirmation the layers (Beaches, Landmarks) are populated with verified pins. Implementation would then embed `https://www.google.com/maps/d/embed?mid=<MAP_ID>` in an iframe on the map screen. Not implemented tonight (needs the hotel's map ID; current search links remain safe).
 
+## ⚠️ OPEN — HOTEL CONFIRMATION REQUIRED (do not pick a winner)
+Two hotel-core values conflict between `config.js` and the HOTELI Airtable record. **Not changed** pending hotel confirmation:
+| Field | config.js | HOTELI (Airtable) |
+|---|---|---|
+| Reception phone | `+38521785208` | `+385992140829` |
+| Address | `Ul. Dioklecijanova 1, 21000 Split` | `Poljana Grgura Ninskog 1` |
+Once confirmed, reconcile HOTELI ↔ config.js and re-test the contact answer. (See AI_ANSWER_AUDIT_ROUND_1.md F4.)
+
 ## Still OPEN (after tonight)
 - **Extra-bed answer quality** (202/302): price-guard mutes the €40/availability. Candidate for a small deterministic extra-bed handler reading `roomFeatures`. Left OPEN to avoid rushing a handler; info is present in data.
 - **Hotel Info address conflict**: CONFIG "Ul. Dioklecijanova 1" vs HOTELI "Poljana Grgura Ninskog 1" — confirm correct address, then wire Info to HOTELI.

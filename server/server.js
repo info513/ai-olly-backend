@@ -11,7 +11,7 @@ import cors from 'cors';
 import Airtable from 'airtable';
 import OpenAI from 'openai';
 import webpush from 'web-push';
-import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion, isMaintenanceReportQuestion, isRoomNumberQuestion, isExtraTowelsQuestion, isExtraBedQuestion, isIdentityQuestion, isCapabilitiesQuestion } from './classify.js';
+import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion, isMaintenanceReportQuestion, isRoomNumberQuestion, isExtraTowelsQuestion, isExtraBedQuestion, isBreakfastInBedQuestion, isBreakfastBagQuestion, isReceptionHelpQuestion, isIdentityQuestion, isCapabilitiesQuestion } from './classify.js';
 import { timingSafeEqual, randomBytes } from 'node:crypto';
 import { asArray, isEmptyArray, fieldHasAny, valuesToStrings, matchesHotelSlug, allowForWeb, allowForPWA } from './filters.js';
 
@@ -1804,6 +1804,26 @@ function renderExtraBedAnswer(roomGuide, lang = 'EN') {
     : 'Yes — an extra bed is available in your room on request. Please contact Reception for the price and to arrange it.';
 }
 
+// Breakfast in bed / breakfast bag — sourced from the Breakfast (Hours & Policy)
+// SERVICES record (order to room by dialing 100; bags need evening-before notice).
+function renderBreakfastInBedAnswer(lang = 'EN') {
+  return lang === 'HR'
+    ? 'Da — doručak možete naručiti u sobu pozivom na broj 100 i odabirom iz À la carte menija.'
+    : 'Yes — you can order breakfast to your room by dialing 100 and choosing from the À la carte menu.';
+}
+function renderBreakfastBagAnswer(lang = 'EN') {
+  return lang === 'HR'
+    ? 'Da — ako odlazite prije 7:30, možemo pripremiti paket doručka. Molimo obavijestite hotel prethodne večeri.'
+    : 'Yes — if you are departing before 7:30, a breakfast bag can be prepared. Please notify the hotel by the evening before.';
+}
+// Short general assistance answer for "Can Reception help me?" — no contact
+// dump. Contact-details requests are handled separately by isContactCoreQuestion.
+function renderReceptionHelpAnswer(lang = 'EN') {
+  return lang === 'HR'
+    ? 'Da. Recepcija vam rado pomaže sa zahtjevima za sobu, prijevozom, prtljagom, rezervacijama restorana i drugom podrškom tijekom vašeg boravka.'
+    : 'Yes. Reception is available to help with room requests, transfers, luggage, restaurant arrangements and other assistance during your stay.';
+}
+
 function buildRoomContext(roomGuide) {
   if (!roomGuide) return '';
   const parts = [];
@@ -2808,12 +2828,41 @@ app.post('/api/pwa-ask', async (req, res) => {
       });
     }
 
+    // ✅ 0.09) Deterministic: general reception-help — "Can Reception help me?"
+    // Must fire BEFORE isContactCoreQuestion (which matches 'reception' and would
+    // dump the full contact card). Contact-DETAILS requests still fall through.
+    if (isReceptionHelpQuestion(question)) {
+      return res.json({
+        ok: true,
+        answer: renderReceptionHelpAnswer(lang),
+        meta: { hotelSlug, roomNumber, deterministic: 'reception_help', ms: Date.now() - started },
+      });
+    }
+
     // ✅ 0.1) Deterministic: hotel core (contact / address / check-in-out)
     if (isContactCoreQuestion(question)) {
       return res.json({
         ok: true,
         answer: renderFocusedHotelCoreAnswer(hotelRec, question, lang),
         meta: { hotelSlug, roomNumber, deterministic: 'hotel_core', ms: Date.now() - started },
+      });
+    }
+
+    // ✅ 0.48) Deterministic: breakfast in bed / breakfast bag — must fire BEFORE
+    // isBreakfastHoursQuestion so "when should I request a breakfast bag" (has a
+    // time word) is answered as a bag question, not the hours handler.
+    if (isBreakfastInBedQuestion(question)) {
+      return res.json({
+        ok: true,
+        answer: renderBreakfastInBedAnswer(lang),
+        meta: { hotelSlug, roomNumber, deterministic: 'breakfast_in_bed', ms: Date.now() - started },
+      });
+    }
+    if (isBreakfastBagQuestion(question)) {
+      return res.json({
+        ok: true,
+        answer: renderBreakfastBagAnswer(lang),
+        meta: { hotelSlug, roomNumber, deterministic: 'breakfast_bag', ms: Date.now() - started },
       });
     }
 

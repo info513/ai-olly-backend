@@ -715,6 +715,70 @@ export function isExtraBedQuestion(question) {
   );
 }
 
+// ── isBreakfastInBedQuestion ─────────────────────────────────────────────────
+// "Can I have breakfast in bed / in my room / to my room?" — answered from the
+// verified Breakfast (Hours & Policy) record (order to room by dialing 100).
+// Must fire BEFORE isBreakfastHoursQuestion (a bare "when is breakfast" must
+// still route to the hours handler).
+export function isBreakfastInBedQuestion(question) {
+  const q = normalizeText(question);
+  if (!q.includes('breakfast') && !q.includes('dorucak') && !q.includes('doručak')) return false;
+  return (
+    q.includes('in bed')      ||
+    q.includes('to my room')  ||
+    q.includes('to the room') ||
+    q.includes('in my room')  ||
+    q.includes('in room')     ||
+    q.includes('room service')||
+    q.includes('u sobu')      ||
+    q.includes('u krevet')
+  );
+}
+
+// ── isBreakfastBagQuestion ───────────────────────────────────────────────────
+// "Can I get a breakfast bag / breakfast to go (early departure)?" — answered
+// from the verified Breakfast (Hours & Policy) record. Must fire BEFORE
+// isBreakfastHoursQuestion ("when should I request a breakfast bag" contains a
+// time word but is a bag question, not an hours question).
+export function isBreakfastBagQuestion(question) {
+  const q = normalizeText(question);
+  if (!q.includes('breakfast') && !q.includes('dorucak') && !q.includes('doručak')) return false;
+  return (
+    q.includes('bag')         ||   // "breakfast bag"
+    q.includes('to go')       ||
+    q.includes('takeaway')    ||
+    q.includes('take away')   ||
+    q.includes('packed')      ||
+    q.includes('leave early') ||
+    q.includes('leaving early')||
+    q.includes('depart')      ||
+    q.includes('za ponijeti') ||
+    q.includes('paket')
+  );
+}
+
+// ── isReceptionHelpQuestion ──────────────────────────────────────────────────
+// "Can Reception help me?", "What can Reception help with?" — a general
+// assistance question. Returns a short assistance answer. Deliberately NOT a
+// contact-details request: if the guest asks to CONTACT reception (phone, email,
+// number, address, WhatsApp), this returns false so isContactCoreQuestion handles it.
+export function isReceptionHelpQuestion(question) {
+  const q = normalizeText(question);
+  const mentionsReception = q.includes('reception') || q.includes('recepcij');
+  if (!mentionsReception) return false;
+  const isContactRequest = (
+    q.includes('contact') || q.includes('phone') || q.includes('number') ||
+    q.includes('call')    || q.includes('email') || q.includes('e mail') ||
+    q.includes('reach')   || q.includes('address') || q.includes('whatsapp') ||
+    q.includes('broj')    || q.includes('telefon')
+  );
+  const asksHelp = (
+    q.includes('help')   || q.includes('assist') || q.includes('what can') ||
+    q.includes('pomo')   || q.includes('može')   || q.includes('moze')
+  );
+  return asksHelp && !isContactRequest;
+}
+
 // ── isIdentityQuestion ───────────────────────────────────────────────────────
 // Fires when a guest asks about the origin or creator of the AI assistant.
 // "Who made you?", "Who created you?", "Who built you?", "What is Dioclea?"
@@ -745,6 +809,9 @@ export function isIdentityQuestion(question) {
 // Returns a short deterministic answer that always mentions Reception (eval F-003).
 export function isCapabilitiesQuestion(question) {
   const q = normalizeText(question);
+  // "What can Reception help with?" is a reception-help question, not an
+  // AI-capabilities question — let isReceptionHelpQuestion handle it.
+  if (q.includes('reception') || q.includes('recepcij')) return false;
   return (
     (q.includes('what') && q.includes('can') && q.includes('help'))       ||  // "what can you help me with"
     (q.includes('how') && q.includes('can') && q.includes('help'))        ||  // "how can you help me"

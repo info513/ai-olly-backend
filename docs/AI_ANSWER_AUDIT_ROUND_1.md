@@ -78,9 +78,35 @@ After fixes, every room passes the room-specific set (identity, type, view, wind
 
 **Hotel-wide questions:** check-in 14:00 / check-out 11:00 ✅, late check-out ✅, business invoice ✅, key fob ✅, arrival guidance ✅ (F2 fixed), breakfast hours/allergies/gluten-free ✅, extra towels/pillows/iron/shoe-cleaning ✅, ferry/bus ✅, sunset/beach/restaurant ✅. **OPEN:** breakfast in bed/bag (F3), "Can Reception help me?" raw dump + phone/address conflict (F4), 201 toiletries (F5).
 
+## Round-1 follow-up (2026-07-31) — closing F3, F4 (help part), F5
+
+### F3 — Breakfast in bed / breakfast bag  →  FIXED
+- An AI_INTENT_PATTERNS entry for this already existed (`rec2w3ojg1xoUOyPH`, phrases incl. "breakfast in bed"/"breakfast bag") linked to *Room Service & In-Room Breakfast*, but GPT routing across 617 patterns did not reliably surface it, so the questions still handed off. Per the "deterministic if routing can't be made reliable" rule, added **deterministic handlers** `isBreakfastInBedQuestion` / `isBreakfastBagQuestion` (fire before the breakfast-hours handler), sourced from the verified **Breakfast (Hours & Policy)** record. No duplicate service records created; no AI_INTENT_PATTERNS changed.
+- Answers: in bed → *"…order breakfast to your room by dialing 100 and choosing from the À la carte menu."*; bag → *"…if you are departing before 7:30, a breakfast bag can be prepared. **Please notify the hotel by the evening before.**"*
+
+### F4 (help answer) — "Can Reception help me?"  →  FIXED
+- Added deterministic `isReceptionHelpQuestion` (fires before the contact card) → short assistance answer, **no URLs/phone/address**. Guarded `isCapabilitiesQuestion` to defer to it when "reception" is mentioned. Contact-detail requests ("how can I contact reception?") still return contact info via the existing hotel-core handler. **Phone/address values were NOT changed** (see Task 4 / OPEN below).
+
+### F5 — Room 201 toiletries  →  FIXED
+- Added "• L'Occitane toiletries" to ROOM GUIDE **201** (`rec0lHP301GragCLj`) `Room features/Communication`. Other rooms with hotel-supplied L'Occitane (101, 202, 203, 302, 303) retain it. Q "What toiletries are provided?" (201) now returns L'Occitane.
+
+### Local re-test (LOCAL ONLY — localhost, not production)
+| # | Question | Room | Result | Class |
+|---|---|---|---|---|
+| 1 | Can I request breakfast in bed? | 201 | dial 100, À la carte | **PASS** |
+| 2 | Can I request a breakfast bag? | 201 | "…notify the hotel by the evening before." | **PASS** |
+| 3 | When should I request a breakfast bag? | 201 | same (not the hours handler) | **PASS** |
+| 4 | What toiletries are provided? | 201 | "L'Occitane toiletries" | **PASS** |
+| 5 | Can Reception help me? | 201 | short assistance answer, no URLs | **PASS** |
+| 6 | What can Reception help with? | 201 | short assistance answer (not capabilities) | **PASS** |
+| 7 | How can I contact Reception? | 201 | contact via hotel-core handler | **PASS** |
+
+Regression: "What can you help me with?" (no "reception") still → capabilities handler ✅.
+
 ## Remaining OPEN
-- **F3** breakfast in bed / breakfast bag — link phrases in AI_INTENT_PATTERNS (Airtable).
-- **F4** HOTELI vs config phone (+385992140829 vs +38521785208) and address ("Poljana Grgura Ninskog 1" vs "Ul. Dioklecijanova 1") — **confirm correct values with the hotel**, then reconcile; trim raw URLs from the hotel-core card.
-- **F5** 201 toiletries brand — add to ROOM GUIDE only if confirmed.
+- **F4 (data) — HOTEL CONFIRMATION REQUIRED — do not pick a winner:**
+  - **Phone:** config.js `+38521785208` vs HOTELI `+385992140829`.
+  - **Address:** config.js `Ul. Dioklecijanova 1` vs HOTELI `Poljana Grgura Ninskog 1`.
+  - Not changed. Once the hotel confirms the correct values, reconcile HOTELI ↔ config.js. (The contact handler currently surfaces the HOTELI phone.)
 
 ## Production verification — PENDING (Render suspended). Do NOT run `eval:prod` yet.
