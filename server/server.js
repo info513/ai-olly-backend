@@ -11,7 +11,7 @@ import cors from 'cors';
 import Airtable from 'airtable';
 import OpenAI from 'openai';
 import webpush from 'web-push';
-import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion, isMaintenanceReportQuestion, isRoomNumberQuestion, isExtraTowelsQuestion, isIdentityQuestion, isCapabilitiesQuestion } from './classify.js';
+import { normalizeText, detectLang, isContactCoreQuestion, isBreakfastHoursQuestion, isHousekeepingHoursQuestion, isWifiQuestion, isPetPolicyQuestion, isHotelSpecificQuestion, isCityQuestion, isAcQuestion, isTvQuestion, isSafeQuestion, isCityActivityQuestion, isCheckinTimeOnlyQuestion, isEmergencyQuestion, isParkingAvailabilityQuery, isWhatsAppQuestion, isMaintenanceReportQuestion, isRoomNumberQuestion, isExtraTowelsQuestion, isExtraBedQuestion, isIdentityQuestion, isCapabilitiesQuestion } from './classify.js';
 import { timingSafeEqual, randomBytes } from 'node:crypto';
 import { asArray, isEmptyArray, fieldHasAny, valuesToStrings, matchesHotelSlug, allowForWeb, allowForPWA } from './filters.js';
 
@@ -1780,6 +1780,30 @@ function renderExtraTowelsAnswer(lang = 'EN') {
   return 'Of course. Please contact Reception or send a request through the Help & Requests section, and the team will arrange extra towels for your room.';
 }
 
+// PWA extra-bed renderer — answers per-room from ROOM GUIDE features.
+// Rooms whose "Room features/Communication" mentions an extra bed get a
+// confirmation (with the surcharge if present); rooms without get a clear "no".
+function renderExtraBedAnswer(roomGuide, lang = 'EN') {
+  const features = String(roomGuide?.roomFeatures || '');
+  const hasExtraBed = /extra bed/i.test(features);
+  if (!hasExtraBed) {
+    return lang === 'HR'
+      ? 'Vaša soba nema opciju pomoćnog kreveta. Za druge mogućnosti smještaja rado će vam pomoći recepcija.'
+      : 'Your room does not offer an extra bed. For other options, Reception will be happy to help.';
+  }
+  // Extract a price such as "€40" / "40 €" that appears with the extra-bed line.
+  const m = features.match(/extra bed[^\n]*?(€\s?\d+(?:[.,]\d+)?|\d+(?:[.,]\d+)?\s?€|\d+\s?eur)/i);
+  const price = m ? m[1].replace(/\s+/g, '').replace(/eur/i, ' €').trim() : '';
+  if (lang === 'HR') {
+    return price
+      ? `Da — u vašoj sobi moguć je pomoćni krevet na upit uz doplatu ${price} po noći. Molimo obratite se recepciji za dogovor.`
+      : 'Da — u vašoj sobi moguć je pomoćni krevet na upit. Molimo obratite se recepciji za cijenu i dostupnost.';
+  }
+  return price
+    ? `Yes — an extra bed is available in your room on request for ${price} per night. Please contact Reception to arrange it.`
+    : 'Yes — an extra bed is available in your room on request. Please contact Reception for the price and to arrange it.';
+}
+
 function buildRoomContext(roomGuide) {
   if (!roomGuide) return '';
   const parts = [];
@@ -2825,6 +2849,17 @@ app.post('/api/pwa-ask', async (req, res) => {
         ok: true,
         answer: renderExtraTowelsAnswer(lang),
         meta: { hotelSlug, roomNumber, deterministic: 'extra_towels', ms: Date.now() - started },
+      });
+    }
+
+    // ✅ 0.66) Deterministic (PWA only): extra-bed availability + price, per room.
+    // Reads ROOM GUIDE features so answers are room-specific and bypass the GPT
+    // price-guard (which otherwise hides the confirmed extra-bed surcharge).
+    if (isExtraBedQuestion(question)) {
+      return res.json({
+        ok: true,
+        answer: renderExtraBedAnswer(roomGuide, lang),
+        meta: { hotelSlug, roomNumber, deterministic: 'extra_bed', ms: Date.now() - started },
       });
     }
 

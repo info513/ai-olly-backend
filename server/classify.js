@@ -128,6 +128,16 @@ export function isContactCoreQuestion(question) {
   );
   const hasCroOdjava = q.includes('odjava');
 
+  // Arrival context: "how should I reach the hotel", "get to the hotel from the
+  // airport" etc. are transport/arrival questions, NOT contact — they must route
+  // to the Arrival Guidance service, not the reception phone card.
+  const isArrivalContext = (
+    (q.includes('reach') || q.includes('get to') || q.includes('getting to')) &&
+    (q.includes('hotel') || q.includes('airport') || q.includes('ferry') ||
+     q.includes('station') || q.includes('transfer') || q.includes('transport') ||
+     q.includes('arrive') || q.includes('arrival'))
+  );
+
   return (
     q.includes('contact') ||
     q.includes('kontakt') ||
@@ -137,7 +147,7 @@ export function isContactCoreQuestion(question) {
     q.includes('call') ||
     q.includes('email') ||
     q.includes('e mail') ||
-    q.includes('reach') ||
+    (q.includes('reach') && !isArrivalContext) ||
     (q.includes('reception') && !isReceptionHoursQuery) ||   // guard: reception hours → service record
     (q.includes('recepc')    && !isReceptionHoursQuery) ||
     q.includes('address') ||
@@ -683,6 +693,25 @@ export function isExtraTowelsQuestion(question) {
     q.includes('rucnik')  ||  // HR: towel (no diacritic)
     q.includes('ručnici') ||  // HR: towels plural (with diacritic)
     q.includes('rucnici')     // HR: towels plural (no diacritic)
+  );
+}
+
+// ── isExtraBedQuestion ───────────────────────────────────────────────────────
+// Fires when a guest asks about an extra/additional bed (availability or price).
+// PWA-only handler answers per-room from ROOM GUIDE features (some rooms have an
+// extra bed with a surcharge, others do not) — bypasses the GPT price-guard which
+// otherwise replies "price not available" and hides the confirmed €40 rate.
+// Croatian: "pomoćni/dodatni krevet" = extra bed.
+export function isExtraBedQuestion(question) {
+  const q = normalizeText(question);
+  return (
+    q.includes('extra bed')       ||
+    q.includes('additional bed')  ||
+    q.includes('third bed')       ||
+    q.includes('pomocni krevet')  ||
+    q.includes('pomoćni krevet')  ||
+    q.includes('dodatni krevet')  ||
+    (q.includes('extra') && q.includes('bed'))
   );
 }
 
