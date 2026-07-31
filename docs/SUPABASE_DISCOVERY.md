@@ -4,6 +4,8 @@
 > **Purpose of this document:** capture every decision I need from you *before* any architecture is designed. Nothing here is a proposal yet.
 > **How to read it:** each item is either **[KNOWN]** (a fact I've already verified in the current system — confirm or correct) or **[DECIDE]** (an open question only you can answer). Please answer the **[DECIDE]** items; correct any **[KNOWN]** item that's wrong.
 > Date: 2026-07-31. Source of truth for [KNOWN] items: the live Airtable base `appon9UYjX6KU9cr1`, `server/server.js`, and the QA/architecture docs already in `docs/`.
+>
+> **Update (2026-07-31): Supabase Phase 1 (infrastructure bootstrap) has STARTED** on `feature/ai-olly-platform-2` (foundation only — CLI structure, one foundation migration, isolated connection module, Phase-1 docs). This does **not** answer the [DECIDE] questions below; architecture still waits on them. **Production PWA is frozen, Airtable is still live, and no production cutover has occurred.**
 
 ---
 

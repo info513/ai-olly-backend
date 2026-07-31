@@ -6,6 +6,8 @@
 > Branch: `feature/ai-olly-platform-2`. Production (`main`, tag `v1.0.0-antique`) is frozen.
 > Date: 2026-07-31.
 
+> **Status update (2026-07-31): Supabase Phase 1 (infrastructure bootstrap) STARTED** on `feature/ai-olly-platform-2` — local CLI structure, one foundation migration, isolated server-only connection module + health check, and the Phase-1 docs. **Production PWA remains frozen. Airtable remains the live data provider. No production cutover has occurred. The full architecture is not finished.**
+
 ## Confirmed directions (the ground we build on)
 Supabase = primary DB + Auth + Storage + CMS backend + dashboard backend + AI knowledge backend + newsletter + analytics. **Airtable is fully retired.** **The dashboard is the only content-editing interface.** **Render stays** the backend API host. **The guest PWA and the v1 frozen contract are untouchable.** Vector search/embeddings is a **future** capability (design-for, build-later).
 

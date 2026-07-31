@@ -23,6 +23,7 @@ P1 Supabase migration ──▶ P2 Dashboard ──▶ P3 CMS ──▶ P4 AI Kn
 ---
 
 ## Phase 1 — Supabase migration (data layer)
+> **Status (2026-07-31): foundation STARTED (infrastructure bootstrap).** Local Supabase CLI structure, one foundation migration, isolated server-only connection module + health-check, and environment/security/storage/transition/setup docs are in place on `feature/ai-olly-platform-2`. Airtable is still the live provider; no endpoint switched; no production cutover. Data migration itself is not yet begun.
 - **Goal:** Stand up Supabase (EU region) as the primary database; migrate the Airtable content + operational model into Postgres; make the Express API read/write Supabase behind the existing endpoints, with Airtable dual-run as a fallback until verified.
 - **Dependencies:** Answered discovery (isolation model, tenant hierarchy, migrate-1:1-vs-redesign, historical-data scope); a Supabase project + connection pooling from Render.
 - **Risks:** Data-model mismatch (Airtable's loose typing → strict Postgres); breaking the frozen QR/token→room resolution; PII handling (GUESTS/STAYS/PRIVOLE); hidden Airtable Automations.
