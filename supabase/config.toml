@@ -1,0 +1,46 @@
+# Supabase CLI configuration — AI OLLY Platform 2.0 (development foundation)
+# Safe to commit: contains NO secrets. Keys/passwords live in .env (gitignored)
+# and in the Supabase dashboard, never here.
+# Requires: Supabase CLI + Docker to run `supabase start` / `supabase db reset`.
+
+project_id = "ai-olly-platform"
+
+[api]
+enabled = true
+port = 54321
+# Schemas exposed via PostgREST. `platform` is intentionally NOT exposed
+# (server-only helpers). Business schemas are added in later phases.
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false          # enable per-environment in the dashboard for Render
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]                # local email testing (Auth phase)
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+# Filled in during the Auth phase (Phase 2). Placeholders only — no real URLs yet.
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = false     # dashboard invites only; no open signups
+
+[analytics]
+enabled = false

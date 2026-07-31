@@ -8,12 +8,14 @@
     "test": "node --test tests/fix-01-02.test.js tests/fix-03-filters.test.js tests/fix-04-routing.test.js",
     "eval:prod": "node scripts/run-evals.js",
     "lint:content": "node scripts/lint-content.js",
-    "validate:tenant": "node scripts/validate-tenant.js"
+    "validate:tenant": "node scripts/validate-tenant.js",
+    "check:supabase": "node scripts/check-supabase-connection.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.111.0",
     "airtable": "^0.12.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

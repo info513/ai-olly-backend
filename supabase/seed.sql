@@ -1,0 +1,11 @@
+-- ============================================================================
+-- AI OLLY Platform 2.0 — Seed (development only)
+-- ----------------------------------------------------------------------------
+-- Intentionally EMPTY in Phase 1.
+--
+-- NO production hotel data, NO guest PII, NO Airtable content is seeded here.
+-- Development seed data (fictional demo tenant) will be added in a later phase,
+-- and only ever with synthetic, non-personal data.
+-- ============================================================================
+
+-- (no seed data in Phase 1)
