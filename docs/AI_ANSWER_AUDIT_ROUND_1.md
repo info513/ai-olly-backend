@@ -103,10 +103,14 @@ After fixes, every room passes the room-specific set (identity, type, view, wind
 
 Regression: "What can you help me with?" (no "reception") still → capabilities handler ✅.
 
-## Remaining OPEN
-- **F4 (data) — HOTEL CONFIRMATION REQUIRED — do not pick a winner:**
-  - **Phone:** config.js `+38521785208` vs HOTELI `+385992140829`.
-  - **Address:** config.js `Ul. Dioklecijanova 1` vs HOTELI `Poljana Grgura Ninskog 1`.
-  - Not changed. Once the hotel confirms the correct values, reconcile HOTELI ↔ config.js. (The contact handler currently surfaces the HOTELI phone.)
+## F4 (data) — RESOLVED (2026-07-31): official contact info confirmed & reconciled
+The hotel officially confirmed the canonical guest-facing values, now used everywhere:
+| Field | Official value |
+|---|---|
+| Telephone | **+385 21 785 208** |
+| Mobile | **+385 91 525 6985** |
+| Address | **Poljana Grgura Ninskog 1** |
+
+Reconciled: HOTELI `Telefon` `+385992140829 → +385 21 785 208`; new HOTELI field `Mobitel (recepcija)` = `+385 91 525 6985`; HOTELI WhatsApp → `wa.me/385915256985`; config.js address `Ul. Dioklecijanova 1 → Poljana Grgura Ninskog 1`, config.js whatsapp → mobile, added `config.mobile`. The stray `+385992140829` and `Ul. Dioklecijanova 1` no longer appear anywhere. Contact answers now return Telephone + Mobile consistently. **No OPEN conflicts remain.**
 
 ## Production verification — PENDING (Render suspended). Do NOT run `eval:prod` yet.

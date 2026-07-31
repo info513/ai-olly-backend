@@ -707,6 +707,13 @@ async function getHotelRecord(hotelSlug) {
       f.Phone,
       f['Phone Number']
     ),
+    mobitel: pickFirstNonEmpty(
+      f['Mobitel (recepcija)'],
+      f['Mobitel'],
+      f.Mobile,
+      f['Mobile Phone'],
+      ''
+    ),
     email: pickFirstNonEmpty(
       f['Email (recepcija)'],
       f['E-mail (recepcija)'],
@@ -1215,8 +1222,9 @@ function renderHotelCoreAnswer(hotelRec, lang = 'HR') {
   if (hotelRec.hotelNaziv) parts.push(lang === 'EN' ? `${hotelRec.hotelNaziv}` : `${hotelRec.hotelNaziv}`);
   if (hotelRec.adresa) parts.push(lang === 'EN' ? `Address: ${hotelRec.adresa}` : `Adresa: ${hotelRec.adresa}`);
 
-  // phone/email
-  if (hotelRec.telefon) parts.push(lang === 'EN' ? `Reception phone: ${hotelRec.telefon}` : `Telefon (recepcija): ${hotelRec.telefon}`);
+  // phone/mobile/email
+  if (hotelRec.telefon) parts.push(lang === 'EN' ? `Telephone: ${hotelRec.telefon}` : `Telefon: ${hotelRec.telefon}`);
+  if (hotelRec.mobitel) parts.push(lang === 'EN' ? `Mobile: ${hotelRec.mobitel}` : `Mobitel: ${hotelRec.mobitel}`);
   if (hotelRec.email) parts.push(lang === 'EN' ? `Email: ${hotelRec.email}` : `Email: ${hotelRec.email}`);
 
   // checkin/checkout
@@ -1266,11 +1274,15 @@ function renderFocusedHotelCoreAnswer(hotelRec, question, lang = 'HR') {
     q.includes('nazovit')  || q.includes('broj')    || q.includes('contact') ||
     q.includes('kontakt')  || q.includes('reach')   || q.includes('reception phone')
   ) {
-    const phone = hotelRec.telefon;
-    if (!phone) return renderNoInfo(lang);
-    return lang === 'EN'
-      ? `You can reach us at ${phone}`
-      : `Možete nas dosegnuti na ${phone}`;
+    const phone  = hotelRec.telefon;
+    const mobile = hotelRec.mobitel;
+    if (!phone && !mobile) return renderNoInfo(lang);
+    const lines = [];
+    if (phone)  lines.push(lang === 'EN' ? `Telephone: ${phone}`  : `Telefon: ${phone}`);
+    if (mobile) lines.push(lang === 'EN' ? `Mobile: ${mobile}`    : `Mobitel: ${mobile}`);
+    return (lang === 'EN'
+      ? `You can reach Reception at:\n`
+      : `Recepciju možete dobiti na:\n`) + lines.join('\n');
   }
 
   // Address / location / map

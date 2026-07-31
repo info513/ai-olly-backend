@@ -5,9 +5,10 @@
 const CONFIG = {
   hotelName:   'Hotel Antique Split',
   phone:       '+38521785208',
-  whatsapp:    '38521785208',   // digits only, no +
+  mobile:      '+385915256985',
+  whatsapp:    '385915256985',  // digits only, no + (official reception mobile)
   reception:   'Reception is available 24 hours a day.',
-  address:     'Ul. Dioklecijanova 1, 21000 Split, Croatia',
+  address:     'Poljana Grgura Ninskog 1, 21000 Split, Croatia',
   checkIn:     'From 14:00',
   checkOut:    'Until 11:00',
   hotelCoords: { lat: 43.5088, lng: 16.4401 },
