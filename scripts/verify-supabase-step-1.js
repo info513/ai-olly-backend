@@ -12,9 +12,10 @@ import pg from 'pg';
 import { getSupabaseServerClient } from '../server/data/supabase/client.js';
 
 const TABLES = ['translations', 'content_versions', 'audit_log', 'retention_policies'];
-// Later-domain tables that must NOT exist yet (through Step 3). Tenancy (Step 2)
-// and rooms/room_types (Step 3) are legitimately present.
-const BUSINESS_TABLES = ['services', 'pois', 'routes', 'partners', 'events', 'destination_events', 'guests', 'stays', 'price_items', 'subscribers', 'campaigns'];
+// Package B (and later) domain tables that must NOT exist yet — through Step 7,
+// tenancy, rooms, services, destination content and pricing are legitimately
+// present, so this guards only genuinely not-yet-started domains (proves B not begun).
+const BUSINESS_TABLES = ['guests', 'stays', 'reservations', 'subscribers', 'newsletter_campaigns', 'ai_documents', 'ai_knowledge', 'reception_requests', 'storage_objects'];
 const TAG = 'verify.step1';
 const ENTITY_ID = '00000000-0000-4000-8000-000000000001';
 
