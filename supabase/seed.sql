@@ -120,5 +120,47 @@ values
   'archived', true, true, false, true, 50)
 on conflict do nothing;
 
+-- ── Step 5: canonical destination content (platform-owned, published) ────────
+insert into public.destination_pois (id, destination_id, key, name, category, short_description, body_content, latitude, longitude, status, active, sort_order, published_at) values
+ ('45000000-0000-4000-8000-000000000001','d0000000-0000-4000-8000-000000000001','diocletian-palace','Diocletian''s Palace','landmark','UNESCO Roman palace at the heart of Split.','{"version":1,"blocks":[{"type":"paragraph","text":"A 4th-century Roman palace forming the old town core."}]}'::jsonb,43.508300,16.440400,'published',true,10,now()),
+ ('45000000-0000-4000-8000-000000000002','d0000000-0000-4000-8000-000000000001','riva-promenade','Riva Promenade','landmark','Seafront palm-lined promenade.','{"version":1,"blocks":[{"type":"paragraph","text":"The city''s main waterfront promenade."}]}'::jsonb,43.507000,16.439000,'published',true,20,now())
+on conflict do nothing;
+
+insert into public.destination_routes (id, destination_id, key, name, short_description, body_content, difficulty, distance_km, duration_minutes, status, active, sort_order, published_at) values
+ ('46000000-0000-4000-8000-000000000001','d0000000-0000-4000-8000-000000000001','old-town-walk','Old Town Walk','A gentle loop through the historic core.','{"version":1,"blocks":[{"type":"paragraph","text":"Start at the Riva, loop through the palace cellars."}]}'::jsonb,'easy',2.50,45,'published',true,10,now())
+on conflict do nothing;
+
+insert into public.destination_whispers (id, destination_id, channel_key, key, title, body_content, status, active, sort_order, published_at) values
+ ('47000000-0000-4000-8000-000000000001','d0000000-0000-4000-8000-000000000001','food','best-burek','Where to find the best burek','{"version":1,"blocks":[{"type":"paragraph","text":"Locals queue at the bakery near the fish market."}]}'::jsonb,'published',true,10,now())
+on conflict do nothing;
+
+insert into public.destination_events (id, destination_id, key, title, short_description, body_content, starts_at, ends_at, status, active, sort_order, published_at) values
+ ('48000000-0000-4000-8000-000000000001','d0000000-0000-4000-8000-000000000001','summer-festival','Split Summer Festival','Annual open-air arts festival.','{"version":1,"blocks":[{"type":"paragraph","text":"Concerts and theatre across the old town."}]}'::jsonb, now() + interval '20 days', now() + interval '60 days','published',true,10,now())
+on conflict do nothing;
+
+-- ── Step 6: Demo Hotel presentation over canonical content (Pattern B) ───────
+insert into public.hotel_poi_settings (id, hotel_id, poi_id, visible, featured, walking_time_minutes, hotel_recommendation) values
+ ('4b000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000001','45000000-0000-4000-8000-000000000001',true,true,5,'A five-minute stroll from our lobby — go early to beat the crowds.')
+on conflict do nothing;
+insert into public.hotel_poi_settings (id, hotel_id, poi_id, visible, featured) values
+ ('4b000000-0000-4000-8000-000000000002','40000000-0000-4000-8000-000000000001','45000000-0000-4000-8000-000000000002',false,false)  -- Demo Hotel hides Riva
+on conflict do nothing;
+
+-- ── Step 7: pricing (platform default + Demo Hotel override + native) ────────
+insert into public.price_categories (id, hotel_id, key, name, sort_order) values
+ ('49000000-0000-4000-8000-000000000001', null, 'transfers', 'Transfers', 10),
+ ('49000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', 'demo-extras', 'Demo Extras', 20)
+on conflict do nothing;
+
+insert into public.price_items (id, hotel_id, category_id, key, name, amount, currency, vat_rate, vat_included, billing_unit, status, active, published_at) values
+ ('4a000000-0000-4000-8000-000000000001', null, '49000000-0000-4000-8000-000000000001', 'airport-transfer', 'Airport Transfer', 40.00, 'EUR', 25.00, true, 'per_use', 'published', true, now())
+on conflict do nothing;
+insert into public.price_items (id, hotel_id, category_id, key, name, amount, currency, vat_rate, vat_included, billing_unit, status, active, override_of_price_item_id, published_at) values
+ ('4a000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', null, 'airport-transfer', 'Airport Transfer (Demo Hotel)', 35.00, 'EUR', 25.00, true, 'per_use', 'published', true, '4a000000-0000-4000-8000-000000000001', now())
+on conflict do nothing;
+insert into public.price_items (id, hotel_id, category_id, key, name, amount, currency, vat_rate, vat_included, billing_unit, status, active, published_at) values
+ ('4a000000-0000-4000-8000-000000000003', '40000000-0000-4000-8000-000000000001', '49000000-0000-4000-8000-000000000002', 'late-checkout', 'Late Check-out', 20.00, 'EUR', 25.00, true, 'per_use', 'published', true, now())
+on conflict do nothing;
+
 -- Synthetic staff users/memberships are created by the verification script using
 -- Supabase Auth admin APIs (so they are real, testable, and cleaned up).
