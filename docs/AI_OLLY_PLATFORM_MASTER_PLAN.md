@@ -269,4 +269,4 @@ These require Ivan's input before architecture. (Consolidated from `SUPABASE_DIS
 
 ---
 
-> **Progress update (2026-08-01):** planning blockers resolved; implementation underway on `feature/ai-olly-platform-2`, `aiolly-dev` only. **Steps 1–3 applied & verified**: cross-cutting (35 checks), tenancy & identity (50), rooms & Room Guide / Pattern C inheritance (40). Production, Airtable, Render and the guest PWA remain untouched (`DATA_PROVIDER=airtable`). Next: **Services** (then destination content). See `DATABASE_MIGRATION_STEP_1..3.md`.
+> **Progress update (2026-08-01):** planning blockers resolved; implementation underway on `feature/ai-olly-platform-2`, `aiolly-dev` only. **Steps 1–4 applied & verified**: cross-cutting (35 checks), tenancy & identity (50), rooms & Room Guide / Pattern C (40), **Hotel Services & operational content / Pattern A + publishing/versioning (76)**. Production, Airtable, Render and the guest PWA remain untouched (`DATA_PROVIDER=airtable`). Next: **Destination content** (POIs / events / routes). See `DATABASE_MIGRATION_STEP_1..4.md`.
