@@ -343,4 +343,12 @@ Each step is one (or a few) migration(s); **RLS + policies are written together 
 ## B.4 Remaining questions
 All **schema-design** blockers are resolved. The only outstanding item is **external, not a schema blocker**: the **exact legal retention periods (Q3)** await legal confirmation — the `retention_policies` mechanism already accommodates whatever values legal confirms.
 
-> Proposal complete. **No SQL, no tables, no migration, no PWA changes** until you approve building step 1.
+> Proposal complete.
+
+---
+
+# Implementation status
+
+- **Migration Step 1 (cross-cutting: enums, `translations`, `content_versions`, `audit_log`, `retention_policies`) — APPLIED to `aiolly-dev`** (2026-08-01). RLS enabled + fail-closed; append-only enforced; **33/33 verification checks pass**. See `docs/DATABASE_MIGRATION_STEP_1.md`.
+- **Architectural finding:** Supabase **default privileges over-grant** (`service_role`, and would `anon`/`authenticated`) **ALL** privileges on new `public` tables. Every migration must **`REVOKE ALL` then `GRANT` the exact minimum** (a dedicated hardening migration corrected Step 1). This pattern is now standard for all future domain migrations.
+- Business domains (tenancy, hotels, rooms, …) **not started**. Production, Airtable, Render and the guest PWA **untouched**; `DATA_PROVIDER=airtable`.

@@ -9,7 +9,8 @@
     "eval:prod": "node scripts/run-evals.js",
     "lint:content": "node scripts/lint-content.js",
     "validate:tenant": "node scripts/validate-tenant.js",
-    "check:supabase": "node scripts/check-supabase-connection.js"
+    "check:supabase": "node scripts/check-supabase-connection.js",
+    "verify:supabase:step1": "node scripts/verify-supabase-step-1.js"
   },
   "keywords": [],
   "author": "",
@@ -24,6 +25,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "pg": "^8.22.0",
     "supabase": "^2.111.0"
   }
 }

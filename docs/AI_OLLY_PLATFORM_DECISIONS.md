@@ -267,4 +267,6 @@ Resolve the last database-design blockers.
 
 **Q8. Destination versioning** — Canonical destination content is **fully versioned (immutable snapshots)**. Hotel presentation settings are **audited but not full-version-snapshotted** in R1. Any hotel-side change affecting guest presentation still produces an **audit-log entry**.
 
-> All database-design blockers are now resolved. Applied to `AI_OLLY_DATABASE_ARCHITECTURE.md` → **Addendum B** (final inventory + migration order). Still no SQL/tables/migration.
+> All database-design blockers are now resolved. Applied to `AI_OLLY_DATABASE_ARCHITECTURE.md` → **Addendum B** (final inventory + migration order).
+>
+> **Implementation status (2026-08-01):** Migration **Step 1** (cross-cutting: enums, translations, content_versions, audit_log, retention_policies) is **applied to `aiolly-dev`** with RLS/fail-closed/append-only, **33/33 checks pass** (`docs/DATABASE_MIGRATION_STEP_1.md`). Finding: Supabase default privileges over-grant — every migration must `REVOKE ALL` then `GRANT` the minimum. Business domains not started; production/Airtable/PWA untouched.
