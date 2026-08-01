@@ -288,3 +288,59 @@ These locked decisions refine the v0 proposal: they add a **Destination** contex
 - **Q8.** Do destination-shared types get version history **at the destination level** (canonical versioned; per-hotel presentation settings are lightweight config, audited not versioned)? (assumed **yes** — confirm.)
 
 > Everything above is proposal/refinement. **Still no SQL, no tables, no migration, no PWA changes.**
+
+---
+
+# Addendum B — Final blockers resolved (Q1–Q8, 2026-08-01)
+
+## B.1 Refinements from Q1–Q8
+- **Pricing (Q1):** single controlled polymorphic `price_items` with a fixed `context_type` set (`minibar_item`, `transfer`, `hotel_service`, `room`, `parking`, `breakfast`, `wellness`, `laundry`, `extra_bed`); PMS-ready via `external_source`/`external_id`/`last_synced_at`. No per-domain price tables.
+- **Platform admin (Q2):** `profiles.is_platform_admin` global flag; hotel roles in **`hotel_memberships`** (renamed from the earlier `hotel_members`); platform admin needs no membership.
+- **Retention (Q3):** `retention_policies` keyed by **data_type, hotel_id?, jurisdiction?, effective_date, retention_duration, action** (`delete`/`anonymize`/`archive`). Exact legal values are **pending legal**, not hardcoded.
+- **Image optimization (Q4):** store **one original** per asset; serve Supabase-transformed variants (`thumbnail`, `card`, `hero`, `full`). No stored copies. `assets` keeps only the original + metadata.
+- **Deterministic handlers (Q5):** **logic in code** (emergency, safety, room identity, QR/token, safe handoff, identity, anti-hallucination, critical routing, fallback); **facts in data** (`knowledge_articles`, `ai_configs`, room/room_type facts, `price_items`, approved answers, keyword aliases). `ai_configs` may hold approved answers + safe keyword aliases per hotel.
+- **Destination editing (Q6):** canonical destination content editable **only by `platform_admin`** in R1; hotels edit presentation settings only; no `destination_editor` role.
+- **Hotel↔destination (Q7):** `hotels.destination_id` — exactly one destination per hotel; no M:N.
+- **Destination versioning (Q8):** canonical destination content **fully versioned**; `hotel_*_settings` are **audited, not versioned** in R1; every guest-facing hotel-side change writes an `audit_log` entry.
+
+## B.2 Final table inventory (by domain)
+Flags: **T** tenant-scoped · **D** destination-scoped · **I** inheritable (Pattern A) · **L** localized · **V** versioned · **A** audited.
+
+**1. Tenancy & Identity** — `destinations` (V A), `hotel_groups` (A), `hotels` (+destination_id, A), `profiles` (+is_platform_admin, A), `hotel_memberships` (role, A)
+**2. Rooms & Room Guide** — `room_types` (T L V A; holds default room-guide content), `rooms` (T A; access_token + structured fact overrides)
+**3. Destination-shared canonical content** — `pois` (D L V), `whisper_chapters` (D-or-hotel owner, L V), `destination_events` (D L V)
+**4. Hotel presentation settings (Pattern B)** — `hotel_poi_settings` (T L, A), `hotel_whisper_settings` (T, A), `hotel_event_settings` (T, A)
+**5. Hotel operational content (Pattern A / hotel-owned)** — `services` (T I L V A), `routes` (T I L V A), `route_pois` (join), `partners` (T I L V A), `faqs` (T I L V A), `news` (T L V A), `events` hotel-owned (T L V A)
+**6. Pricing** — `price_items` (T; polymorphic context)
+**7. AI Knowledge** — `knowledge_articles` (T I L V A), `ai_configs` (T I L A; persona/output/approved answers/aliases), `ai_response_logs` (T; 90-day), `unanswered_questions` (T), `knowledge_embeddings` (future placeholder)
+**8. Guests, Stays & Consent** — `guests` (T A; external_source/id, pseudonymized), `guest_duplicate_suggestions` (T; suggest-only), `stays` (T A; stay_token, source), `consents` (T A; retained per policy)
+**9. Reception** — `requests` (T A), `feedback` (T A), `push_subscriptions` (T)
+**10. Media / Assets** — `assets` (T A; original only), `asset_usages` (T)
+**11. Newsletter** — `subscribers` (T), `segments` (T), `campaigns` (T), `campaign_stats` (—)
+**12. Cross-cutting** — `translations` (L mechanism), `content_versions` (immutable JSON snapshots), `audit_log` (A mechanism), `retention_policies` (configurable)
+
+*RLS is created inline with every table (never a table without a policy). Content-resolution views (Pattern A platform↔hotel resolution; Pattern B destination+settings resolution; Pattern C room_type→room facts) are added after their content tables exist.*
+
+## B.3 Recommended migration order
+Each step is one (or a few) migration(s); **RLS + policies are written together with each table**, not deferred.
+
+0. **(done)** `0000…platform_foundation` — extensions, `platform` schema, `set_updated_at()`, `platform_health()`.
+1. **Enums + cross-cutting scaffolding** — enum types (hotel roles, statuses, `context_type`, retention `action`, asset `kind`, content `status`); `translations`, `content_versions`, `audit_log`, `retention_policies`. *(referenced by everything)*
+2. **Tenancy & Identity** — `destinations`, `hotel_groups`, `hotels`, `profiles`, `hotel_memberships` + RLS + platform-admin policy helpers.
+3. **Rooms** — `room_types`, `rooms` (access_token uniqueness, backward-compat).
+4. **Destination canonical content** — `pois`, `whisper_chapters`, `destination_events`.
+5. **Hotel presentation settings** — `hotel_poi_settings`, `hotel_whisper_settings`, `hotel_event_settings`.
+6. **Hotel operational content** — `services`, `routes`, `route_pois`, `partners`, `faqs`, `news`, `events`.
+7. **Pricing** — `price_items`.
+8. **AI Knowledge** — `knowledge_articles`, `ai_configs`, `ai_response_logs`, `unanswered_questions`.
+9. **Guests, Stays & Consent** — `guests`, `guest_duplicate_suggestions`, `stays`, `consents`.
+10. **Reception** — `requests`, `feedback`, `push_subscriptions`.
+11. **Media** — `assets`, `asset_usages` (+ Storage buckets & Storage RLS).
+12. **Newsletter** — `subscribers`, `segments`, `campaigns`, `campaign_stats`.
+13. **Resolution views** — Pattern A / B / C resolution + any convenience views for the data layer.
+14. **Dev seed** — synthetic non-personal demo data only (no production/Airtable data).
+
+## B.4 Remaining questions
+All **schema-design** blockers are resolved. The only outstanding item is **external, not a schema blocker**: the **exact legal retention periods (Q3)** await legal confirmation — the `retention_policies` mechanism already accommodates whatever values legal confirms.
+
+> Proposal complete. **No SQL, no tables, no migration, no PWA changes** until you approve building step 1.

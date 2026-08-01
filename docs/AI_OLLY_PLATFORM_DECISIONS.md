@@ -244,3 +244,27 @@ Refine the architecture proposal. Introduce a **destination** concept and three 
 **10. Backward compatibility** — Preserve: hotel **slug**, **room number**, existing **room/access tokens**, **QR URL structure**, existing **API response contracts**. Use new **UUID** primary keys internally. Hotel slug **globally unique**; room number + access token **unique within the hotel scope**, with **token security preserved**.
 
 > Applied to the architecture in `docs/AI_OLLY_DATABASE_ARCHITECTURE.md` → **Addendum A**. Still no SQL/tables/migration.
+
+---
+
+## LOCKED DATABASE ARCHITECTURE DECISIONS (Q1–Q8) — confirmed 2026-08-01
+
+Resolve the last database-design blockers.
+
+**Q1. Pricing model** — One **controlled polymorphic `price_items`** table (no per-domain price tables). Fields: id, hotel_id, context_type, context_id, name, amount, currency, billing_unit, vat_included, tax_rate (where applicable), valid_from, valid_to, active, note, external_source, external_id, last_synced_at. Allowed `context_type`: `minibar_item`, `transfer`, `hotel_service`, `room`, `parking`, `breakfast`, `wellness`, `laundry`, `extra_bed`.
+
+**Q2. Platform admin** — Global flag `profiles.is_platform_admin`. Hotel-specific roles remain in `hotel_memberships`. A platform admin **does not require a hotel membership** to access platform-level administration.
+
+**Q3. Retention** — Exact legal periods remain **PENDING LEGAL CONFIRMATION**; do not hardcode assumed periods. Schema supports configurable retention policies by: **data type, hotel, jurisdiction, effective date, retention duration, action (delete / anonymize / archive)**.
+
+**Q4. Image optimization** — Use **Supabase image transformations** for R1. Store **one original** asset; serve transformed variants: `thumbnail`, `card`, `hero`, `full`. Do not pre-generate/store multiple copies unless later justified by performance/cost.
+
+**Q5. Deterministic handlers** — **Logic stays in code:** emergency routing, safety guards, room identity, QR/token logic, safe handoff, identity questions, anti-hallucination rules, critical routing, fallback. **Facts stay in data (Supabase):** check-in/out, contact info, breakfast times, parking, transfers, extra bed, Smart Glass, room-specific facts, approved answers, safe keyword aliases where appropriate. **Principle: logic in code, facts in data.**
+
+**Q6. Destination content editing** — R1: **only `platform_admin`** may edit canonical destination content (canonical POIs, Whispers chapters, destination events, coordinates, identity). Hotel staff manage **only hotel presentation settings** (visibility, priority, sort order, walking time, hotel short description, recommendation, hotel media). **No `destination_editor` role in R1.**
+
+**Q7. Hotel ↔ destination** — R1: **one hotel belongs to exactly one destination** via `hotels.destination_id`. **No many-to-many** unless a confirmed future use case requires it.
+
+**Q8. Destination versioning** — Canonical destination content is **fully versioned (immutable snapshots)**. Hotel presentation settings are **audited but not full-version-snapshotted** in R1. Any hotel-side change affecting guest presentation still produces an **audit-log entry**.
+
+> All database-design blockers are now resolved. Applied to `AI_OLLY_DATABASE_ARCHITECTURE.md` → **Addendum B** (final inventory + migration order). Still no SQL/tables/migration.
