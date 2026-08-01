@@ -191,51 +191,28 @@ Each decision lists: **Decision · Rationale · Consequence · Deferred details*
 
 ---
 
-## OPEN DECISIONS — DATABASE DESIGN BLOCKERS
+## LOCKED DATABASE-DESIGN DECISIONS (A–J) — confirmed 2026-08-01
 
-Only the decisions that genuinely block the **first business schema**. Presented as a questionnaire with my **recommended default** — do not treat these as answered.
+The former open blockers are now **locked** (confirmed by Ivan). These govern the first business schema.
 
-**A. Tenant hierarchy** — *Recommended: one hotel per tenant now, with a nullable `hotel_group_id` so groups can be added later without a reshape; a `hotel_members` join table so a staff user can belong to multiple hotels.*
-- A1. One hotel per tenant, or hotel groups owning multiple hotels?
-- A2. Can one staff user belong to multiple hotels?
+**A. Tenant hierarchy** — Support **hotel groups AND individual hotels**. A hotel **may optionally** belong to a group. One staff user **may belong to multiple hotels**. Use **hotel memberships** (join table), not a single `hotel_id` on the user.
 
-**B. Staff roles (first release)** — *Recommended: `platform_admin`, `hotel_admin`, `reception`, `editor` for R1; add `marketing` and `read_only` later. Simple role-based (not per-resource permissions) to start.*
-- B1. Confirm the R1 role set.
+**B. First-release staff roles** — `platform_admin`, `hotel_admin`, `reception`, `editor`, `marketing`, `read_only`. **Role-based** permissions for R1, structured to allow **more granular permissions later**.
 
-**C. Content inheritance** — *Recommended: live platform defaults with hotel overrides (not copy-on-create), so platform-wide improvements propagate; hotels override only what they change.*
-- C1. Templates copied into each hotel, live defaults + overrides, or hybrid?
+**C. Content inheritance** — **Hybrid**: live platform defaults + hotel-specific overrides; **hotel override wins** when present; **do not copy** every platform record into every hotel.
 
-**D. Publishing workflow** — *Recommended: `hotel_admin` + `editor` may publish; review optional (not mandatory) in R1; `hotel_admin` has emergency direct-publish.*
-- D1. Who may publish?
-- D2. Is review mandatory?
-- D3. Emergency direct-publish permission?
+**D. Publishing** — May publish: `platform_admin`, `hotel_admin`, `editor`. Review **optional** in R1. **Emergency direct publish:** `platform_admin` + `hotel_admin` only. **Critical facts** (emergency info, checkout times, prices, legal texts) must show an **explicit warning before publication**.
 
-**E. Pricing model** — *Recommended: one generic `price_items` model (label, amount, currency, optional category) with effective dates; tax handling as a simple field; PMS integration future-only.*
-- E1. Generic price items vs service-specific price tables?
-- E2. Currency/tax/effective-date requirements?
-- E3. Future PMS integration in scope for the price model?
+**E. Pricing** — One **generic `price_items`** model, linked to services or other content contexts. Columns: `amount`, `currency`, `vat_included`, `tax_rate` (where applicable), `billing_unit`, `valid_from`, `valid_to`, `status`, hotel override, `note`, `external_source`, `external_id`, `last_synced_at`. **PMS integration is future scope; schema must be PMS-ready.**
 
-**F. Localization** — *Recommended: English-only content in release 1, but schema carries a `locale` from day one (translations added later without reshape).*
-- F1. English only in R1, or multilingual from schema day one?
+**F. Localization** — **English only required for R1**, but schema supports localization from day one via **translation tables + locale fields**. **No `title_en`/`title_hr`-style columns.**
 
-**G. Guest/stay model** — *Recommended: manual stays only in R1; PMS integration later; guests need NO accounts (token-only), matching the frozen guest contract.*
-- G1. Manual stays only initially?
-- G2. PMS integration later?
-- G3. Do guests need accounts? (recommend no)
+**G. Guests & stays** — Stays created **manually or via QR/token** initially; **PMS later**. **Guests do not create accounts.** Preserve **room token / stay token** guest access (frozen contract).
 
-**H. Media/video** — *Recommended: Supabase Storage for images/documents/audio (private buckets for signatures/PDFs); long-form video via Vimeo/YouTube/external CDN; ~10 MB image / ~20 MB PDF upload caps.*
-- H1. Confirm Storage for images/docs/audio.
-- H2. External hosting for long-form video?
-- H3. Max upload sizes?
+**H. Media** — Supabase Storage for images, PDFs, short audio, signatures, consent PDFs, logos, newsletter assets. **Long-form video:** Vimeo preferred, YouTube for public, Supabase Storage only for shorter videos. **Upload limits:** images 15 MB · PDFs 25 MB · audio 50 MB · short video 100 MB · signatures 5 MB. **Plan automatic image optimization** for PWA delivery.
 
-**I. Audit/retention** — *Recommended: keep last ~20 content versions (or 1 year); guest/stay + consent documents retained per legal minimum with erasure on request; AI logs retained ~90 days.*
-- I1. Content version retention?
-- I2. Guest-data retention?
-- I3. Consent-document retention?
-- I4. AI-log retention?
+**I. Audit & retention** — Retain **≥50 content versions**. Published **legal/consent text versions retained permanently or per confirmed legal policy**. Guest-data retention **configurable and legally confirmed**. Support **deletion + pseudonymization** workflows. **AI full-text logs: 90 days**; anonymized aggregate analytics may be retained longer. **Do not hardcode legal retention periods without approval.**
 
-**J. Dashboard hosting** — *Recommended: a separate Next.js app in the same repo (monorepo), deployed on Vercel (best Next.js DX), talking to Supabase via RLS + to Render for AI/ops; keeps the API on Render.*
-- J1. Vercel or Render for the dashboard?
-- J2. Separate Next.js app or same repository?
+**J. Dashboard** — Host the **Next.js dashboard on Vercel**; keep **Render** for Express API + AI. **Separate dashboard app inside the same repository (monorepo).** Guest PWA is not modified in this phase.
 
-> These blockers are returned to Ivan as a numbered questionnaire in the accompanying message. **No schema, tables, or SQL are created until A–J are answered.**
+> Architecture proposal built on these locks: `docs/AI_OLLY_DATABASE_ARCHITECTURE.md`. **No SQL is created or applied until that proposal is reviewed.**
