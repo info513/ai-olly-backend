@@ -11,7 +11,8 @@
     "validate:tenant": "node scripts/validate-tenant.js",
     "check:supabase": "node scripts/check-supabase-connection.js",
     "verify:supabase:step1": "node scripts/verify-supabase-step-1.js",
-    "verify:supabase:step2": "node scripts/verify-supabase-step-2.js"
+    "verify:supabase:step2": "node scripts/verify-supabase-step-2.js",
+    "verify:supabase:step3": "node scripts/verify-supabase-step-3.js"
   },
   "keywords": [],
   "author": "",

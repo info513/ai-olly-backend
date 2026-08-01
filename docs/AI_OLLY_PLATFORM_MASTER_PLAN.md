@@ -266,3 +266,7 @@ These require Ivan's input before architecture. (Consolidated from `SUPABASE_DIS
 ---
 
 > **This is the master planning document only.** No architecture, no schema, no SQL, no implementation has been produced. Awaiting Ivan's answers to the open questions before architecture begins.
+
+---
+
+> **Progress update (2026-08-01):** planning blockers resolved; implementation underway on `feature/ai-olly-platform-2`, `aiolly-dev` only. **Steps 1–3 applied & verified**: cross-cutting (35 checks), tenancy & identity (50), rooms & Room Guide / Pattern C inheritance (40). Production, Airtable, Render and the guest PWA remain untouched (`DATA_PROVIDER=airtable`). Next: **Services** (then destination content). See `DATABASE_MIGRATION_STEP_1..3.md`.
