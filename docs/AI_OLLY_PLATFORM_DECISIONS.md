@@ -216,3 +216,31 @@ The former open blockers are now **locked** (confirmed by Ivan). These govern th
 **J. Dashboard** — Host the **Next.js dashboard on Vercel**; keep **Render** for Express API + AI. **Separate dashboard app inside the same repository (monorepo).** Guest PWA is not modified in this phase.
 
 > Architecture proposal built on these locks: `docs/AI_OLLY_DATABASE_ARCHITECTURE.md`. **No SQL is created or applied until that proposal is reviewed.**
+
+---
+
+## LOCKED DATABASE ARCHITECTURE DECISIONS (1–10) — confirmed 2026-08-01
+
+Refine the architecture proposal. Introduce a **destination** concept and three distinct override patterns.
+
+**1. Room Guide** — **Room-type inheritance with room-specific overrides.** `room_types` hold shared/default room-guide content; individual rooms override specific facts (view, Smart Glass, window operation, heating, extra-bed availability, notes). The **resolved room context must always be deterministic**; shared text is **not** duplicated across every room.
+
+**2. Whispers** — Whispers belong primarily to a **destination**, not a single hotel. Destination-level chapters; hotels may **select, order or hide** destination chapters and may add **private hotel-specific stories**.
+
+**3. Split Today / Events** — City events are **destination-shared**: one canonical destination event record; hotels control **visibility, highlighting and ordering**. Hotel-specific news/events remain **hotel-owned** content.
+
+**4. POIs** — **Destination-shared** with hotel presentation overrides. Canonical shared data: identity, location, coordinates, destination, general description. Hotel override data: hotel-specific short description, recommendation, photo, priority, walking time, visibility, sort order.
+
+**5. Localization** — Generic translations model for R1: `(entity_type, entity_id, field_key, locale, value)`. English required for R1; schema fully localization-ready.
+
+**6. Content versioning** — **Full immutable JSON snapshots** per version. Rollback restores a complete snapshot; the UI may compute field-level before/after diffs. **Legal, consent, pricing and critical AI content must preserve exactly what was published.**
+
+**7. Content inheritance** — Hotel overrides replace the **complete logical content record** (platform ↔ hotel axis). **No automatic field-by-field merging** of text/content. Configuration fields (visibility, ordering) may be separate, but text/content overrides must be **explicit and predictable**.
+
+**8. Guest deduplication** — **One guest, multiple stays**, but **no automatic merge** solely by matching email/phone. Possible duplicates are **suggested for staff review**. Reliable linking via manual confirmation, PMS external identifier, or another trusted external source. **Guests do not receive user accounts.**
+
+**9. Retention** — Configurable, **not hardcoded as legal truth**. A **retention-policy** concept by data type and, where needed, hotel/jurisdiction. Planning defaults: full AI conversation content **90 days**; anonymized analytics may be retained longer; content versions **≥50**; legal/consent published snapshots per **confirmed legal policy**; guest operational data configurable with **deletion/pseudonymization** support.
+
+**10. Backward compatibility** — Preserve: hotel **slug**, **room number**, existing **room/access tokens**, **QR URL structure**, existing **API response contracts**. Use new **UUID** primary keys internally. Hotel slug **globally unique**; room number + access token **unique within the hotel scope**, with **token security preserved**.
+
+> Applied to the architecture in `docs/AI_OLLY_DATABASE_ARCHITECTURE.md` → **Addendum A**. Still no SQL/tables/migration.

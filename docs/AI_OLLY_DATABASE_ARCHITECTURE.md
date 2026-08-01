@@ -213,6 +213,8 @@ Buckets: `media-public` (guest media), `consent-private` (signatures + consent P
 
 ## 8. Unresolved database questions (need decisions before finalizing schema)
 
+> **Superseded by Addendum A (2026-08-01).** Decisions 1–10 resolved most of these; see Addendum A for the destination model, the three override patterns, and the reduced remaining-questions list.
+
 1. **Room Guide granularity:** per-**room** (current) or per-**room_type** with room-level overrides? (affects `room_guides` shape).
 2. **Whispers & city events ownership:** are Whispers and "Split Today" city events **platform-shared** (one source, many hotels) or **per-hotel**? (affects inheritance + `hotel_id` nullability).
 3. **City POIs:** shared city POIs vs per-hotel POIs? (today they're per-hotel-slug; coordinates are frozen regardless).
@@ -228,3 +230,61 @@ Buckets: `media-public` (guest media), `consent-private` (signatures + consent P
 13. **Deterministic handler config:** which parts (if any) become per-hotel data in `ai_configs` vs remaining purely in code.
 
 > **No SQL will be written or applied until this proposal is reviewed and the §8 questions are resolved.**
+
+---
+
+# Addendum A — Locked refinements (decisions 1–10, 2026-08-01)
+
+These locked decisions refine the v0 proposal: they add a **Destination** context and clarify that the platform uses **three distinct override patterns** (not one).
+
+## A.1 New context — Destinations
+- **`destinations`** (id, name, slug, timezone) — e.g. "Split". Holds **platform-managed canonical city content**.
+- **`hotels.destination_id`** — the destination a hotel belongs to (assume one destination per hotel for R1).
+- Destination-shared content = **POIs, Whisper chapters, city events**. Hotels layer presentation on top; they never edit the canonical record.
+
+## A.2 The three override patterns (supersedes §5's single description)
+| Pattern | Axis | Rule | Applies to |
+|---|---|---|---|
+| **A — Content inheritance** | platform ↔ hotel | Hotel override **replaces the complete logical record**; **no field-by-field merge** (decision 7). Config (visibility/order) may be a separate row. | services, faqs, routes, partners, knowledge_articles, ai_configs |
+| **B — Destination + hotel presentation** | destination → hotel | Canonical destination record (identity/coords/description) + a **per-hotel settings** row (visibility, order, highlight, priority, walking time, hotel short description, recommendation, photo). Hotels may also add **private hotel-owned** items. | pois, whisper_chapters, city events |
+| **C — Room-type → room facts** | within a hotel | `room_types` hold shared room-guide content; a room stores a **structured override of specific facts**; **deterministic** resolution (room fact if set, else room_type). This is intentionally field-level (decision 1) and is a different axis from Pattern A. | room guide |
+
+## A.3 Revised / added tables
+| Table | Change | Flags |
+|---|---|---|
+| `destinations` | **new** — canonical city (Split); id, name, slug, timezone | A |
+| `hotels` | **+ `destination_id`** | — |
+| `room_types` | now holds **default room-guide content** (wifi, ac, tv, safe, smart_glass, features, notes, ai_welcome) | T L V A |
+| `rooms` | **+ structured fact overrides** (view, smart_glass, window_mode, underfloor_heating, extra_bed, notes); nullable; deterministic resolution; keeps `access_token` (frozen) | T A |
+| `pois` | now **destination-scoped** (`destination_id`): identity, category, latitude, longitude *(frozen)*, general description | destination · L V |
+| `hotel_poi_settings` | **new** — hotel_id, poi_id, visible, sort_order, priority, walking_time, short_description, recommendation, photo_asset_id | T L |
+| `whisper_chapters` | **new/renamed** — owner is **destination_id XOR hotel_id** (shared chapters + private hotel stories); key, chapter_no, title/body | L V |
+| `hotel_whisper_settings` | **new** — hotel_id, chapter_id, visible, sort_order | T |
+| `destination_events` | **new** — destination_id, key, start_date, end_date, kind, title/desc (canonical city events) | L V |
+| `hotel_event_settings` | **new** — hotel_id, event_id, visible, highlight, sort_order | T |
+| `news`, hotel `events` | remain **hotel-owned** content (hotel_id) | T L V A |
+| `guests` | **+ `external_source`, `external_id`** (PMS/trusted linking), `pseudonymized` | T A |
+| `guest_duplicate_suggestions` | **new** — guest_id_a, guest_id_b, reason, status (**suggest-only; no auto-merge**, decision 8) | T |
+| `retention_policies` | **by `data_type` + optional `hotel_id`/`jurisdiction`**, retention_period, is_permanent, legal_basis, approved_by (decision 9) | — |
+| `content_versions` | **full immutable JSON snapshot** confirmed; UI computes diffs (decision 6) | — |
+
+## A.4 Confirmations from decisions 5, 6, 7, 10
+- **Localization:** generic `translations` table confirmed; EN in R1; localization-ready.
+- **Versioning:** full immutable JSON snapshots; **legal / consent / pricing / critical-AI preserve exactly what was published**; rollback restores a full snapshot.
+- **Inheritance:** Pattern A = full-record replace, **no automatic field merge**.
+- **Backward compatibility:** `hotels.slug` **globally unique**; `rooms.number` + `rooms.access_token` **unique within hotel scope**, token security preserved; `stays.stay_token`; QR URL structure + API response contracts preserved; **UUID** PKs internal.
+
+## A.5 Remaining unresolved questions (only those NOT covered by decisions 1–10)
+**From the original §8:**
+- **Q1 (§8.7) Pricing linkage** — `price_items` polymorphic `(context_type, context_id)` (flexible) vs explicit FKs per priced type (safer). *Open.*
+- **Q2 (§8.8) `platform_admin` representation** — `profiles.is_platform_admin` flag (proposed) vs a membership row with a platform scope. *Open.*
+- **Q3 (§8.10) Exact legal retention values** — the **mechanism** is locked (decision 9); the **precise legal periods** for consent/guest data still need **legal approval**. *Pending legal.*
+- **Q4 (§8.11) Image optimization approach** — Supabase on-the-fly transforms vs pre-generated sizes for PWA delivery (decision H said "plan"). *Open.*
+- **Q5 (§8.13) Deterministic handler config** — which parts (if any) become per-hotel data in `ai_configs` vs remaining purely in code. *Open.*
+
+**Newly surfaced by the destination model:**
+- **Q6.** Who edits destination-level canonical content (POIs, whisper chapters, city events) — `platform_admin` only, or a new "destination editor" capability?
+- **Q7.** Can a hotel belong to **more than one** destination? (assumed **one** for R1 — confirm.)
+- **Q8.** Do destination-shared types get version history **at the destination level** (canonical versioned; per-hotel presentation settings are lightweight config, audited not versioned)? (assumed **yes** — confirm.)
+
+> Everything above is proposal/refinement. **Still no SQL, no tables, no migration, no PWA changes.**
