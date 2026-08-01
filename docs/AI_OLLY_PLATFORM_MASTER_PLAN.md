@@ -7,6 +7,8 @@
 > Date: 2026-07-31.
 
 > **Status update (2026-07-31): Supabase Phase 1 (infrastructure bootstrap) STARTED** on `feature/ai-olly-platform-2` — local CLI structure, one foundation migration, isolated server-only connection module + health check, and the Phase-1 docs. **Production PWA remains frozen. Airtable remains the live data provider. No production cutover has occurred. The full architecture is not finished.**
+>
+> **Status update (2026-08-01): DB migration Steps 1 & 2 APPLIED to `aiolly-dev`.** Step 1 cross-cutting (translations, content_versions, audit_log, retention_policies) fail-closed/append-only; Step 2 tenancy & identity (destinations, hotel_groups, hotels, profiles, hotel_memberships) with tenant-isolation RLS. Verified 35/35 + 50/50. Rooms/later domains not started; production/Airtable/PWA untouched.
 
 ## Confirmed directions (the ground we build on)
 Supabase = primary DB + Auth + Storage + CMS backend + dashboard backend + AI knowledge backend + newsletter + analytics. **Airtable is fully retired.** **The dashboard is the only content-editing interface.** **Render stays** the backend API host. **The guest PWA and the v1 frozen contract are untouchable.** Vector search/embeddings is a **future** capability (design-for, build-later).

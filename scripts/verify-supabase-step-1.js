@@ -12,7 +12,9 @@ import pg from 'pg';
 import { getSupabaseServerClient } from '../server/data/supabase/client.js';
 
 const TABLES = ['translations', 'content_versions', 'audit_log', 'retention_policies'];
-const BUSINESS_TABLES = ['hotels', 'rooms', 'services', 'pois', 'guests', 'stays', 'destinations', 'hotel_memberships'];
+// Later-domain tables that must NOT exist yet (through Step 2). Tenancy tables
+// (destinations/hotels/hotel_memberships) are legitimately added by Step 2.
+const BUSINESS_TABLES = ['rooms', 'room_types', 'services', 'pois', 'routes', 'partners', 'events', 'guests', 'stays', 'price_items', 'subscribers'];
 const TAG = 'verify.step1';
 const ENTITY_ID = '00000000-0000-4000-8000-000000000001';
 
