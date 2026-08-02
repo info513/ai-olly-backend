@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   AI OLLY Design System — token layer (dark-mode-first).
+   These variables are the single source of truth; components read them via
+   Tailwind aliases. Light mode (future) swaps values under :root, not markup.
+   ============================================================================ */
+:root {
+  /* brand */
+  --brand-navy: #1a3445;
+  --brand-navy-deep: #14222d;
+  --brand-navy-soft: #22455a;
+  --brand-cream: #e8d4a0;
+  --brand-cream-soft: #f1e6c7;
+  --brand-gold-deep: #c6a55c;
+
+  /* neutrals (dark ink & surface ladder) */
+  --surface-base: #10191f;
+  --surface-raised: #16232c;
+  --surface-overlay: #1c2e39;
+  --surface-sunken: #0c141a;
+  --border-subtle: #243642;
+  --border-strong: #334a58;
+  --ink-primary: #f4f7f9;
+  --ink-secondary: #aec0cc;
+  --ink-tertiary: #6e828f;
+  --ink-disabled: #475866;
+
+  /* semantic (meaning only) */
+  --info: #5aa9e6;
+  --info-soft: #16303f;
+  --success: #4fb286;
+  --success-soft: #12302a;
+  --warning: #e0a94b;
+  --warning-soft: #33290f;
+  --danger: #e5695b;
+  --danger-soft: #331c1c;
+
+  /* ai state */
+  --ai-confident: #4fb286;
+  --ai-handoff: #e0a94b;
+  --ai-unknown: #6e828f;
+
+  color-scheme: dark;
+}
+
+* {
+  border-color: var(--border-subtle);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--surface-base);
+  color: var(--ink-primary);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* quiet, branded scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+/* focus-visible ring — consistent gold glow (Design System §7/§17) */
+:where(a, button, [role="button"], input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-gold-deep) 45%, transparent);
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* skeleton shimmer */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-overlay);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--ink-primary) 6%, transparent),
+    transparent
+  );
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
