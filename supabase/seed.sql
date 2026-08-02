@@ -219,5 +219,66 @@ insert into public.push_subscriptions (id, hotel_id, endpoint, p256dh, auth_key,
  ('66000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'https://fcm.example.invalid/DEMO-FAKE-ENDPOINT', 'DEMO-FAKE-P256DH', 'DEMO-FAKE-AUTH', 'Seed/DemoDevice', true)
 on conflict do nothing;
 
+-- ── Package C: Storage & Assets (Step 11) ────────────────────────────────────
+insert into public.assets (id, hotel_id, destination_id, bucket_name, storage_path, original_filename, display_name, asset_type, mime_type, file_size_bytes, status, public_access, alt_text, rights_owner) values
+ ('70000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', null, 'public-media', 'hotels/40000000-0000-4000-8000-000000000001/logo.png', 'logo.png', 'Demo Hotel Logo', 'logo', 'image/png', 40000, 'ready', true, 'Demo Hotel logo', 'Demo Hotel'),
+ ('70000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', null, 'public-media', 'hotels/40000000-0000-4000-8000-000000000001/rooms/42000000-0000-4000-8000-000000000101/hero.jpg', 'hero.jpg', 'Room 101 Hero', 'room_image', 'image/jpeg', 900000, 'ready', true, 'Room 101 sea view', 'Demo Hotel'),
+ ('70000000-0000-4000-8000-000000000003', null, 'd0000000-0000-4000-8000-000000000001', 'public-media', 'destinations/d0000000-0000-4000-8000-000000000001/poi/palace.jpg', 'palace.jpg', 'Palace (shared)', 'poi_image', 'image/jpeg', 1200000, 'ready', true, 'Diocletian''s Palace', 'Platform'),
+ ('70000000-0000-4000-8000-000000000004', '40000000-0000-4000-8000-000000000001', null, 'consent-files', 'hotels/40000000-0000-4000-8000-000000000001/consents/63000000-0000-4000-8000-000000000001/signature.png', 'signature.png', 'Consent signature (synthetic)', 'consent_signature', 'image/png', 12000, 'ready', false, null, 'Demo Hotel')
+on conflict do nothing;
+
+insert into public.asset_usages (id, asset_id, hotel_id, entity_type, entity_id, usage_role) values
+ ('76000000-0000-4000-8000-000000000001', '70000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'hotel', '40000000-0000-4000-8000-000000000001', 'logo'),
+ ('76000000-0000-4000-8000-000000000002', '70000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', 'room', '42000000-0000-4000-8000-000000000101', 'hero'),
+ ('76000000-0000-4000-8000-000000000003', '70000000-0000-4000-8000-000000000003', null, 'destination_poi', '45000000-0000-4000-8000-000000000001', 'card')
+on conflict do nothing;
+
+-- ── Package C: Newsletter (Step 12) ──────────────────────────────────────────
+insert into public.newsletter_subscribers (id, hotel_id, email, first_name, locale, status, source, subscribed_at, consent_id) values
+ ('71000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'demo.subscriber@verify.local', 'Demo', 'en', 'subscribed', 'pwa', now(), '63000000-0000-4000-8000-000000000001'),
+ ('71000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', 'demo.unsub@verify.local', 'Left', 'en', 'unsubscribed', 'pwa', now(), null)
+on conflict do nothing;
+
+insert into public.newsletter_segments (id, hotel_id, key, name, type, rules) values
+ ('72000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'all-subscribed', 'All Subscribed', 'static', null),
+ ('72000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', 'english-guests', 'English Guests', 'rule', '{"match":"all","conditions":[{"field":"locale","op":"eq","value":"en"}]}'::jsonb)
+on conflict do nothing;
+insert into public.newsletter_segment_members (segment_id, subscriber_id) values
+ ('72000000-0000-4000-8000-000000000001', '71000000-0000-4000-8000-000000000001')
+on conflict do nothing;
+
+insert into public.newsletter_templates (id, hotel_id, key, name, subject, preview_text, content, locale, status, published_at) values
+ ('73000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'welcome', 'Welcome', 'Welcome to Demo Hotel', 'A warm hello', '{"version":1,"blocks":[{"type":"paragraph","text":"Thanks for subscribing!"}]}'::jsonb, 'en', 'published', now()),
+ ('73000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', 'draft-news', 'Draft News', 'Summer news', 'Coming soon', '{"version":1,"blocks":[{"type":"paragraph","text":"Draft only."}]}'::jsonb, 'en', 'draft', null)
+on conflict do nothing;
+
+insert into public.newsletter_campaigns (id, hotel_id, name, template_id, segment_id, status) values
+ ('74000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'Draft Campaign', '73000000-0000-4000-8000-000000000002', '72000000-0000-4000-8000-000000000001', 'draft')
+on conflict do nothing;
+insert into public.newsletter_campaigns (id, hotel_id, name, template_id, segment_id, subject_snapshot, preview_text_snapshot, content_snapshot, status, scheduled_at) values
+ ('74000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', 'Scheduled Campaign', '73000000-0000-4000-8000-000000000001', '72000000-0000-4000-8000-000000000001', 'Welcome to Demo Hotel', 'A warm hello', '{"version":1,"blocks":[{"type":"paragraph","text":"Thanks for subscribing!"}]}'::jsonb, 'scheduled', now() + interval '1 day')
+on conflict do nothing;
+
+insert into public.newsletter_campaign_recipients (id, campaign_id, hotel_id, subscriber_id, delivery_status, sent_at) values
+ ('75000000-0000-4000-8000-000000000001', '74000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', '71000000-0000-4000-8000-000000000001', 'sent', now())
+on conflict do nothing;
+insert into public.newsletter_events (id, hotel_id, campaign_id, recipient_id, subscriber_id, event_type) values
+ ('75000000-0000-4000-8000-000000000011', '40000000-0000-4000-8000-000000000001', '74000000-0000-4000-8000-000000000002', '75000000-0000-4000-8000-000000000001', '71000000-0000-4000-8000-000000000001', 'delivered')
+on conflict do nothing;
+
+-- ── Package C: Analytics (Step 13) — synthetic daily aggregates ──────────────
+insert into public.ai_quality_daily (hotel_id, day, total_questions, deterministic_answers, model_answers, safe_handoffs, unanswered, avg_latency_ms, prompt_tokens, completion_tokens, knowledge_articles_used, coverage_estimate, calc_version) values
+ ('40000000-0000-4000-8000-000000000001', current_date, 20, 12, 6, 2, 1, 850, 4000, 1500, 5, 0.9000, 'v1')
+on conflict do nothing;
+insert into public.operations_daily (hotel_id, day, requests_total, requests_resolved, requests_open, avg_ack_seconds, avg_resolution_seconds, feedback_count, avg_rating, stays_arriving, consents_granted, calc_version) values
+ ('40000000-0000-4000-8000-000000000001', current_date, 5, 4, 1, 120, 3600, 3, 4.67, 2, 1, 'v1')
+on conflict do nothing;
+insert into public.newsletter_daily (hotel_id, day, subscribers_active, consent_active, sent, delivered, opened, clicked, bounced, unsubscribed, calc_version) values
+ ('40000000-0000-4000-8000-000000000001', current_date, 1, 1, 1, 1, 0, 0, 0, 0, 'v1')
+on conflict do nothing;
+insert into public.content_health_daily (hotel_id, day, published_count, draft_count, archived_count, expired_count, critical_pending, unresolved_unanswered, unused_assets, assets_missing_alt, assets_missing_rights, completeness_score, calc_version) values
+ ('40000000-0000-4000-8000-000000000001', current_date, 4, 1, 0, 0, 0, 0, 1, 1, 0, 0.8000, 'v1')
+on conflict do nothing;
+
 -- Synthetic staff users/memberships are created by the verification script using
 -- Supabase Auth admin APIs (so they are real, testable, and cleaned up).
