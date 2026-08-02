@@ -12,11 +12,11 @@ import pg from 'pg';
 import { getSupabaseServerClient } from '../server/data/supabase/client.js';
 
 const TABLES = ['translations', 'content_versions', 'audit_log', 'retention_policies'];
-// Package C (and later) domain tables that must NOT exist yet — through Package B
-// (Steps 8-10) AI Knowledge, guests/stays/consent and reception are legitimately
-// present, so this guards only genuinely not-yet-started domains (Newsletter /
-// Storage / Analytics — proves Package C not begun).
-const BUSINESS_TABLES = ['subscribers', 'newsletter_campaigns', 'newsletter_sends', 'storage_objects', 'storage_assets', 'asset_folders', 'analytics_events'];
+// Post-Package-C domain tables that must NOT exist yet — through Package C
+// (Steps 11-13) Storage/assets, Newsletter and Analytics are legitimately present,
+// so this guards only genuinely not-yet-started work (dashboard / provider cutover
+// / Airtable migration — proves that final package has not begun).
+const BUSINESS_TABLES = ['airtable_import_batches', 'migration_jobs', 'provider_sync_state', 'dashboard_sessions', 'compare_snapshots', 'cutover_runs'];
 const TAG = 'verify.step1';
 const ENTITY_ID = '00000000-0000-4000-8000-000000000001';
 
