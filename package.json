@@ -14,7 +14,8 @@
     "verify:supabase:step2": "node scripts/verify-supabase-step-2.js",
     "verify:supabase:step3": "node scripts/verify-supabase-step-3.js",
     "verify:supabase:step4": "node scripts/verify-supabase-step-4.js",
-    "verify:supabase:step567": "node scripts/verify-supabase-step-5-6-7.js"
+    "verify:supabase:step567": "node scripts/verify-supabase-step-5-6-7.js",
+    "verify:supabase:packageb": "node scripts/verify-supabase-package-b.js"
   },
   "keywords": [],
   "author": "",

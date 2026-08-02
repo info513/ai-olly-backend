@@ -103,3 +103,12 @@ P1 Supabase migration ──▶ P2 Dashboard ──▶ P3 CMS ──▶ P4 AI Kn
 - **Airtable retirement** happens per hotel, only after that hotel is fully served by Supabase + dashboard and verified.
 
 > This roadmap is milestone-level only. No schema, no code, no implementation is committed by this document.
+
+---
+
+## Implementation progress (2026-08-02)
+On `feature/ai-olly-platform-2`, `aiolly-dev` only — production/Airtable/Render/PWA untouched (`DATA_PROVIDER=airtable`):
+- **Steps 1–7 (Foundation → Pricing)** applied & verified: cross-cutting, tenancy/identity, rooms/Room Guide, Hotel Services, destination content, presentation layer, pricing.
+- **Package B (Steps 8–10)** applied & verified: **AI Knowledge CMS** (structured articles, deterministic hotel→destination→platform resolution, preview-via-RLS, publish/version, aliases, ai_configs, response logs, unanswered questions, embeddings placeholder), **Guests/Stays/Consent** (no accounts, duplicate suggestions, immutable signed consents, pseudonymization), **Reception** (requests, append-only events, feedback, push with hidden secrets).
+- Verification: Package B **136/136**; regressions Step 1–4 + Package A all green (35/50/40/76/90).
+- **Not started (Package C):** Newsletter, Storage buckets / Asset Manager, Analytics, provider cutover, Airtable migration.
