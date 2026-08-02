@@ -1,36 +1,11 @@
-import type {
-  AppNotification,
-  CommandAction,
-  Hotel,
-  SearchItem,
-  Session,
-  User,
-} from "./types";
+import type { AppNotification, CommandAction, SearchItem } from "./types";
 
 /**
- * In-memory demo content for Sprint 1. Clearly synthetic — no real guests,
- * emails, tokens, or hotel data. Timestamps are expressed as "minutes ago"
- * offsets and converted to ISO at call time (client-side) to avoid SSR/CSR
- * hydration drift.
+ * In-memory PLACEHOLDER operational content (Sprint 2). Clearly synthetic — no
+ * real guests, emails, or tokens. Auth, hotels, profiles and roles are NOT here
+ * (they are real, from Supabase). Timestamps are "minutes ago" offsets converted
+ * to ISO at call time (client-side) to avoid SSR/CSR hydration drift.
  */
-
-export const DEMO_USER: User = {
-  id: "u_demo",
-  name: "Ivan Marić",
-  email: "manager@demo-hotel.example",
-  isPlatformAdmin: false,
-};
-
-export const DEMO_SESSION: Session = {
-  user: DEMO_USER,
-  token: "demo-session-token",
-};
-
-export const HOTELS: Hotel[] = [
-  { id: "h_demo", name: "Demo Hotel", slug: "demo-hotel", destination: "Split", environment: "dev", role: "hotel_admin" },
-  { id: "h_antique", name: "Antique Split", slug: "antique-split", destination: "Split", environment: "dev", role: "hotel_admin" },
-  { id: "h_riva", name: "Riva Boutique", slug: "riva-boutique", destination: "Split", environment: "dev", role: "reception" },
-];
 
 /** Notifications with tiers (Design System §14). offset = minutes ago. */
 export const NOTIFICATIONS: (Omit<AppNotification, "createdAt"> & { minutesAgo: number })[] = [

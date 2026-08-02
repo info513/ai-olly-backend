@@ -1,32 +1,49 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
+import { useHotel } from "@/providers/hotel-provider";
+import { usePermissions } from "@/providers/permission-provider";
+import { moduleKeyFromPath } from "@/lib/permissions";
 import { AppSidebar } from "@/components/shell/app-sidebar";
 import { TopBar } from "@/components/shell/top-bar";
 import { CommandPalette } from "@/components/shell/command-palette";
 
+function ShellLoader({ label }: { label: string }) {
+  return (
+    <div className="grid min-h-screen place-items-center bg-surface-base">
+      <div className="flex flex-col items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-cream font-display text-lg font-semibold text-brand-navyDeep">
+          O
+        </span>
+        <span className="text-[13px] text-ink-tertiary">{label}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { session, loading } = useAuth();
+  const { session, loading: authLoading } = useAuth();
+  const { loading: hotelLoading, hotels, isPlatformAdmin } = useHotel();
+  const { can } = usePermissions();
   const router = useRouter();
+  const pathname = usePathname();
+
+  const resolving = authLoading || (session && hotelLoading);
+  const moduleKey = moduleKeyFromPath(pathname);
+  const noTenant = Boolean(session) && !hotelLoading && !isPlatformAdmin && hotels.length === 0;
+  const forbidden = Boolean(session) && !hotelLoading && !noTenant && !can(moduleKey);
 
   React.useEffect(() => {
-    if (!loading && !session) router.replace("/login");
-  }, [loading, session, router]);
+    if (resolving) return;
+    if (!session) router.replace("/login");
+    else if (noTenant) router.replace("/no-access");
+    else if (forbidden) router.replace("/403");
+  }, [resolving, session, noTenant, forbidden, router]);
 
-  if (loading || !session) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-surface-base">
-        <div className="flex flex-col items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-cream font-display text-lg font-semibold text-brand-navyDeep">
-            O
-          </span>
-          <span className="text-[13px] text-ink-tertiary">Loading your hotel…</span>
-        </div>
-      </div>
-    );
-  }
+  if (resolving) return <ShellLoader label="Loading your hotel…" />;
+  if (!session || noTenant || forbidden) return <ShellLoader label="Redirecting…" />;
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface-base">

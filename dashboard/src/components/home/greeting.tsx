@@ -6,7 +6,7 @@ import { useHotel } from "@/providers/hotel-provider";
 
 export function Greeting() {
   const { user } = useAuth();
-  const { currentHotel } = useHotel();
+  const { currentHotel, profile } = useHotel();
   const [part, setPart] = React.useState("Hello");
 
   React.useEffect(() => {
@@ -14,7 +14,8 @@ export function Greeting() {
     setPart(h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening");
   }, []);
 
-  const first = user?.name?.split(" ")[0] ?? "there";
+  const displayName = profile?.displayName ?? user?.email ?? "there";
+  const first = displayName.split(/[ @]/)[0];
 
   return (
     <div>

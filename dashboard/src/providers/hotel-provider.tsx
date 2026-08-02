@@ -2,12 +2,24 @@
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { mockProvider } from "@/mock/provider";
-import type { Hotel } from "@/mock/types";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useAuth } from "./auth-provider";
+import type { HotelMembershipItem, Profile } from "@/lib/types";
+import type { Role } from "@/lib/permissions";
 
+/**
+ * HotelContextProvider — the real multi-tenant context. After sign-in it loads
+ * the user's profile and their ACTIVE memberships (RLS-scoped: the user only
+ * ever sees their own). The active hotel is remembered in localStorage; the
+ * current role is the role at the active hotel. Switching hotels changes context
+ * in place — no full reload.
+ */
 interface HotelContextValue {
-  hotels: Hotel[];
-  currentHotel: Hotel | null;
+  profile: Profile | null;
+  hotels: HotelMembershipItem[];
+  currentHotel: HotelMembershipItem | null;
+  role: Role | null;
+  isPlatformAdmin: boolean;
   setHotelId: (id: string) => void;
   loading: boolean;
 }
@@ -15,20 +27,60 @@ interface HotelContextValue {
 const HotelContext = React.createContext<HotelContextValue | null>(null);
 const STORAGE_KEY = "aiolly.hotel";
 
+async function loadContext(userId: string): Promise<{ profile: Profile | null; hotels: HotelMembershipItem[] }> {
+  const supabase = getSupabaseBrowserClient();
+
+  const [{ data: prof }, { data: memberships, error }] = await Promise.all([
+    supabase.from("profiles").select("user_id,email,display_name,is_platform_admin").eq("user_id", userId).maybeSingle(),
+    supabase
+      .from("hotel_memberships")
+      .select("role, hotel:hotels(id,name,slug, destination:destinations(name))")
+      .eq("status", "active"),
+  ]);
+  if (error) throw error;
+
+  const hotels: HotelMembershipItem[] = (memberships ?? [])
+    .filter((m: any) => m.hotel)
+    .map((m: any) => ({
+      id: m.hotel.id,
+      name: m.hotel.name,
+      slug: m.hotel.slug,
+      destination: m.hotel.destination?.name ?? "—",
+      role: m.role as Role,
+    }))
+    .sort((a: HotelMembershipItem, b: HotelMembershipItem) => a.name.localeCompare(b.name));
+
+  const profile: Profile | null = prof
+    ? { userId: prof.user_id, email: prof.email, displayName: prof.display_name, isPlatformAdmin: !!prof.is_platform_admin }
+    : null;
+
+  return { profile, hotels };
+}
+
 export function HotelProvider({ children }: { children: React.ReactNode }) {
-  const { data: hotels = [], isLoading } = useQuery({
-    queryKey: ["hotels"],
-    queryFn: () => mockProvider.listHotels(),
-  });
+  const { user, loading: authLoading } = useAuth();
   const [hotelId, setHotelIdState] = React.useState<string | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["hotel-context", user?.id],
+    queryFn: () => loadContext(user!.id),
+    enabled: Boolean(user?.id),
+  });
 
   React.useEffect(() => {
     const stored = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
     if (stored) setHotelIdState(stored);
   }, []);
 
+  const hotels = data?.hotels ?? [];
+
+  // reconcile active hotel with real memberships (unknown/stale id -> first)
   React.useEffect(() => {
-    if (!hotelId && hotels.length) setHotelIdState(hotels[0].id);
+    if (!hotels.length) return;
+    if (!hotelId || !hotels.some((h) => h.id === hotelId)) {
+      setHotelIdState(hotels[0].id);
+      window.localStorage.setItem(STORAGE_KEY, hotels[0].id);
+    }
   }, [hotels, hotelId]);
 
   const setHotelId = React.useCallback((id: string) => {
@@ -38,11 +90,17 @@ export function HotelProvider({ children }: { children: React.ReactNode }) {
 
   const currentHotel = hotels.find((h) => h.id === hotelId) ?? hotels[0] ?? null;
 
-  return (
-    <HotelContext.Provider value={{ hotels, currentHotel, setHotelId, loading: isLoading }}>
-      {children}
-    </HotelContext.Provider>
-  );
+  const value: HotelContextValue = {
+    profile: data?.profile ?? null,
+    hotels,
+    currentHotel,
+    role: currentHotel?.role ?? null,
+    isPlatformAdmin: data?.profile?.isPlatformAdmin ?? false,
+    setHotelId,
+    loading: authLoading || (Boolean(user) && isLoading),
+  };
+
+  return <HotelContext.Provider value={value}>{children}</HotelContext.Provider>;
 }
 
 export function useHotel() {

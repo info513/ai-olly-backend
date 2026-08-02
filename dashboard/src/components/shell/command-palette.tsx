@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useCommand } from "@/providers/command-provider";
+import { useHotel } from "@/providers/hotel-provider";
 import { useSearch } from "@/hooks/use-dashboard";
 import { mockProvider } from "@/mock/provider";
 import {
@@ -27,9 +28,10 @@ const ACTION_ICON: Record<string, LucideIcon> = {
 
 export function CommandPalette() {
   const { open, setOpen } = useCommand();
+  const { currentHotel } = useHotel();
   const [query, setQuery] = React.useState("");
   const router = useRouter();
-  const { data: results = [] } = useSearch(query, open);
+  const { data: results = [] } = useSearch(query, currentHotel?.id, open);
   const actions = mockProvider.commandActions();
 
   const go = (href: string) => {

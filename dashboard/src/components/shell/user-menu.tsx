@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { LogOut, Settings, User as UserIcon, Moon } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
+import { useHotel } from "@/providers/hotel-provider";
+import { usePermissions } from "@/providers/permission-provider";
+import { ROLE_LABEL } from "@/lib/permissions";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -16,8 +19,13 @@ import { initials, cn } from "@/lib/utils";
 
 export function UserMenu({ collapsed }: { collapsed?: boolean }) {
   const { user, signOut } = useAuth();
+  const { profile } = useHotel();
+  const { role, can } = usePermissions();
   const router = useRouter();
   if (!user) return null;
+
+  const name = profile?.displayName ?? user.email ?? "Account";
+  const email = user.email ?? "";
 
   return (
     <DropdownMenu>
@@ -28,28 +36,32 @@ export function UserMenu({ collapsed }: { collapsed?: boolean }) {
         )}
       >
         <Avatar>
-          <AvatarFallback>{initials(user.name)}</AvatarFallback>
+          <AvatarFallback>{initials(name)}</AvatarFallback>
         </Avatar>
         {!collapsed && (
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium text-ink-primary">{user.name}</span>
-            <span className="block truncate text-[11px] text-ink-tertiary">{user.email}</span>
+            <span className="block truncate text-[13px] font-medium text-ink-primary">{name}</span>
+            <span className="block truncate text-[11px] text-ink-tertiary">
+              {role ? ROLE_LABEL[role] : email}
+            </span>
           </span>
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" className="w-60">
-        <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
+        <DropdownMenuLabel>{email}</DropdownMenuLabel>
         <DropdownMenuItem><UserIcon className="h-4 w-4" /> Profile</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => router.push("/settings")}>
-          <Settings className="h-4 w-4" /> Settings
-        </DropdownMenuItem>
+        {can("settings") && (
+          <DropdownMenuItem onSelect={() => router.push("/settings")}>
+            <Settings className="h-4 w-4" /> Settings
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem><Moon className="h-4 w-4" /> Dark theme</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           destructive
-          onSelect={() => {
-            signOut();
-            router.push("/login");
+          onSelect={async () => {
+            await signOut();
+            router.replace("/login");
           }}
         >
           <LogOut className="h-4 w-4" /> Sign out

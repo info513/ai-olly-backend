@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Bell, AlertTriangle, CircleAlert, CheckCircle2, Info, ListTodo } from "lucide-react";
 import { useNotifications } from "@/hooks/use-dashboard";
+import { useHotel } from "@/providers/hotel-provider";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { relativeTime, cn } from "@/lib/utils";
@@ -17,7 +18,8 @@ const TIER: Record<NotificationTier, { icon: typeof Info; color: string }> = {
 };
 
 export function Notifications() {
-  const { data, isLoading } = useNotifications();
+  const { currentHotel } = useHotel();
+  const { data, isLoading } = useNotifications(currentHotel?.id);
   const unread = (data ?? []).filter((n) => !n.read).length;
 
   return (

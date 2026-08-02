@@ -1,50 +1,26 @@
-import {
-  COMMAND_ACTIONS,
-  HOTELS,
-  NOTIFICATIONS,
-  SEARCH_ITEMS,
-  DEMO_SESSION,
-} from "./data";
-import type {
-  AppNotification,
-  CommandAction,
-  Hotel,
-  HomeSummary,
-  SearchItem,
-  Session,
-} from "./types";
+import { COMMAND_ACTIONS, NOTIFICATIONS, SEARCH_ITEMS } from "./data";
+import type { AppNotification, CommandAction, HomeSummary, SearchItem } from "./types";
 
 /**
- * The Sprint-1 data boundary. Every screen reads through this typed provider so
- * that a later sprint can replace the body of each method with a real Supabase
- * call (RLS-scoped) without touching any component. Nothing here hits a network.
+ * Placeholder OPERATIONAL data boundary (Sprint 2). Auth, hotels, profile, roles
+ * and permissions are now REAL (Supabase) — this provider only supplies the not-
+ * yet-built operational content (search corpus, notifications, Home KPIs), all
+ * scoped by the active hotel id. A later sprint swaps each body for an RLS-scoped
+ * Supabase query with no component changes. No mock session/auth remains here.
  */
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const iso = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000).toISOString();
 
 export const mockProvider = {
-  async signIn(_email: string, _password: string): Promise<Session> {
-    await delay(500); // simulate auth round-trip
-    return DEMO_SESSION;
-  },
-
-  async getSession(): Promise<Session | null> {
-    await delay(120);
-    return DEMO_SESSION;
-  },
-
-  async listHotels(): Promise<Hotel[]> {
-    await delay(150);
-    return HOTELS;
-  },
-
-  async listNotifications(): Promise<AppNotification[]> {
+  // Scoped to the active hotel (hotelId keys the query; content is placeholder
+  // until wired to Supabase). A real provider filters by hotel_id under RLS.
+  async listNotifications(_hotelId: string): Promise<AppNotification[]> {
     await delay(200);
     return NOTIFICATIONS.map(({ minutesAgo, ...n }) => ({ ...n, createdAt: iso(minutesAgo) }));
   },
 
-  async search(query: string): Promise<SearchItem[]> {
+  async search(query: string, _hotelId: string): Promise<SearchItem[]> {
     await delay(90);
     const q = query.trim().toLowerCase();
     if (!q) return SEARCH_ITEMS.slice(0, 6);

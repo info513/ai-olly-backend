@@ -7,6 +7,7 @@ import { PanelLeftClose, PanelLeft } from "lucide-react";
 import { NAV_ITEMS } from "./nav-config";
 import { HotelSwitcher } from "./hotel-switcher";
 import { UserMenu } from "./user-menu";
+import { usePermissions } from "@/providers/permission-provider";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +15,11 @@ const STORAGE_KEY = "aiolly.sidebar.collapsed";
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { can } = usePermissions();
   const [collapsed, setCollapsed] = React.useState(false);
+
+  // Permission-aware navigation: modules the role can't access are HIDDEN, not disabled.
+  const items = NAV_ITEMS.filter((item) => can(item.href.replace(/^\//, "")));
 
   React.useEffect(() => {
     setCollapsed(window.localStorage.getItem(STORAGE_KEY) === "1");
@@ -63,7 +68,7 @@ export function AppSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
-        {NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
           const link = (
