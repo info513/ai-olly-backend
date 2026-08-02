@@ -162,5 +162,62 @@ insert into public.price_items (id, hotel_id, category_id, key, name, amount, cu
  ('4a000000-0000-4000-8000-000000000003', '40000000-0000-4000-8000-000000000001', '49000000-0000-4000-8000-000000000002', 'late-checkout', 'Late Check-out', 20.00, 'EUR', 25.00, true, 'per_use', 'published', true, now())
 on conflict do nothing;
 
+-- ── Package B: AI Knowledge (Step 8) ─────────────────────────────────────────
+insert into public.knowledge_categories (id, hotel_id, key, name, sort_order) values
+ ('5c000000-0000-4000-8000-000000000001', null, 'policies', 'Policies', 10)
+on conflict do nothing;
+
+-- platform article + hotel override (override wins), destination article, hotel, critical, draft
+insert into public.knowledge_articles (id, hotel_id, destination_id, category_id, key, title, body_content, approved_answer, locale, status, active, available_to_ai, is_critical, published_at) values
+ ('5d000000-0000-4000-8000-000000000001', null, null, '5c000000-0000-4000-8000-000000000001', 'check-in-policy', 'Check-in Policy', '{"version":1,"blocks":[{"type":"paragraph","text":"Standard check-in from 15:00."}]}'::jsonb, 'Check-in is from 15:00.', 'en', 'published', true, true, false, now()),
+ ('5d000000-0000-4000-8000-000000000002', null, 'd0000000-0000-4000-8000-000000000001', '5c000000-0000-4000-8000-000000000001', 'local-tips', 'Local Tips', '{"version":1,"blocks":[{"type":"paragraph","text":"Ask reception for the best coffee spots."}]}'::jsonb, null, 'en', 'published', true, true, false, now()),
+ ('5d000000-0000-4000-8000-000000000003', '40000000-0000-4000-8000-000000000001', null, null, 'demo-wifi', 'Wi-Fi Access', '{"version":1,"blocks":[{"type":"paragraph","text":"Network AIOLLY-DEMO, password at reception."}]}'::jsonb, 'Network AIOLLY-DEMO.', 'en', 'published', true, true, false, now()),
+ ('5d000000-0000-4000-8000-000000000005', '40000000-0000-4000-8000-000000000001', null, '5c000000-0000-4000-8000-000000000001', 'emergency-info', 'Emergency Information', '{"version":1,"blocks":[{"type":"paragraph","text":"Dial 112 for emergencies; reception is staffed 24/7."}]}'::jsonb, 'Dial 112.', 'en', 'published', true, true, true, now()),
+ ('5d000000-0000-4000-8000-000000000006', '40000000-0000-4000-8000-000000000001', null, null, 'draft-note', 'Draft Note', '{"version":1,"blocks":[{"type":"paragraph","text":"Work in progress."}]}'::jsonb, null, 'en', 'draft', true, true, false, null)
+on conflict do nothing;
+-- hotel override of the platform check-in policy (same key+locale)
+insert into public.knowledge_articles (id, hotel_id, destination_id, category_id, key, title, body_content, approved_answer, locale, status, active, available_to_ai, override_of_article_id, published_at) values
+ ('5d000000-0000-4000-8000-000000000004', '40000000-0000-4000-8000-000000000001', null, '5c000000-0000-4000-8000-000000000001', 'check-in-policy', 'Check-in Policy (Demo Hotel)', '{"version":1,"blocks":[{"type":"paragraph","text":"Demo Hotel check-in from 14:00."}]}'::jsonb, 'Check-in is from 14:00.', 'en', 'published', true, true, '5d000000-0000-4000-8000-000000000001', now())
+on conflict do nothing;
+
+insert into public.ai_configs (id, hotel_id, tone, safe_handoff_text, status, active, published_at) values
+ ('5e000000-0000-4000-8000-000000000001', null, 'friendly', 'Let me connect you with reception.', 'published', true, now()),
+ ('5e000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', 'warm and concise', 'Our reception is happy to help — please call the front desk.', 'published', true, now())
+on conflict do nothing;
+
+insert into public.knowledge_aliases (id, hotel_id, article_id, locale, alias_text) values
+ ('5f000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', '5d000000-0000-4000-8000-000000000003', 'en', 'wifi password')
+on conflict do nothing;
+
+-- ── Package B: Guests / Stays / Consent (Step 9) ─────────────────────────────
+insert into public.guests (id, hotel_id, first_name, last_name, preferred_locale, country_code, external_source, external_id) values
+ ('60000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'Demo', 'Guest', 'en', 'HR', 'manual', 'demo-1')
+on conflict do nothing;
+
+insert into public.consent_templates (id, hotel_id, key, locale, version, title, body_text, status, active, published_at) values
+ ('61000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'marketing-consent', 'en', 1, 'Marketing Consent', '[SYNTHETIC PLACEHOLDER CONSENT TEXT — not legal wording]', 'published', true, now())
+on conflict do nothing;
+
+insert into public.stays (id, hotel_id, guest_id, room_id, status, arrival_at, checked_in_at, access_token_hash, external_source, external_id) values
+ ('62000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000001', '42000000-0000-4000-8000-000000000101', 'checked_in', now(), now(), 'sha256$DEMO-SYNTHETIC-HASH', 'manual', 'stay-demo-1')
+on conflict do nothing;
+
+insert into public.consents (id, hotel_id, guest_id, stay_id, template_id, consent_type, consent_version, locale, consent_text_snapshot, signed_name, signed_at, status) values
+ ('63000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000001', '62000000-0000-4000-8000-000000000001', '61000000-0000-4000-8000-000000000001', 'marketing-consent', 1, 'en', '[SYNTHETIC PLACEHOLDER CONSENT TEXT — not legal wording]', 'Demo Guest', now(), 'granted')
+on conflict do nothing;
+
+-- ── Package B: Reception (Step 10) ───────────────────────────────────────────
+insert into public.guest_requests (id, hotel_id, stay_id, room_id, guest_id, request_type, title, description, priority, status, source, internal_notes) values
+ ('64000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', '62000000-0000-4000-8000-000000000001', '42000000-0000-4000-8000-000000000101', '60000000-0000-4000-8000-000000000001', 'housekeeping', 'Extra towels', 'Two extra towels please.', 'normal', 'new', 'pwa', 'Guest is a repeat visitor.')
+on conflict do nothing;
+
+insert into public.feedback (id, hotel_id, stay_id, room_id, rating, category, message, follow_up_requested, status, source) values
+ ('65000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', '62000000-0000-4000-8000-000000000001', '42000000-0000-4000-8000-000000000101', 5, 'stay', 'Lovely room and service!', false, 'new', 'pwa')
+on conflict do nothing;
+
+insert into public.push_subscriptions (id, hotel_id, endpoint, p256dh, auth_key, user_agent, active) values
+ ('66000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'https://fcm.example.invalid/DEMO-FAKE-ENDPOINT', 'DEMO-FAKE-P256DH', 'DEMO-FAKE-AUTH', 'Seed/DemoDevice', true)
+on conflict do nothing;
+
 -- Synthetic staff users/memberships are created by the verification script using
 -- Supabase Auth admin APIs (so they are real, testable, and cleaned up).
