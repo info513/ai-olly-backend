@@ -33,7 +33,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const resolving = authLoading || (session && hotelLoading);
   const moduleKey = moduleKeyFromPath(pathname);
   const noTenant = Boolean(session) && !hotelLoading && !isPlatformAdmin && hotels.length === 0;
-  const forbidden = Boolean(session) && !hotelLoading && !noTenant && !can(moduleKey);
+  // Platform-admin-only DEV routes (e.g. /platform/migration) bypass hotel-role modules.
+  const isPlatformRoute = pathname.startsWith("/platform");
+  const forbidden = Boolean(session) && !hotelLoading && !noTenant &&
+    (isPlatformRoute ? !isPlatformAdmin : !can(moduleKey));
 
   React.useEffect(() => {
     if (resolving) return;

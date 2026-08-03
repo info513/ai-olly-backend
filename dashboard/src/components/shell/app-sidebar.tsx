@@ -4,10 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
+import { DatabaseZap } from "lucide-react";
 import { NAV_ITEMS } from "./nav-config";
 import { HotelSwitcher } from "./hotel-switcher";
 import { UserMenu } from "./user-menu";
 import { usePermissions } from "@/providers/permission-provider";
+import { useHotel } from "@/providers/hotel-provider";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +18,7 @@ const STORAGE_KEY = "aiolly.sidebar.collapsed";
 export function AppSidebar() {
   const pathname = usePathname();
   const { can } = usePermissions();
+  const { isPlatformAdmin } = useHotel();
   const [collapsed, setCollapsed] = React.useState(false);
 
   // Permission-aware navigation: modules the role can't access are HIDDEN, not disabled.
@@ -109,6 +112,26 @@ export function AppSidebar() {
             link
           );
         })}
+
+        {/* Platform-admin-only DEV tools — hidden from every hotel role. */}
+        {isPlatformAdmin && (() => {
+          const href = "/platform/migration";
+          const active = pathname.startsWith(href);
+          const link = (
+            <Link href={href} aria-current={active ? "page" : undefined}
+              className={cn("group relative mt-1 flex items-center gap-3 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors",
+                collapsed && "justify-center px-0",
+                active ? "bg-brand-navy/60 text-ink-primary" : "text-ink-secondary hover:bg-surface-overlay hover:text-ink-primary")}>
+              {active && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-cream" />}
+              <DatabaseZap className="h-[18px] w-[18px] shrink-0" />
+              {!collapsed && (<><span className="flex-1">Migration</span>
+                <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600">dev</span></>)}
+            </Link>
+          );
+          return collapsed ? (
+            <Tooltip><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right">Migration (dev)</TooltipContent></Tooltip>
+          ) : link;
+        })()}
       </nav>
 
       {/* Account */}
