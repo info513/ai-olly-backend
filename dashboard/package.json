@@ -11,10 +11,13 @@
     "setup:dev-user": "node scripts/setup-dev-user.mjs",
     "setup:dev-content": "node scripts/setup-dev-content.mjs",
     "setup:dev-ai": "node scripts/setup-dev-ai.mjs",
+    "setup:dev-reception": "node scripts/setup-dev-reception.mjs",
     "verify:content": "node scripts/verify-content.mjs",
     "verify:ai": "node scripts/verify-ai.mjs",
+    "verify:reception": "node scripts/verify-reception.mjs",
     "audit:security": "node scripts/security-audit-content.mjs",
-    "audit:security-ai": "node scripts/security-audit-ai.mjs"
+    "audit:security-ai": "node scripts/security-audit-ai.mjs",
+    "audit:security-reception": "node scripts/security-audit-reception.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.1",
