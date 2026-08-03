@@ -27,7 +27,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 export const MODULE_ACCESS: Record<string, Role[]> = {
   home: ["platform_admin", "hotel_admin", "reception", "editor", "marketing", "read_only"],
   content: ["platform_admin", "hotel_admin", "editor", "read_only"],
-  ai: ["platform_admin", "hotel_admin", "editor", "read_only"],
+  ai: ["platform_admin", "hotel_admin", "editor", "reception", "marketing", "read_only"],
   reception: ["platform_admin", "hotel_admin", "reception"],
   guests: ["platform_admin", "hotel_admin", "reception"],
   assets: ["platform_admin", "hotel_admin", "editor", "marketing", "reception", "read_only"],

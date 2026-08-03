@@ -23,7 +23,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { label: "Home", href: "/home", icon: Home, ready: true },
   { label: "Content", href: "/content", icon: FileText, ready: false },
-  { label: "AI", href: "/ai", icon: Sparkles, ready: false },
+  { label: "AI", href: "/ai", icon: Sparkles, ready: true },
   { label: "Reception", href: "/reception", icon: ConciergeBell, ready: false },
   { label: "Guests", href: "/guests", icon: Users, ready: false },
   { label: "Assets", href: "/assets", icon: Images, ready: false },
