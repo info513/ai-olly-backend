@@ -3,10 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ShieldCheck, ShieldOff, Lock, FileLock2, User } from "lucide-react";
+import { ShieldOff, Lock, FileLock2, User, Eye, RotateCw, FileText, ExternalLink } from "lucide-react";
 import { useHotel } from "@/providers/hotel-provider";
 import { usePermissions } from "@/providers/permission-provider";
 import { useConsent, useRevokeConsent } from "@/data/consents";
+import { useSignedPreview } from "@/data/consent-files";
 import { humanizeError } from "@/data/errors";
 import { PageHeader } from "@/components/content/page-header";
 import { SectionLoader, ErrorState } from "@/components/content/states";
@@ -66,9 +67,20 @@ export default function ConsentRecord() {
           <div className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-md border border-border-strong bg-surface-sunken px-3 py-2.5 text-[13px] leading-relaxed text-ink-secondary">{c.textSnapshot}</div>
         </div>
 
-        <div className="mt-4 flex items-center gap-4 text-[12px] text-ink-tertiary">
-          <span className="flex items-center gap-1.5"><FileLock2 className="h-3.5 w-3.5" /> Signature file: {c.hasSignatureAsset ? "stored (private)" : "not captured"}</span>
-          <span className="flex items-center gap-1.5"><FileLock2 className="h-3.5 w-3.5" /> Document: {c.hasDocumentAsset ? "stored (private)" : "none"}</span>
+        {/* Signature (private, authorized preview only) */}
+        <div className="mt-5">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary"><FileLock2 className="h-3.5 w-3.5" /> Signature</div>
+          {c.signatureAssetId ? <SignaturePreview assetId={c.signatureAssetId} /> : <p className="text-[13px] text-ink-tertiary">No signature image was captured for this consent.</p>}
+        </div>
+
+        {/* Consent document (PDF) status — generation deferred, private access ready */}
+        <div className="mt-5">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary"><FileText className="h-3.5 w-3.5" /> Consent document</div>
+          {c.documentAssetId ? (
+            <DocumentLink assetId={c.documentAssetId} />
+          ) : (
+            <p className="rounded-md border border-border-subtle bg-surface-base px-3 py-2 text-[13px] text-ink-tertiary">Document generation not yet available. The signed text above is the record of consent; a downloadable PDF can be generated later and served privately.</p>
+          )}
         </div>
 
         <div className="mt-4 flex flex-wrap gap-3 text-[12px]">
@@ -89,4 +101,31 @@ export default function ConsentRecord() {
 
 function Item({ label, children }: { label: string; children: React.ReactNode }) {
   return <div><dt className="text-[11px] uppercase tracking-wide text-ink-tertiary">{label}</dt><dd className="mt-0.5">{children}</dd></div>;
+}
+
+function SignaturePreview({ assetId }: { assetId: string }) {
+  const [reveal, setReveal] = React.useState(false);
+  const q = useSignedPreview(assetId, reveal);
+  if (!reveal) return (
+    <button onClick={() => setReveal(true)} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border-strong px-3 text-[12px] text-ink-secondary hover:text-ink-primary"><Eye className="h-3.5 w-3.5" /> Show signature (private)</button>
+  );
+  if (q.isLoading) return <span className="flex items-center gap-2 text-[13px] text-ink-tertiary"><RotateCw className="h-4 w-4 animate-spin" /> Getting a secure link…</span>;
+  if (q.isError) return <p className="text-[13px] text-danger">{humanizeError(q.error)}</p>;
+  if (!q.data) return <p className="text-[13px] text-ink-tertiary">No preview available.</p>;
+  return (
+    <div>
+      <img src={q.data.url} alt="Captured signature" className="max-h-40 rounded-md border border-border-subtle bg-white object-contain" />
+      <p className="mt-1 text-[11px] text-ink-tertiary flex items-center gap-1.5"><Lock className="h-3 w-3" /> Private · link expires ~{q.data.expiresIn}s · <button onClick={() => q.refetch()} className="underline hover:text-ink-secondary">refresh</button></p>
+    </div>
+  );
+}
+
+function DocumentLink({ assetId }: { assetId: string }) {
+  const [reveal, setReveal] = React.useState(false);
+  const q = useSignedPreview(assetId, reveal);
+  if (!reveal) return <button onClick={() => setReveal(true)} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border-strong px-3 text-[12px] text-ink-secondary hover:text-ink-primary"><Eye className="h-3.5 w-3.5" /> Open document (private)</button>;
+  if (q.isLoading) return <span className="flex items-center gap-2 text-[13px] text-ink-tertiary"><RotateCw className="h-4 w-4 animate-spin" /> Getting a secure link…</span>;
+  if (q.isError) return <p className="text-[13px] text-danger">{humanizeError(q.error)}</p>;
+  if (!q.data) return <p className="text-[13px] text-ink-tertiary">No document available.</p>;
+  return <a href={q.data.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[13px] text-info hover:underline">Open PDF (expiring link) <ExternalLink className="h-3.5 w-3.5" /></a>;
 }

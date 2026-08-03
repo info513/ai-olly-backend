@@ -23,6 +23,7 @@ const mapConsent = (c: any): SignedConsent => ({
   id: c.id, hotelId: c.hotel_id, guestId: c.guest_id, stayId: c.stay_id, templateId: c.template_id,
   consentType: c.consent_type, consentVersion: c.consent_version, locale: c.locale, textSnapshot: c.consent_text_snapshot,
   signedName: c.signed_name, signedAt: c.signed_at, staffUserId: c.staff_user_id, status: c.status, revokedAt: c.revoked_at,
+  signatureAssetId: c.signature_asset_id ?? null, documentAssetId: c.generated_document_asset_id ?? null,
   hasSignatureAsset: !!c.signature_asset_id, hasDocumentAsset: !!c.generated_document_asset_id,
 });
 
@@ -114,8 +115,8 @@ export function usePublishTemplate(hotelId?: string) {
 export function useSignConsent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (v: { templateId: string; guestId: string; stayId: string | null; signedName: string; device?: Record<string, unknown> | null }) => {
-      const { data, error } = await sb().rpc("sign_consent", { p_template: v.templateId, p_guest: v.guestId, p_stay: v.stayId, p_signed_name: v.signedName, p_device: v.device ?? null });
+    mutationFn: async (v: { templateId: string; guestId: string; stayId: string | null; signedName: string; device?: Record<string, unknown> | null; signatureAssetId?: string | null }) => {
+      const { data, error } = await sb().rpc("sign_consent", { p_template: v.templateId, p_guest: v.guestId, p_stay: v.stayId, p_signed_name: v.signedName, p_device: v.device ?? null, p_signature_asset: v.signatureAssetId ?? null });
       if (error) throw error;
       return Array.isArray(data) ? data[0] : data;
     },

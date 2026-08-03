@@ -3,13 +3,15 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { PenLine, ShieldCheck, Info } from "lucide-react";
+import { PenLine, ShieldCheck } from "lucide-react";
 import { useHotel } from "@/providers/hotel-provider";
 import { useStay } from "@/data/stays";
 import { useConsentTemplates, signableTemplates, useSignConsent } from "@/data/consents";
+import { uploadPrivate } from "@/data/storage";
 import { humanizeError } from "@/data/errors";
 import { PageHeader } from "@/components/content/page-header";
 import { SectionLoader, ErrorState, EmptyState } from "@/components/content/states";
+import { SignaturePad, SignatureClearButton, type SignaturePadHandle } from "@/components/reception/signature-pad";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +29,9 @@ export default function ConsentCapture() {
   const [confirmed, setConfirmed] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [nameTouched, setNameTouched] = React.useState(false);
+  const [hasInk, setHasInk] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const padRef = React.useRef<SignaturePadHandle>(null);
 
   const signable = signableTemplates(templatesQ.data ?? []);
   const template = signable.find((t) => t.id === templateId) ?? signable[0];
@@ -44,9 +49,19 @@ export default function ConsentCapture() {
     if (!signedName.trim()) { setError("Enter the signer's name."); return; }
     if (!confirmed) { setError("Confirm the guest agrees to the text above."); return; }
     try {
-      const c: any = await sign.mutateAsync({ templateId: template.id, guestId: stay.guestId, stayId: stay.id, signedName: signedName.trim(), device: { source: "dashboard", staff_confirmed: true } });
+      // Optional signature: private-upload a compact PNG, link it to the consent.
+      let signatureAssetId: string | null = null;
+      const blob = padRef.current && !padRef.current.isEmpty() ? await padRef.current.toBlob() : null;
+      if (blob) {
+        setUploading(true);
+        const file = new File([blob], `signature-${Date.now()}.png`, { type: "image/png" });
+        const up = await uploadPrivate({ file, assetType: "consent_signature", hotelId: stay.hotelId, displayName: `Signature — ${signedName.trim()}` });
+        signatureAssetId = up.assetId;
+        setUploading(false);
+      }
+      const c: any = await sign.mutateAsync({ templateId: template.id, guestId: stay.guestId, stayId: stay.id, signedName: signedName.trim(), device: { source: "dashboard", staff_confirmed: true, signed_with_signature: !!signatureAssetId }, signatureAssetId });
       router.push(`/consent/${c.id}`);
-    } catch (e) { setError(humanizeError(e)); }
+    } catch (e) { setUploading(false); setError(humanizeError(e)); }
   };
 
   return (
@@ -80,7 +95,15 @@ export default function ConsentCapture() {
 
             <div className="space-y-1.5"><label className="text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary">Signed name</label><Input value={signedName} onChange={(e) => { setSignedName(e.target.value); setNameTouched(true); }} placeholder="Guest's full name" /></div>
 
-            <div className="flex items-start gap-2 rounded-md border border-info/30 bg-info-soft/30 px-3 py-2 text-[12px] text-info"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Signature image capture is deferred in this environment — no signature file is created or faked. The signed name, exact text and staff member are recorded.</div>
+            {/* Signature pad — optional; uploaded privately and linked to the consent */}
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary">Signature <span className="normal-case text-ink-tertiary/70">(optional)</span></label>
+                {hasInk && <SignatureClearButton onClick={() => { padRef.current?.clear(); setHasInk(false); }} />}
+              </div>
+              <SignaturePad ref={padRef} onChange={setHasInk} disabled={sign.isPending || uploading} />
+              <p className="mt-1 text-[11px] text-ink-tertiary">Sign above with a mouse or touch. The image is stored privately (consent-files) and linked to this record — never public, never overwritten.</p>
+            </div>
 
             <label className="flex items-start gap-2.5 rounded-md border border-border-subtle bg-surface-base p-3">
               <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[color:var(--brand-cream)]" />
@@ -90,7 +113,7 @@ export default function ConsentCapture() {
             {error && <p className="text-[12px] text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => router.push(`/stays/${stay.id}`)}>Cancel</Button>
-              <Button variant="primary" onClick={submit} loading={sign.isPending} disabled={!confirmed || !signedName.trim()}><PenLine className="h-4 w-4" /> Record consent</Button>
+              <Button variant="primary" onClick={submit} loading={sign.isPending || uploading} disabled={!confirmed || !signedName.trim()}><PenLine className="h-4 w-4" /> {uploading ? "Saving signature…" : "Record consent"}</Button>
             </div>
           </div>
         </Card>

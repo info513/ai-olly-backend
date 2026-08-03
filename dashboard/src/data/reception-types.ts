@@ -130,6 +130,8 @@ export interface SignedConsent {
   staffUserId: string | null;
   status: ConsentState;
   revokedAt: string | null;
+  signatureAssetId: string | null;
+  documentAssetId: string | null;
   hasSignatureAsset: boolean;
   hasDocumentAsset: boolean;
 }
