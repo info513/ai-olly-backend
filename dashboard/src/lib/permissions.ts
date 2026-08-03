@@ -30,6 +30,8 @@ export const MODULE_ACCESS: Record<string, Role[]> = {
   ai: ["platform_admin", "hotel_admin", "editor", "reception", "marketing", "read_only"],
   reception: ["platform_admin", "hotel_admin", "reception"],
   guests: ["platform_admin", "hotel_admin", "reception"],
+  stays: ["platform_admin", "hotel_admin", "reception"],
+  consent: ["platform_admin", "hotel_admin", "reception"],
   assets: ["platform_admin", "hotel_admin", "editor", "marketing", "reception", "read_only"],
   newsletter: ["platform_admin", "hotel_admin", "marketing"],
   analytics: ["platform_admin", "hotel_admin", "reception", "editor", "marketing", "read_only"],
