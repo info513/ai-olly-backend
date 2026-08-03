@@ -26,7 +26,9 @@
     "audit:security-reception": "node scripts/security-audit-reception.mjs",
     "audit:security-assets": "node scripts/security-audit-assets.mjs",
     "audit:security-newsletter": "node scripts/security-audit-newsletter.mjs",
-    "audit:security-analytics": "node scripts/security-audit-analytics.mjs"
+    "audit:security-analytics": "node scripts/security-audit-analytics.mjs",
+    "verify:migration": "node scripts/verify-antique-migration.mjs",
+    "audit:security-migration": "node scripts/security-audit-migration.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.1",
