@@ -13,14 +13,17 @@
     "setup:dev-ai": "node scripts/setup-dev-ai.mjs",
     "setup:dev-reception": "node scripts/setup-dev-reception.mjs",
     "setup:dev-assets": "node scripts/setup-dev-assets.mjs",
+    "setup:dev-newsletter": "node scripts/setup-dev-newsletter.mjs",
     "verify:content": "node scripts/verify-content.mjs",
     "verify:ai": "node scripts/verify-ai.mjs",
     "verify:reception": "node scripts/verify-reception.mjs",
     "verify:assets": "node scripts/verify-assets.mjs",
+    "verify:newsletter": "node scripts/verify-newsletter.mjs",
     "audit:security": "node scripts/security-audit-content.mjs",
     "audit:security-ai": "node scripts/security-audit-ai.mjs",
     "audit:security-reception": "node scripts/security-audit-reception.mjs",
-    "audit:security-assets": "node scripts/security-audit-assets.mjs"
+    "audit:security-assets": "node scripts/security-audit-assets.mjs",
+    "audit:security-newsletter": "node scripts/security-audit-newsletter.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.1",
