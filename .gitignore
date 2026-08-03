@@ -4,3 +4,12 @@ logs/
 node_modules/
 *.log
 .DS_Store
+
+# Antique Split migration — LOCAL artifacts only.
+# raw/ contains production room access tokens + full production content;
+# normalized/ + manifests/ + reports/ contain full production content.
+# Never commit these. Human-readable, redacted reports live in docs/ instead.
+/migration/antique-split/raw/
+/migration/antique-split/normalized/
+/migration/antique-split/manifests/
+/migration/antique-split/reports/
