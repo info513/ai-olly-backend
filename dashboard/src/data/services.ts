@@ -7,6 +7,31 @@ import type { HotelService, ResolvedService, ServiceCategory, ServiceVersion } f
 
 const sb = () => getSupabaseBrowserClient();
 
+/**
+ * True when the working (draft) row differs from the currently-LIVE snapshot —
+ * i.e. there are edits guests won't see until the next publish. Never-published
+ * services (no snapshot) are not "pending"; they're simply unpublished.
+ */
+export function hasUnpublishedChanges(s: HotelService): boolean {
+  const snap = s.published_snapshot;
+  if (!snap) return false;
+  const pick = (o: any) => ({
+    title: o.title ?? null,
+    short_description: o.short_description ?? null,
+    body_content: o.body_content ?? null,
+    is_critical: !!o.is_critical,
+    visible_in_pwa: !!o.visible_in_pwa,
+    visible_in_web: !!o.visible_in_web,
+    available_to_ai: !!o.available_to_ai,
+    active: !!o.active,
+    category_id: o.category_id ?? null,
+    sort_order: o.sort_order ?? 0,
+    valid_from: o.valid_from ?? null,
+    valid_to: o.valid_to ?? null,
+  });
+  return JSON.stringify(pick(s)) !== JSON.stringify(pick(snap));
+}
+
 // ── Categories ──────────────────────────────────────────────────────────────
 async function fetchCategories(hotelId: string): Promise<ServiceCategory[]> {
   const { data, error } = await sb()

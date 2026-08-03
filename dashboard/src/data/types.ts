@@ -141,6 +141,8 @@ export interface HotelService {
   valid_from: string | null;
   valid_to: string | null;
   updated_at: string;
+  /** The currently-LIVE content snapshot (set only by publish). Null = never published. */
+  published_snapshot: Record<string, any> | null;
   categoryName?: string;
 }
 

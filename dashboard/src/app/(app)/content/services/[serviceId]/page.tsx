@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { Save, History, UploadCloud, Eye } from "lucide-react";
 import { useHotel } from "@/providers/hotel-provider";
 import { usePermissions } from "@/providers/permission-provider";
-import { useService, useUpdateService, usePublishService, useCategories } from "@/data/services";
+import { useService, useUpdateService, usePublishService, useCategories, hasUnpublishedChanges } from "@/data/services";
 import { humanizeError } from "@/data/errors";
 import { PageHeader } from "@/components/content/page-header";
 import { SectionLoader, ErrorState, PermissionDenied } from "@/components/content/states";
@@ -18,6 +18,7 @@ import { TextField, TextAreaField, ToggleField, NumberField, Field } from "@/com
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import type { HotelService } from "@/data/types";
 
 const toDateInput = (iso: string | null) => (iso ? iso.slice(0, 10) : "");
@@ -66,12 +67,13 @@ export default function ServiceEditor() {
   if (serviceQ.isLoading || !s) return <div className="mx-auto max-w-[1200px] p-6"><SectionLoader rows={6} /></div>;
 
   const dis = !mayEdit;
+  const pending = hasUnpublishedChanges(s);   // saved edits not yet live
 
   return (
     <div className="mx-auto max-w-[1200px] p-6 pb-24">
       <PageHeader
         crumbs={[{ label: "Content", href: "/content" }, { label: "Services", href: "/content/services" }, { label: s.title }]}
-        title={<span className="flex items-center gap-3">{form.title || s.title} <StatusPill status={s.status} /></span>}
+        title={<span className="flex items-center gap-3">{form.title || s.title} <StatusPill status={s.status} />{pending && <Badge tone="warning" dot>Unpublished changes</Badge>}</span>}
         subtitle={<span className="flex items-center gap-2"><SourceBadge source={s.source_type} /> {s.categoryName ?? ""}</span>}
         backHref="/content/services"
         actions={
@@ -147,6 +149,16 @@ export default function ServiceEditor() {
 
           <Card className="p-5">
             <div className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-ink-tertiary">Publishing</div>
+            {pending && (
+              <p className="mb-3 rounded-md border border-warning/30 bg-warning-soft/40 px-3 py-2 text-[12px] text-warning">
+                Saved edits aren’t live yet — guests still see the last published version. Publish to update them.
+              </p>
+            )}
+            {s.status === "draft" && s.published_snapshot && (
+              <p className="mb-3 rounded-md border border-info/30 bg-info-soft/40 px-3 py-2 text-[12px] text-info">
+                This is a working draft (e.g. after a rollback). Guests still see the last published version until you publish.
+              </p>
+            )}
             <dl className="space-y-2.5 text-[13px]">
               <SummaryRow label="Status"><StatusPill status={s.status} /></SummaryRow>
               <SummaryRow label="Visible to"><VisibilityChips pwa={!!form.visible_in_pwa} web={!!form.visible_in_web} ai={!!form.available_to_ai} /></SummaryRow>
