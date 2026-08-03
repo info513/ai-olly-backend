@@ -32,6 +32,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Consent", href: "/consent", icon: FileSignature, ready: true },
   { label: "Assets", href: "/assets", icon: Images, ready: true },
   { label: "Newsletter", href: "/newsletter", icon: Send, ready: true },
-  { label: "Analytics", href: "/analytics", icon: BarChart3, ready: false },
+  { label: "Analytics", href: "/analytics", icon: BarChart3, ready: true },
   { label: "Settings", href: "/settings", icon: Settings, ready: false },
 ];
