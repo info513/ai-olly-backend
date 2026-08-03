@@ -6,6 +6,7 @@ import {
   BedDouble, ConciergeBell, BookOpen, Sparkles, CalendarCheck, FileSignature,
   UserPlus, Users, MessageSquare, LogIn, LogOut, Search, CornerDownLeft, PlayCircle,
   Images, Upload, ImageIcon, FileText, Link2Off, Send, Mail, Filter, ShieldAlert,
+  HeartPulse, Activity, RefreshCw,
   type LucideIcon,
 } from "lucide-react";
 import { useCommand } from "@/providers/command-provider";
@@ -49,6 +50,10 @@ const ACTIONS: Action[] = [
   { id: "consent-docs", label: "Consent documents", icon: FileSignature, href: "/assets/documents", group: "Go", module: "assets" },
   { id: "scheduled-campaigns", label: "Scheduled campaigns", icon: Send, href: "/newsletter/campaigns?filter=scheduled", group: "Go", module: "newsletter" },
   { id: "consent-issues", label: "Consent issues", icon: ShieldAlert, href: "/newsletter/subscribers?filter=consent-missing", group: "Go", module: "newsletter" },
+  { id: "hotel-health", label: "Open Hotel Health", icon: HeartPulse, href: "/analytics/health", group: "Go", module: "analytics" },
+  { id: "analytics", label: "Analytics overview", icon: Activity, href: "/analytics", group: "Go", module: "analytics" },
+  { id: "ai-handoffs", label: "View AI handoffs", icon: Activity, href: "/analytics/ai", group: "Go", module: "analytics" },
+  { id: "refresh-analytics", label: "Refresh analytics (dev)", icon: RefreshCw, href: "/analytics/health", group: "Go", module: "analytics" },
 ];
 
 export function CommandPalette() {
