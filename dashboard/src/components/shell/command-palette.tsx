@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   BedDouble, ConciergeBell, BookOpen, Sparkles, CalendarCheck, FileSignature,
   UserPlus, Users, MessageSquare, LogIn, LogOut, Search, CornerDownLeft, PlayCircle,
+  Images, Upload, ImageIcon, FileText, Link2Off,
   type LucideIcon,
 } from "lucide-react";
 import { useCommand } from "@/providers/command-provider";
@@ -17,7 +18,7 @@ import {
 import { Kbd } from "@/components/ui/kbd";
 
 const KIND_ICON: Record<SearchResultKind, LucideIcon> = {
-  room: BedDouble, guest: Users, stay: CalendarCheck, request: ConciergeBell, consent: FileSignature, feedback: MessageSquare,
+  room: BedDouble, guest: Users, stay: CalendarCheck, request: ConciergeBell, consent: FileSignature, feedback: MessageSquare, asset: Images,
 };
 
 interface Action { id: string; label: string; icon: LucideIcon; href: string; group: "Create" | "Go"; module: string }
@@ -27,6 +28,7 @@ const ACTIONS: Action[] = [
   { id: "new-guest", label: "Find or add guest", icon: UserPlus, href: "/guests", group: "Create", module: "guests" },
   { id: "capture-consent", label: "Capture consent", icon: FileSignature, href: "/consent", group: "Create", module: "consent" },
   { id: "add-knowledge", label: "Add AI answer", icon: Sparkles, href: "/ai/knowledge/new", group: "Create", module: "ai" },
+  { id: "upload-asset", label: "Upload asset", icon: Upload, href: "/assets/upload", group: "Create", module: "assets" },
   { id: "arrivals", label: "View arrivals", icon: LogIn, href: "/reception#arrivals", group: "Go", module: "reception" },
   { id: "departures", label: "View departures", icon: LogOut, href: "/reception#departures", group: "Go", module: "reception" },
   { id: "requests", label: "All requests", icon: ConciergeBell, href: "/reception/requests", group: "Go", module: "reception" },
@@ -35,6 +37,11 @@ const ACTIONS: Action[] = [
   { id: "feedback", label: "Feedback", icon: MessageSquare, href: "/reception/feedback", group: "Go", module: "reception" },
   { id: "test-ai", label: "Test the AI", icon: PlayCircle, href: "/ai/preview", group: "Go", module: "ai" },
   { id: "knowledge", label: "AI knowledge", icon: BookOpen, href: "/ai/knowledge", group: "Go", module: "ai" },
+  { id: "find-image", label: "Find image", icon: ImageIcon, href: "/assets/images", group: "Go", module: "assets" },
+  { id: "find-document", label: "Find document", icon: FileText, href: "/assets/documents", group: "Go", module: "assets" },
+  { id: "unused-assets", label: "Unused assets", icon: Link2Off, href: "/assets/usage?filter=unused", group: "Go", module: "assets" },
+  { id: "missing-alt", label: "Assets missing alt text", icon: ImageIcon, href: "/assets/images?filter=missing-alt", group: "Go", module: "assets" },
+  { id: "consent-docs", label: "Consent documents", icon: FileSignature, href: "/assets/documents", group: "Go", module: "assets" },
 ];
 
 export function CommandPalette() {
