@@ -5,7 +5,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const sb = () => getSupabaseBrowserClient();
 
-export type SearchResultKind = "room" | "guest" | "stay" | "request" | "consent" | "feedback" | "asset";
+export type SearchResultKind = "room" | "guest" | "stay" | "request" | "consent" | "feedback" | "asset" | "subscriber" | "segment" | "template" | "campaign";
 
 export interface SearchResult {
   id: string;
@@ -29,12 +29,16 @@ export function useReceptionSearch(query: string, hotelId?: string, enabled = tr
     enabled: enabled && !!hotelId && q.length >= 1,
     queryFn: async (): Promise<SearchResult[]> => {
       const like = `%${q}%`;
-      const [rooms, guests, requests, feedback, assets] = await Promise.all([
+      const [rooms, guests, requests, feedback, assets, subs, segs, tpls, camps] = await Promise.all([
         sb().from("rooms").select("id,room_number").eq("hotel_id", hotelId).ilike("room_number", like).limit(5),
         sb().from("guests").select("id,first_name,last_name,pseudonymized_at").eq("hotel_id", hotelId).or(`first_name.ilike.${like},last_name.ilike.${like}`).limit(6),
         sb().from("guest_requests").select("id,title,status, room:rooms(room_number)").eq("hotel_id", hotelId).ilike("title", like).limit(6),
         sb().from("feedback").select("id,category,rating").eq("hotel_id", hotelId).ilike("category", like).limit(4),
         sb().from("assets").select("id,display_name,original_filename,asset_type").or(`hotel_id.eq.${hotelId},hotel_id.is.null`).is("deleted_at", null).or(`display_name.ilike.${like},original_filename.ilike.${like},alt_text.ilike.${like},source_credit.ilike.${like}`).limit(6),
+        sb().from("newsletter_subscribers").select("id,email,first_name,last_name").eq("hotel_id", hotelId).or(`email.ilike.${like},first_name.ilike.${like},last_name.ilike.${like}`).limit(5),
+        sb().from("newsletter_segments").select("id,name").eq("hotel_id", hotelId).ilike("name", like).limit(4),
+        sb().from("newsletter_templates").select("id,name,subject").or(`hotel_id.eq.${hotelId},hotel_id.is.null`).or(`name.ilike.${like},subject.ilike.${like}`).limit(4),
+        sb().from("newsletter_campaigns").select("id,name,status").eq("hotel_id", hotelId).ilike("name", like).limit(4),
       ]);
 
       const out: SearchResult[] = [];
@@ -46,6 +50,10 @@ export function useReceptionSearch(query: string, hotelId?: string, enabled = tr
       for (const rq of (requests.data ?? []) as any[]) out.push({ id: rq.id, kind: "request", title: rq.title, subtitle: `Request · ${rq.status}${rq.room?.room_number ? ` · Room ${rq.room.room_number}` : ""}`, href: `/reception/requests/${rq.id}` });
       for (const f of (feedback.data ?? []) as any[]) out.push({ id: f.id, kind: "feedback", title: f.category || "Feedback", subtitle: `Feedback${f.rating ? ` · ${f.rating}★` : ""}`, href: `/reception/feedback` });
       for (const a of (assets.data ?? []) as any[]) out.push({ id: a.id, kind: "asset", title: a.display_name || a.original_filename || "Asset", subtitle: `Asset · ${String(a.asset_type).replace(/_/g, " ")}`, href: `/assets/${a.id}` });
+      for (const s of (subs.data ?? []) as any[]) out.push({ id: s.id, kind: "subscriber", title: [s.first_name, s.last_name].filter(Boolean).join(" ") || s.email, subtitle: `Subscriber · ${s.email}`, href: `/newsletter/subscribers/${s.id}` });
+      for (const g of (segs.data ?? []) as any[]) out.push({ id: g.id, kind: "segment", title: g.name, subtitle: "Segment", href: `/newsletter/segments/${g.id}` });
+      for (const t of (tpls.data ?? []) as any[]) out.push({ id: t.id, kind: "template", title: t.name, subtitle: `Template · ${t.subject}`, href: `/newsletter/templates/${t.id}` });
+      for (const cm of (camps.data ?? []) as any[]) out.push({ id: cm.id, kind: "campaign", title: cm.name, subtitle: `Campaign · ${cm.status}`, href: `/newsletter/campaigns/${cm.id}` });
       return out;
     },
   });

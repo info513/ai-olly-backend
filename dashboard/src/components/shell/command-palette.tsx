@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   BedDouble, ConciergeBell, BookOpen, Sparkles, CalendarCheck, FileSignature,
   UserPlus, Users, MessageSquare, LogIn, LogOut, Search, CornerDownLeft, PlayCircle,
-  Images, Upload, ImageIcon, FileText, Link2Off,
+  Images, Upload, ImageIcon, FileText, Link2Off, Send, Mail, Filter, ShieldAlert,
   type LucideIcon,
 } from "lucide-react";
 import { useCommand } from "@/providers/command-provider";
@@ -19,6 +19,7 @@ import { Kbd } from "@/components/ui/kbd";
 
 const KIND_ICON: Record<SearchResultKind, LucideIcon> = {
   room: BedDouble, guest: Users, stay: CalendarCheck, request: ConciergeBell, consent: FileSignature, feedback: MessageSquare, asset: Images,
+  subscriber: Users, segment: Filter, template: Mail, campaign: Send,
 };
 
 interface Action { id: string; label: string; icon: LucideIcon; href: string; group: "Create" | "Go"; module: string }
@@ -29,6 +30,10 @@ const ACTIONS: Action[] = [
   { id: "capture-consent", label: "Capture consent", icon: FileSignature, href: "/consent", group: "Create", module: "consent" },
   { id: "add-knowledge", label: "Add AI answer", icon: Sparkles, href: "/ai/knowledge/new", group: "Create", module: "ai" },
   { id: "upload-asset", label: "Upload asset", icon: Upload, href: "/assets/upload", group: "Create", module: "assets" },
+  { id: "new-campaign", label: "New campaign", icon: Send, href: "/newsletter/campaigns/new", group: "Create", module: "newsletter" },
+  { id: "create-segment", label: "Create segment", icon: Filter, href: "/newsletter/segments", group: "Create", module: "newsletter" },
+  { id: "create-template", label: "Create email template", icon: Mail, href: "/newsletter/templates/new", group: "Create", module: "newsletter" },
+  { id: "find-subscriber", label: "Find subscriber", icon: Users, href: "/newsletter/subscribers", group: "Create", module: "newsletter" },
   { id: "arrivals", label: "View arrivals", icon: LogIn, href: "/reception#arrivals", group: "Go", module: "reception" },
   { id: "departures", label: "View departures", icon: LogOut, href: "/reception#departures", group: "Go", module: "reception" },
   { id: "requests", label: "All requests", icon: ConciergeBell, href: "/reception/requests", group: "Go", module: "reception" },
@@ -42,6 +47,8 @@ const ACTIONS: Action[] = [
   { id: "unused-assets", label: "Unused assets", icon: Link2Off, href: "/assets/usage?filter=unused", group: "Go", module: "assets" },
   { id: "missing-alt", label: "Assets missing alt text", icon: ImageIcon, href: "/assets/images?filter=missing-alt", group: "Go", module: "assets" },
   { id: "consent-docs", label: "Consent documents", icon: FileSignature, href: "/assets/documents", group: "Go", module: "assets" },
+  { id: "scheduled-campaigns", label: "Scheduled campaigns", icon: Send, href: "/newsletter/campaigns?filter=scheduled", group: "Go", module: "newsletter" },
+  { id: "consent-issues", label: "Consent issues", icon: ShieldAlert, href: "/newsletter/subscribers?filter=consent-missing", group: "Go", module: "newsletter" },
 ];
 
 export function CommandPalette() {
