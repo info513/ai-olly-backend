@@ -7,7 +7,11 @@
     "dev": "next dev -p 3100",
     "build": "next build",
     "start": "next start -p 3100",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "setup:dev-user": "node scripts/setup-dev-user.mjs",
+    "setup:dev-content": "node scripts/setup-dev-content.mjs",
+    "verify:content": "node scripts/verify-content.mjs",
+    "audit:security": "node scripts/security-audit-content.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.1",
