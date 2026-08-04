@@ -23,6 +23,10 @@ call (individual reviewers' guesses were reconciled for consistency).
 
 Plus a **Cleared / positive-assurance** section (items investigated and found sound — not counted).
 
+> **Progress:** BLOCKER B1 scrubbed (token redacted; rotation + history purge remain owner actions).
+> **H2 RESOLVED** in RC1 Cluster 2 (see the *Cluster 2 — Codebase Hygiene: result* section below).
+> Severities are otherwise unchanged.
+
 ---
 
 ## BLOCKER
@@ -47,8 +51,8 @@ Plus a **Cleared / positive-assurance** section (items investigated and found so
 - **Estimated effort:** M
 - **Risk of fixing:** Med — shell-wide layout change; regression-test all routes.
 
-### H2 — ~550 LOC of dead mock scaffolding still shipped
-- **Severity:** HIGH
+### H2 — ~550 LOC of dead mock scaffolding still shipped ✅ RESOLVED (RC1 Cluster 2)
+- **Severity:** HIGH — **RESOLVED**
 - **Problem:** A closed cluster imported by nothing live: `src/mock/{data,provider,types}.ts`, `src/hooks/use-dashboard.ts` (zero importers), and `src/components/home/*` (`greeting/kpi-card/quick-actions/today-card/requests-card/recent-activity`). The real `app/(app)/home/page.tsx` uses live `@/data/*` hooks and imports none of them. This is the pre-real-Home scaffolding superseded in Sprint 8.
 - **Impact:** ~548 misleading LOC in the RC; a reviewer/agent could mistake `mock/provider` for a live data path.
 - **Recommended fix:** Delete `src/mock/`, `src/hooks/use-dashboard.ts`, `src/components/home/`; `tsc --noEmit` to confirm zero breakage.
@@ -186,6 +190,48 @@ Plus a **Cleared / positive-assurance** section (items investigated and found so
 - **Severity:** LOW (pass with note) · **Problem:** The only native `<table>` (`content/rooms/page.tsx:64`) is correctly wrapped in `overflow-x-auto`; no fixed-width body-scroll offenders found. · **Impact:** None currently. · **Fix:** Keep wrapping any future `<table>` in an overflow container. · **Effort:** S · **Risk:** Low.
 
 ---
+
+## Cluster 2 — Codebase Hygiene: result
+
+**H2 RESOLVED** + repo hygiene (L12, L13). Dead code removed with **no observable behavior change**;
+`npm run rc1` green (25 passed · 0 failed) before and after.
+
+**Files removed (14 + 642 untracked):**
+- Dead Dashboard scaffolding (10 files, closed dead island — proven zero live importers):
+  `dashboard/src/mock/{data,provider,types}.ts`, `dashboard/src/hooks/use-dashboard.ts`,
+  `dashboard/src/components/home/{greeting,kpi-card,quick-actions,today-card,requests-card,recent-activity}.tsx`
+  (the empty `src/mock/`, `src/hooks/`, `src/components/home/` directories were removed).
+- v1 empty stub scripts (L12, 0-byte, referenced nowhere):
+  `sync/airtable_fetch.js`, `sync/vector_upload.js`, `sync/sync_runner.js`, `scripts/create_vector_store.js`
+  (the empty `sync/` directory was removed).
+- Repo hygiene (L13): **642 tracked `node_modules/` artifacts untracked** via `git rm -r --cached`
+  (they remain on disk and were already covered by `.gitignore node_modules/` — only stale tracking removed).
+
+**LOC removed:** **548** lines of dead application code (across the 10 Dashboard files) + 4 empty stub
+files. Untracking `node_modules` dropped 642 stale artifacts (incl. the 1,105-line `.package-lock.json`)
+from version control.
+
+**Dependencies removed:** **none.** Every external import in the dead cluster (`lucide-react`,
+`next/link`, `next/navigation`, `react`) is used by 34–90 other files, so no `package.json`
+dependency became unused.
+
+**Behavior verification:** full `npm run rc1` = 25 passed / 0 failed / 1 skipped (lint), incl. all
+7 dashboard verify suites, 7 security audits, and 7 backend suites; typecheck + build clean; bundle
+secret scan clean; no dangling imports (`@/mock`, `@/hooks/use-dashboard`, `@/components/home`, the
+v1 stubs — all zero references post-deletion). No route, page, provider, or visible feature changed.
+`server/server.js` and `pwa/` untouched; `main` remains `b158278`.
+
+**Intentionally retained (not dead):**
+- `dashboard/src/components/shell/module-placeholder.tsx` — still used by the `[...slug]` catch-all
+  for not-yet-built routes.
+- All dev-setup (`setup-dev-*.mjs`), `verify-*`, `security-audit-*` scripts and the gitignored
+  `migration/antique-split/` fixtures — required by the RC1 gate.
+- The frozen v1 `pwa/` (including its demo files and `pwa/icons/.gitkeep`) and `server/` — the RC1
+  behavior freeze requires them unchanged; PWA demo cleanup is out of scope here.
+- Empty root `README.md` — content file, not scaffolding.
+- Duplicate helpers (`sb()` ×26, `pct`/`rate`, `CriticalBadge` — L7/L8/L9, M14) — **deferred** to a
+  later cluster; consolidating them touches live component/data files and is kept out of this
+  hygiene pass to preserve the behavior freeze.
 
 ## Cleared / positive assurance (investigated, no action — not counted)
 
