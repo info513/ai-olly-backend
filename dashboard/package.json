@@ -28,7 +28,8 @@
     "audit:security-newsletter": "node scripts/security-audit-newsletter.mjs",
     "audit:security-analytics": "node scripts/security-audit-analytics.mjs",
     "verify:migration": "node scripts/verify-antique-migration.mjs",
-    "audit:security-migration": "node scripts/security-audit-migration.mjs"
+    "audit:security-migration": "node scripts/security-audit-migration.mjs",
+    "scan:secrets": "node scripts/scan-bundle-secrets.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.1",

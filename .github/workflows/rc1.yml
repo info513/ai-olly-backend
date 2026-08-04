@@ -1,0 +1,102 @@
+name: RC1 Quality Gate
+
+# AI OLLY Platform 2.0 — the automated safety net (RC1, Cluster 1).
+# Runs EXACTLY `npm run rc1` (scripts/rc1.mjs) so local and CI are identical.
+# Static stages always run. Integration stages (verify-*/audit-*/backend suites)
+# run only when Supabase/Airtable secrets are configured; otherwise they SKIP
+# gracefully and the reason is printed. This workflow NEVER deploys anything.
+
+on:
+  push:
+    branches: [feature/ai-olly-platform-2]
+  pull_request:
+    branches: [feature/ai-olly-platform-2, main]
+  workflow_dispatch:
+
+# Least-privilege: read-only checkout, no deploy/write scopes.
+permissions:
+  contents: read
+
+concurrency:
+  group: rc1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rc1:
+    name: RC1 gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (with npm cache)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            dashboard/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install dashboard dependencies
+        run: npm ci --prefix dashboard
+
+      - name: Lockfile integrity (no unexpected changes)
+        run: git diff --exit-code -- package-lock.json dashboard/package-lock.json
+
+      - name: Provision integration env from secrets (optional)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
+          AIRTABLE_BASE_ID: ${{ secrets.AIRTABLE_BASE_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -n "$SUPABASE_DB_URL" ] && [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            {
+              echo "SUPABASE_URL=$SUPABASE_URL"
+              echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+              echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+              echo "SUPABASE_DB_URL=$SUPABASE_DB_URL"
+              echo "SUPABASE_DB_PASSWORD=$SUPABASE_DB_PASSWORD"
+              echo "AIRTABLE_API_KEY=$AIRTABLE_API_KEY"
+              echo "AIRTABLE_BASE_ID=$AIRTABLE_BASE_ID"
+              echo "OPENAI_API_KEY=$OPENAI_API_KEY"
+              echo "BREVO_API_KEY=$BREVO_API_KEY"
+              echo "DATA_PROVIDER=airtable"
+            } > .env
+            {
+              echo "NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-$SUPABASE_URL}"
+              echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:-$SUPABASE_ANON_KEY}"
+              echo "NEXT_PUBLIC_ENVIRONMENT=ci"
+              echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+            } > dashboard/.env.local
+            echo "Integration secrets present → full gate (.env + dashboard/.env.local written)."
+          else
+            echo "No integration secrets configured → integration stages will SKIP (static gate only)."
+          fi
+
+      - name: Run RC1 gate (npm run rc1)
+        run: npm run rc1
+
+      - name: No generated-code / working-tree drift
+        run: |
+          # The pipeline must not modify any tracked SOURCE file (generated code, lockfiles).
+          # Build + migration artifacts are gitignored, so a clean tree is expected.
+          # node_modules is excluded: it is never source, and a stale tracked file inside it
+          # (pre-existing repo-hygiene issue) is rewritten by `npm ci` — not pipeline drift.
+          if ! git diff --exit-code -- . ':(exclude)node_modules'; then
+            echo "::error::Pipeline modified tracked source files (generated-code drift)."
+            exit 1
+          fi
+          echo "Working tree clean (excluding node_modules) — no generated-code drift."
