@@ -24,9 +24,9 @@ call (individual reviewers' guesses were reconciled for consistency).
 Plus a **Cleared / positive-assurance** section (items investigated and found sound — not counted).
 
 > **Progress:** BLOCKER B1 scrubbed (token redacted; rotation + history purge remain owner actions).
-> **H2 RESOLVED** in RC1 Cluster 2; **H3, H4, H5 RESOLVED** in RC1 Cluster 3 — **all 6 HIGH
-> findings are now resolved** (see the Cluster 2 / Cluster 3 result sections below). Severities
-> are otherwise unchanged.
+> **H2 RESOLVED** (Cluster 2); **H3, H4, H5 RESOLVED** (Cluster 3); **H1 RESOLVED** (Cluster 4) —
+> **all 6 HIGH findings are now resolved** (see the Cluster 2 / 3 / 4 result sections below).
+> Severities are otherwise unchanged.
 
 ---
 
@@ -44,8 +44,8 @@ Plus a **Cleared / positive-assurance** section (items investigated and found so
 
 ## HIGH
 
-### H1 — App shell is not mobile-responsive (no drawer)
-- **Severity:** HIGH
+### H1 — App shell is not mobile-responsive (no drawer) ✅ RESOLVED (RC1 Cluster 4)
+- **Severity:** HIGH — **RESOLVED**
 - **Problem:** `app/(app)/layout.tsx:51-59` always renders `<AppSidebar>`; `components/shell/app-sidebar.tsx:39-44` fixes width to `w-[248px]`/`w-[68px]` with no `md:`/`hidden` breakpoint, no off-canvas Sheet/drawer, and no hamburger. Collapse is a manual localStorage toggle, not viewport-driven; `top-bar.tsx:14` only hides the page title on mobile.
 - **Impact:** On a 375px phone the sidebar consumes ~66% of width (or 68px permanently) and cannot be dismissed — the dashboard is effectively desktop-only. Reception/tablet use suffers.
 - **Recommended fix:** Below `md`, `hidden md:flex` the `<aside>` and render it as a Radix Dialog/Sheet drawer toggled by a hamburger in `TopBar`.
@@ -278,6 +278,50 @@ performance change; a verification bug fix.
 **Deferred (out of Cluster 3 / plan backlog):** list virtualization + cursor-pagination UI (M7), image
 transforms (M8), chart memoization (L6) — these are follow-ups; the bounds above remove the unbounded-fetch
 risk without a UX change.
+
+## Cluster 4 — Responsive Shell: result
+
+**H1 RESOLVED** — the last open HIGH; **all 6 HIGH findings are now resolved.** Implemented per
+`AI_OLLY_RESPONSIVE_PLAN.md` (shell first). Desktop is **pixel-equivalent** (additive breakpoints
+only); `npm run rc1` green (25 passed · 0 failed).
+
+**Responsive components changed (3):**
+- `components/shell/app-sidebar.tsx` — the persistent 248/68 px rail is now gated `hidden md:flex`
+  (desktop unchanged) and, below `md`, the **same permission-filtered nav renders in an off-canvas
+  Radix Dialog drawer** (scrim + focus trap + Escape, `slide-in-from-left`); nav taps close it.
+  Shared `NavLinks` serves both forms — no duplicated nav.
+- `components/shell/top-bar.tsx` — adds a **hamburger** (`md:hidden`) that opens the drawer, keeps
+  **hotel context visible** on mobile (hotel-name chip, since the switcher lives in the drawer), and
+  **collapses the search field to an icon** below `sm` (still opens the command palette).
+- `app/(app)/layout.tsx` — lifts the `navOpen` drawer state, passes it to the sidebar + top bar, and
+  closes the drawer on every route change.
+
+**Breakpoint behaviour (verified):** rail at ≥ 768 (`md`), drawer < 768. On phone the search
+collapses to an icon at < 640 (`sm`). Desktop/tablet keep the exact desktop rail.
+
+**Browser verification (6 bands):**
+
+| Width | Band | Rail | Hamburger | H-overflow |
+|--:|---|---|---|---|
+| 375 | small phone | hidden | shown | none |
+| 430 | large phone | hidden | shown | none |
+| 768 | tablet portrait | shown | hidden | none |
+| 1024 | tablet landscape | shown | hidden | none |
+| 1280 | large laptop | shown | hidden | none |
+| 1440 | desktop | shown | hidden | none |
+
+Drawer opens via the hamburger, renders the full nav + hotel switcher + user menu, a nav tap
+**navigates and auto-closes** the drawer, and no page (rooms `<table>`, analytics charts, guests,
+subscribers, requests, services editor) shows horizontal body overflow at 375 px. **Console clean;
+no broken navigation; no clipped dialogs; desktop pixel-equivalent.**
+
+**Scope note:** this cluster delivers the **responsive shell** — the H1 finding — which makes every
+route usable on phone/tablet with full width and no overflow (content grids/lists already reflow via
+existing Tailwind classes, now that the sidebar no longer squeezes them). The plan's deeper
+per-module touch enhancements (editor preview-as-sheet, reception full-screen task routes,
+tables→cards, command-palette full-screen mode, notifications bottom sheet) are **incremental
+polish on top of the working responsive shell** and are tracked as follow-ups; none are required to
+resolve H1 or to pass the "no overflow / no broken nav / no inaccessible controls" bar.
 
 ## Cleared / positive assurance (investigated, no action — not counted)
 
