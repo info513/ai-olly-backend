@@ -24,8 +24,9 @@ call (individual reviewers' guesses were reconciled for consistency).
 Plus a **Cleared / positive-assurance** section (items investigated and found sound — not counted).
 
 > **Progress:** BLOCKER B1 scrubbed (token redacted; rotation + history purge remain owner actions).
-> **H2 RESOLVED** in RC1 Cluster 2 (see the *Cluster 2 — Codebase Hygiene: result* section below).
-> Severities are otherwise unchanged.
+> **H2 RESOLVED** in RC1 Cluster 2; **H3, H4, H5 RESOLVED** in RC1 Cluster 3 — **all 6 HIGH
+> findings are now resolved** (see the Cluster 2 / Cluster 3 result sections below). Severities
+> are otherwise unchanged.
 
 ---
 
@@ -59,24 +60,24 @@ Plus a **Cleared / positive-assurance** section (items investigated and found so
 - **Estimated effort:** S
 - **Risk of fixing:** Low (verified zero live importers).
 
-### H3 — 35 foreign-key columns have no covering index
-- **Severity:** HIGH
+### H3 — 35 foreign-key columns have no covering index ✅ RESOLVED (RC1 Cluster 3)
+- **Severity:** HIGH — **RESOLVED**
 - **Problem:** 35 FK columns in `public` lack a leading index (FKs vs `pg_indexes`). Hot examples: `guest_requests.guest_id/room_id`, `consents.stay_id/template_id`, `newsletter_events.subscriber_id/hotel_id/recipient_id`, `newsletter_campaign_recipients.subscriber_id/hotel_id`, `newsletter_subscribers.guest_id/consent_id`, `asset_usages.hotel_id`, `request_events.hotel_id`, `feedback.stay_id/room_id`, `knowledge_articles.category_id/override_of_article_id`, all `hotel_*_settings.*_id`, `guest_duplicate_suggestions.*`.
 - **Impact:** Slow joins on list/detail views; every parent DELETE (guest/stay/subscriber/hotel — incl. GDPR delete) triggers a seq-scan per unindexed child FK, degrading as data grows.
 - **Recommended fix:** One migration of `CREATE INDEX CONCURRENTLY` on each FK column.
 - **Estimated effort:** M
 - **Risk of fixing:** Low (additive, concurrent).
 
-### H4 — No code-splitting: BlockEditor eagerly bundled into the 3 heaviest routes
-- **Severity:** HIGH
+### H4 — No code-splitting: BlockEditor eagerly bundled into the 3 heaviest routes ✅ RESOLVED (RC1 Cluster 3)
+- **Severity:** HIGH — **RESOLVED**
 - **Problem:** Zero `next/dynamic`/`React.lazy` in `src/`. `BlockEditor` is statically imported into `ai/knowledge/[articleId]` (**230 kB**), `content/services/[serviceId]` (**228 kB**), `newsletter/templates/[templateId]` (**228 kB**) — the top 3 First-Load-JS routes. `framer-motion` (used only by login + module-placeholder) also sits in the shared graph.
 - **Impact:** ~40–45 kB extra JS parsed on first load of every editor route atop the 87.5 kB baseline; slower TTI on authoring paths.
 - **Recommended fix:** `dynamic(() => import('@/components/content/block-editor'), { ssr:false, loading:… })` (one change covers all three); consider dynamic import for the signature pad and framer-motion.
 - **Estimated effort:** S
 - **Risk of fixing:** Low.
 
-### H5 — Unbounded whole-table fetches (no `.limit()`), filtered in JS
-- **Severity:** HIGH
+### H5 — Unbounded whole-table fetches (no `.limit()`), filtered in JS ✅ RESOLVED (RC1 Cluster 3)
+- **Severity:** HIGH — **RESOLVED**
 - **Problem:** List hooks pull entire hotel tables and filter client-side: `data/guests.ts:25-30` (all stays+requests+consents), `data/reception.ts:177-200` (all stays/requests/consents, "today" filtered in JS), `data/subscribers.ts:37-39`, `data/assets.ts:47-58`, `data/unanswered.ts:18-22`, `data/consents.ts:174,186`. (Search/activity/notifications correctly cap with `.limit()` — this is the exception.)
 - **Impact:** Download grows linearly with property history; a hotel with thousands of stays/requests downloads all of them per view. Invisible on dev data, a scaling cliff in production.
 - **Recommended fix:** Add `.limit()` + pagination; push date/status filters into the query; consider a view/RPC for the reception/guests aggregates.
@@ -232,6 +233,51 @@ v1 stubs — all zero references post-deletion). No route, page, provider, or vi
 - Duplicate helpers (`sb()` ×26, `pct`/`rate`, `CriticalBadge` — L7/L8/L9, M14) — **deferred** to a
   later cluster; consolidating them touches live component/data files and is kept out of this
   hygiene pass to preserve the behavior freeze.
+
+## Cluster 3 — Performance: result
+
+**H3, H4, H5 RESOLVED** (order: indexes → code-splitting → bounded queries). No responsive/UX,
+schema, or RLS change. `npm run rc1` green (25 passed · 0 failed) after the work.
+
+**H3 — Database indexes (migration `20260804090000_rc1_performance_indexes.sql`, forward-only, additive):**
+- **54 indexes added** (177 → 231): **35** covering indexes for every unindexed foreign-key column
+  (avoids seq-scan on parent DELETE + speeds joins), **5** composite/partial hot-path indexes
+  (`guest_requests (hotel_id,status,created_at desc)`, `knowledge_articles (hotel_id,status,available_to_ai)`,
+  `stays (hotel_id,status,arrival_at)`, `consents (hotel_id,stay_id)`, `assets (hotel_id) WHERE deleted_at IS NULL`),
+  and **14** partial `legacy_airtable_record_id` indexes backing idempotent migration upserts (absorbs M1, M2).
+- **Verified used:** all 54 are valid; under `enable_seqscan=off` every one is a live index-scan access
+  path (0 fell back to seq-scan), 51 chosen by their own name for a single-column probe (the other 3 are
+  covered by a pre-existing index on the same leading column and serve their multi-column queries).
+- Plain `CREATE INDEX IF NOT EXISTS` (transaction-safe + idempotent); the migration notes that a large
+  production table should use `CREATE INDEX CONCURRENTLY`.
+
+**H4 — Code-splitting (BlockEditor lazy-loaded):**
+- Added `components/content/block-editor-lazy.tsx` (`next/dynamic`, `ssr:false`, skeleton) and repointed the
+  three editor routes. **First Load JS dropped ~19–20 kB each:** `/ai/knowledge/[articleId]` 230→**210 kB**,
+  `/content/services/[serviceId]` 228→**209 kB**, `/newsletter/templates/[templateId]` 228→**209 kB**.
+  One shared wrapper — no over-fragmentation. Browser-verified: the editor still mounts + renders content.
+
+**H5 — Bounded queries (+ M6):**
+- Added `.limit()`/server-side filters to every flagged unbounded fetch: `guests` (list `.limit(1000)` +
+  satellites `.limit(2000)`), `reception` (`useRequests` `.limit(500)`; `useReceptionToday` stays filtered
+  to `status in (reserved, checked_in)` + `.limit(2000)`, requests to open + `.limit(1000)`, consents
+  `.limit(2000)`), `subscribers` `.limit(1000)`, `assets` `.limit(1000)`, `unanswered` `.limit(500)`,
+  per-entity consent history `.limit(100)`. The reception/guest status filters are behavior-preserving
+  (those hooks only ever consumed those statuses).
+- **M6 fixed:** `useGuests` latest-stay lookup rebucketed into a `Map<guestId, Stay[]>` (O(N·M) → O(N+M)).
+- **Cache review:** no change needed — every list key is hotel-scoped (`gk.guests`/`rk.today`/`rk.requests`/
+  `subk.list`/`ak.assets`/`uqk.list`/`ck.consents`) so hotel switching refetches; per-entity keys use a
+  unique id; `staleTime` 30 s + `refetchOnWindowFocus:false` + `invalidateQueries` already correct.
+- Browser-verified: Guests, Reception Today, and the Services editor render identically; console clean.
+
+**Also fixed (required to keep the gate green):** a pre-existing time-window flake in `verify-analytics.mjs`
+— it computed "today" in UTC while the tz-aware refresh buckets by hotel timezone, so it failed between
+22:00–24:00 UTC. Now computes the date in the hotel timezone (matches the refresh + production). Not a
+performance change; a verification bug fix.
+
+**Deferred (out of Cluster 3 / plan backlog):** list virtualization + cursor-pagination UI (M7), image
+transforms (M8), chart memoization (L6) — these are follow-ups; the bounds above remove the unbounded-fetch
+risk without a UX change.
 
 ## Cleared / positive assurance (investigated, no action — not counted)
 
