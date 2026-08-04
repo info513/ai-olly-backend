@@ -44,7 +44,7 @@
 
 ## 4. QR
 - [ ] 🔴 Generate a QR per room → `/pwa/?slug=antique-split&room=<n>&token=<AccessToken>` (8 rooms: 101,102,201,202,203,301,302,303).
-- [ ] 🟠 Confirm each room's `ROOM GUIDE.Access Token` is set and matches its QR (token auth is live; room 201 verified = `AS201M4X`).
+- [ ] 🟠 Confirm each room's `ROOM GUIDE.Access Token` is set and matches its QR (token auth is live; room 201 verified = `‹redacted — see Airtable; rotate if exposed›`).
 - [ ] 🟠 Test the expired/invalid-token path shows the "rescan QR" message (403 handling verified in tests).
 - [ ] 🟢 Design printed QR cards/table tents (branded) for each room.
 - [ ] 🟢 Decide token rotation policy (rotating a token invalidates old QR prints).
