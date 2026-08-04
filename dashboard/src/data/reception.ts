@@ -36,7 +36,7 @@ export function useRequests(hotelId?: string) {
     queryKey: rk.requests(hotelId),
     enabled: !!hotelId,
     queryFn: async (): Promise<RequestSummary[]> => {
-      const { data, error } = await sb().from("guest_requests").select(LIST_SELECT).eq("hotel_id", hotelId).order("created_at", { ascending: false });
+      const { data, error } = await sb().from("guest_requests").select(LIST_SELECT).eq("hotel_id", hotelId).order("created_at", { ascending: false }).limit(500);
       if (error) throw error;
       return (data ?? []).map(mapRequest);
     },
@@ -175,9 +175,11 @@ export function useReceptionToday(hotelId?: string) {
     queryFn: async (): Promise<TodayData> => {
       const today = ymd(new Date());
       const [staysR, reqR, consR, fbR] = await Promise.all([
-        sb().from("stays").select("id,guest_id,room_id,status,arrival_at,departure_at, room:rooms(room_number), guest:guests(first_name,last_name,pseudonymized_at)").eq("hotel_id", hotelId),
-        sb().from("guest_requests").select(LIST_SELECT).eq("hotel_id", hotelId),
-        sb().from("consents").select("stay_id,guest_id,status").eq("hotel_id", hotelId),
+        // Bounded (RC1 · H5): "today" only ever uses reserved/checked-in stays and
+        // open requests — filter server-side (behavior-preserving) + cap.
+        sb().from("stays").select("id,guest_id,room_id,status,arrival_at,departure_at, room:rooms(room_number), guest:guests(first_name,last_name,pseudonymized_at)").eq("hotel_id", hotelId).in("status", ["reserved", "checked_in"]).limit(2000),
+        sb().from("guest_requests").select(LIST_SELECT).eq("hotel_id", hotelId).not("status", "in", "(resolved,closed,cancelled)").limit(1000),
+        sb().from("consents").select("stay_id,guest_id,status").eq("hotel_id", hotelId).limit(2000),
         sb().from("feedback").select("id,rating,category,follow_up_requested,created_at").eq("hotel_id", hotelId).order("created_at", { ascending: false }).limit(5),
       ]);
       if (staysR.error) throw staysR.error;

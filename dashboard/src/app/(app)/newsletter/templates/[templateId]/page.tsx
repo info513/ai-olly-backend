@@ -10,7 +10,7 @@ import { humanizeError } from "@/data/errors";
 import { PageHeader } from "@/components/content/page-header";
 import { SectionLoader, ErrorState, PermissionDenied } from "@/components/content/states";
 import { StatusPill } from "@/components/content/pills";
-import { BlockEditor } from "@/components/content/block-editor";
+import { BlockEditor } from "@/components/content/block-editor-lazy";
 import { TextField, TextAreaField } from "@/components/content/fields";
 import { EmailPreview } from "@/components/newsletter/email-preview";
 import { TemplateHistoryDrawer } from "@/components/newsletter/template-history-drawer";

@@ -19,7 +19,8 @@ export function useUnanswered(hotelId?: string) {
         .from("unanswered_questions")
         .select("id,hotel_id,normalized_question,original_question,occurrence_count,first_seen_at,last_seen_at,status,assigned_to,resolution_article_id,notes")
         .eq("hotel_id", hotelId)
-        .order("occurrence_count", { ascending: false });
+        .order("occurrence_count", { ascending: false })
+        .limit(500);
       if (error) throw error;
       return (data ?? []) as UnansweredQuestion[];
     },

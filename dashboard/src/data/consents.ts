@@ -171,7 +171,7 @@ export function useGuestConsents(guestId?: string) {
     queryKey: ck.guestConsents(guestId),
     enabled: !!guestId,
     queryFn: async (): Promise<SignedConsent[]> => {
-      const { data, error } = await sb().from("consents").select("*").eq("guest_id", guestId).order("signed_at", { ascending: false });
+      const { data, error } = await sb().from("consents").select("*").eq("guest_id", guestId).order("signed_at", { ascending: false }).limit(100);
       if (error) throw error;
       return (data ?? []).map(mapConsent);
     },
@@ -183,7 +183,7 @@ export function useStayConsents(stayId?: string) {
     queryKey: ck.stayConsents(stayId),
     enabled: !!stayId,
     queryFn: async (): Promise<SignedConsent[]> => {
-      const { data, error } = await sb().from("consents").select("*").eq("stay_id", stayId).order("signed_at", { ascending: false });
+      const { data, error } = await sb().from("consents").select("*").eq("stay_id", stayId).order("signed_at", { ascending: false }).limit(100);
       if (error) throw error;
       return (data ?? []).map(mapConsent);
     },

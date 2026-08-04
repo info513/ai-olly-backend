@@ -15,7 +15,7 @@ import { PageHeader } from "@/components/content/page-header";
 import { SectionLoader, ErrorState, PermissionDenied } from "@/components/content/states";
 import { StatusPill } from "@/components/content/pills";
 import { ScopeBadge, CriticalBadge, AiChip } from "@/components/ai/ai-pills";
-import { BlockEditor } from "@/components/content/block-editor";
+import { BlockEditor } from "@/components/content/block-editor-lazy";
 import { BlockView } from "@/components/content/block-view";
 import { KnowledgePublishSheet } from "@/components/ai/knowledge-publish-sheet";
 import { KnowledgeHistoryDrawer } from "@/components/ai/knowledge-history-drawer";

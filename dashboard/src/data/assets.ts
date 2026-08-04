@@ -48,7 +48,7 @@ export function useAssets(hotelId?: string, opts?: { includeArchived?: boolean }
     queryKey: [...ak.assets(hotelId), opts?.includeArchived ?? false] as const,
     enabled: !!hotelId,
     queryFn: async (): Promise<AssetSummary[]> => {
-      let q = sb().from("assets").select(SELECT).or(`hotel_id.eq.${hotelId},hotel_id.is.null`).order("created_at", { ascending: false });
+      let q = sb().from("assets").select(SELECT).or(`hotel_id.eq.${hotelId},hotel_id.is.null`).order("created_at", { ascending: false }).limit(1000);
       if (!opts?.includeArchived) q = q.is("deleted_at", null);
       const { data, error } = await q;
       if (error) throw error;

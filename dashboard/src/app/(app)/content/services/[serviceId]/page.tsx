@@ -10,7 +10,7 @@ import { humanizeError } from "@/data/errors";
 import { PageHeader } from "@/components/content/page-header";
 import { SectionLoader, ErrorState, PermissionDenied } from "@/components/content/states";
 import { StatusPill, SourceBadge, VisibilityChips, CriticalBadge } from "@/components/content/pills";
-import { BlockEditor } from "@/components/content/block-editor";
+import { BlockEditor } from "@/components/content/block-editor-lazy";
 import { BlockView } from "@/components/content/block-view";
 import { PublishSheet } from "@/components/content/publish-sheet";
 import { HistoryDrawer } from "@/components/content/history-drawer";

@@ -35,7 +35,7 @@ export function useSubscribers(hotelId?: string) {
     enabled: !!hotelId,
     queryFn: async (): Promise<Subscriber[]> => {
       const [{ data, error }, states] = await Promise.all([
-        sb().from("newsletter_subscribers").select(SELECT).eq("hotel_id", hotelId).order("created_at", { ascending: false }),
+        sb().from("newsletter_subscribers").select(SELECT).eq("hotel_id", hotelId).order("created_at", { ascending: false }).limit(1000),
         consentStates(hotelId!),
       ]);
       if (error) throw error;

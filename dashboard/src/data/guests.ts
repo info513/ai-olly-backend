@@ -22,11 +22,13 @@ export function useGuests(hotelId?: string) {
     queryKey: gk.guests(hotelId),
     enabled: !!hotelId,
     queryFn: async (): Promise<GuestSummary[]> => {
+      // Bounded fetches (RC1 · H5): cap the list + its aggregation satellites so a
+      // large property's history can't be pulled wholesale into the browser.
       const [guestsR, staysR, reqR, consR] = await Promise.all([
-        sb().from("guests").select("id,first_name,last_name,preferred_locale,country_code,pseudonymized_at,deleted_at").eq("hotel_id", hotelId).order("updated_at", { ascending: false }),
-        sb().from("stays").select("id,guest_id,room_id,status,arrival_at,departure_at, room:rooms(room_number)").eq("hotel_id", hotelId),
-        sb().from("guest_requests").select("guest_id,status").eq("hotel_id", hotelId).not("status", "in", "(resolved,closed,cancelled)"),
-        sb().from("consents").select("guest_id,status").eq("hotel_id", hotelId),
+        sb().from("guests").select("id,first_name,last_name,preferred_locale,country_code,pseudonymized_at,deleted_at").eq("hotel_id", hotelId).order("updated_at", { ascending: false }).limit(1000),
+        sb().from("stays").select("id,guest_id,room_id,status,arrival_at,departure_at, room:rooms(room_number)").eq("hotel_id", hotelId).limit(2000),
+        sb().from("guest_requests").select("guest_id,status").eq("hotel_id", hotelId).not("status", "in", "(resolved,closed,cancelled)").limit(2000),
+        sb().from("consents").select("guest_id,status").eq("hotel_id", hotelId).limit(2000),
       ]);
       if (guestsR.error) throw guestsR.error;
       const stays = staysR.data ?? [];
@@ -35,9 +37,13 @@ export function useGuests(hotelId?: string) {
       const consentByGuest = new Map<string, boolean>();
       for (const c of consR.data ?? []) if (c.guest_id && c.status === "granted") consentByGuest.set(c.guest_id, true);
 
+      // Bucket stays by guest once (O(N+M)) instead of filtering all stays per guest (O(N·M)).
       const rank: Record<string, number> = { checked_in: 4, reserved: 3, checked_out: 2, no_show: 1, cancelled: 0 };
+      const staysByGuest = new Map<string, any[]>();
+      for (const s of stays as any[]) { if (!s.guest_id) continue; const a = staysByGuest.get(s.guest_id); if (a) a.push(s); else staysByGuest.set(s.guest_id, [s]); }
       const latestStay = (gid: string) =>
-        stays.filter((s: any) => s.guest_id === gid)
+        (staysByGuest.get(gid) ?? [])
+          .slice()
           .sort((a: any, b: any) => (rank[b.status] - rank[a.status]) || String(b.arrival_at ?? "").localeCompare(String(a.arrival_at ?? "")))[0];
 
       return (guestsR.data ?? []).map((g: any): GuestSummary => {

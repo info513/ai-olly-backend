@@ -21,7 +21,10 @@ const readEnv = (k) => { const l = readFileSync(envPath, "utf8").split("\n").fin
 const URL = readEnv("SUPABASE_URL"), ANON = readEnv("SUPABASE_ANON_KEY"), DBURL = readEnv("SUPABASE_DB_URL");
 const svc = createClient(URL, readEnv("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false } });
 const P = "van", DOM = "@verify-analytics.local", PW = "Verify-An-Pass!1";
-const today = new Date().toISOString().slice(0, 10);
+// Bucket "today" in the hotel timezone (the refresh functions bucket by
+// `created_at at time zone tz`). Using a UTC date here flaked between 22:00–24:00
+// UTC, when Europe/Zagreb is already the next local day. Match the refresh + prod.
+const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Zagreb" });
 
 let pass = 0, fail = 0;
 const ok = (m) => { pass++; console.log("  ✓", m); };
