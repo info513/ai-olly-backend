@@ -30,6 +30,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const [navOpen, setNavOpen] = React.useState(false);
+  // Close the mobile nav drawer whenever the route changes.
+  React.useEffect(() => { setNavOpen(false); }, [pathname]);
+
   const resolving = authLoading || (session && hotelLoading);
   const moduleKey = moduleKeyFromPath(pathname);
   const noTenant = Boolean(session) && !hotelLoading && !isPlatformAdmin && hotels.length === 0;
@@ -50,9 +54,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface-base">
-      <AppSidebar />
+      <AppSidebar mobileOpen={navOpen} onMobileOpenChange={setNavOpen} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar />
+        <TopBar onMenu={() => setNavOpen(true)} />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
       <CommandPalette />
