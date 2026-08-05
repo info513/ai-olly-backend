@@ -9,8 +9,11 @@ export function DestinationSwitcher({ collapsed = false }: { collapsed?: boolean
   const { destinations, currentDestination, setDestination, loading } = usePlatform();
 
   // Group destinations by country for the Country → Destination structure.
+  // Archived destinations are hidden from the switcher (visible only in the list
+  // when "Include archived" is explicitly selected).
+  const selectable = destinations.filter((d) => d.status !== "archived");
   const byCountry = new Map<string, typeof destinations>();
-  for (const d of destinations) {
+  for (const d of selectable) {
     const key = d.countryCode || "—";
     (byCountry.get(key) ?? byCountry.set(key, []).get(key)!).push(d);
   }

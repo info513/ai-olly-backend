@@ -89,7 +89,9 @@ async function main() {
     // 1) destination
     const d = bundle.destination;
     const destId = await upsertUnique("destinations", ["slug"],
-      { slug: d.slug, name: d.name, country_code: d.country_code, timezone: d.timezone, default_locale: d.default_locale, status: "active" }, "destinations");
+      // status uses content_status now (draft|preview|published|archived); a
+      // migrated Split destination is live → "published" (was "active" pre-Phase-2).
+      { slug: d.slug, name: d.name, country_code: d.country_code, timezone: d.timezone, default_locale: d.default_locale, status: "published" }, "destinations");
 
     // 2) hotel
     const h = bundle.hotel;
