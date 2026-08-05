@@ -114,8 +114,15 @@ async function main() {
 
   // ai + prices + media
   (await n("select count(*) n from ai_configs where hotel_id=$1", [hid])) === 1 ? ok("ai_configs: exactly one config for hotel") : bad("ai_configs count wrong");
-  eq(await n("select count(*) n from price_items where hotel_id=$1", [hid]), 35, "35 price items");
-  (await n("select count(*) n from price_items where hotel_id=$1 and (pms_metadata->>'needs_review')='true'", [hid])) === 35 ? ok("all price items flagged needs_review (VAT/validity not inferred)") : bad("price review flags missing");
+  eq(await n("select count(*) n from price_items where hotel_id=$1", [hid]), 36, "36 price items (35 parsed lists + confirmed extra-bed)");
+  // vat_rate is NOT NULL (schema default 0.00) so "unknown" can't be null; assert no positive rate was invented + all flagged unconfirmed.
+  (await n("select count(*) n from price_items where hotel_id=$1 and vat_rate > 0", [hid])) === 0 ? ok("no VAT rate invented (none > 0; source has no VAT)") : bad("a positive VAT rate was invented");
+  (await n("select count(*) n from price_items where hotel_id=$1 and (pms_metadata->>'vat_status')='unconfirmed'", [hid])) === 36 ? ok("all price items flag VAT unconfirmed (not silently asserted)") : bad("price VAT flags missing");
+  (await n("select count(*) n from price_items where hotel_id=$1 and key='extra-bed' and amount=40 and billing_unit='per_night'", [hid])) === 1 ? ok("extra-bed €40/night present (CONFIRMED SOURCE: ROOM GUIDE + QA)") : bad("extra-bed price missing");
+  // Whispers (source = v1 PWA pwa/whispers-data.js)
+  eq(await n("select count(*) n from destination_whispers where destination_id=$1", [did]), 12, "12 Whispers chapters migrated");
+  eq(await n("select count(*) n from hotel_whisper_settings s join destination_whispers w on w.id=s.whisper_id where s.hotel_id=$1", [hid]), 12, "12 Whispers hotel presentation settings");
+  (await rows("select key from destination_whispers where destination_id=$1 order by sort_order limit 1", [did]))[0]?.key === "ch01" ? ok("Whispers ordering preserved (ch01 first)") : bad("Whispers order wrong");
   const norm = readJson(join(MIG, "normalized", "antique-split.normalized.json"));
   norm.media_manifest.airtable_attachments === 0 ? ok("media manifest: 0 Airtable attachments (none present)") : bad("unexpected attachments");
 

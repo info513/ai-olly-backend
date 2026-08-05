@@ -12,10 +12,13 @@
 
 import pg from "pg";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { assertDevSupabase, readEnv, readJson, writeJson, RAW_DIR, NORM_DIR, REPORT_DIR, HOTEL_SLUG, nowIso } from "./_lib.mjs";
+import { assertDevSupabase, readEnv, readJson, writeJson, RAW_DIR, NORM_DIR, REPORT_DIR, REPO_ROOT, HOTEL_SLUG, nowIso } from "./_lib.mjs";
 
 const raw = (k) => readJson(join(RAW_DIR, `${k}.json`)).records;
+// Whispers source of truth = the v1 PWA static module (not Airtable).
+const whisperCount = () => (readFileSync(join(REPO_ROOT, "pwa", "whispers-data.js"), "utf8").match(/id:\s*'ch\d+'/g) || []).length;
 const val = (f, n) => { const v = f?.[n]; return v && typeof v === "object" && "name" in v ? v.name : v; };
 const clean = (s) => (s == null ? null : String(s).replace(/\s+/g, " ").trim() || null);
 const present = (s) => (clean(s) ? "Y" : "-");
@@ -49,7 +52,8 @@ async function main() {
     // destination_events holds two source tables — scope each domain to its own Airtable ids.
     ["events", raw("events").length, (await one("select count(*) n from destination_events where destination_id=$1 and legacy_airtable_record_id = any($2)", [did, raw("events").map((r) => r.id)]))[0].n],
     ["split_today", raw("split_today").length, (await one("select count(*) n from destination_events where destination_id=$1 and legacy_airtable_record_id = any($2)", [did, raw("split_today").map((r) => r.id)]))[0].n],
-    ["price_items", 35, (await one("select count(*) n from price_items where hotel_id=$1", [hotel.id]))[0].n],
+    ["whispers", whisperCount(), (await one("select count(*) n from destination_whispers where destination_id=$1", [did]))[0].n], // source = v1 PWA
+    ["price_items", 36, (await one("select count(*) n from price_items where hotel_id=$1", [hotel.id]))[0].n], // 35 parsed lists + confirmed extra-bed
   ];
   for (const [k, src, sup] of domains) {
     const status = Number(src) === Number(sup) ? "MATCH" : "DIFFERENT";
