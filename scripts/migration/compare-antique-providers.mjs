@@ -46,7 +46,9 @@ async function main() {
     ["services_active", svcAntique.filter((r) => r.fields.Active === true).length, (await one("select count(*) n from hotel_services where hotel_id=$1 and status='published'", [hotel.id]))[0].n],
     ["pois", raw("poi").length, (await one("select count(*) n from destination_pois where destination_id=$1 and legacy_airtable_record_id is not null", [did]))[0].n],
     ["routes", raw("routes").length, (await one("select count(*) n from destination_routes where destination_id=$1 and legacy_airtable_record_id is not null", [did]))[0].n],
-    ["events", raw("events").length, (await one("select count(*) n from destination_events where destination_id=$1 and legacy_airtable_record_id is not null", [did]))[0].n],
+    // destination_events holds two source tables — scope each domain to its own Airtable ids.
+    ["events", raw("events").length, (await one("select count(*) n from destination_events where destination_id=$1 and legacy_airtable_record_id = any($2)", [did, raw("events").map((r) => r.id)]))[0].n],
+    ["split_today", raw("split_today").length, (await one("select count(*) n from destination_events where destination_id=$1 and legacy_airtable_record_id = any($2)", [did, raw("split_today").map((r) => r.id)]))[0].n],
     ["price_items", 35, (await one("select count(*) n from price_items where hotel_id=$1", [hotel.id]))[0].n],
   ];
   for (const [k, src, sup] of domains) {

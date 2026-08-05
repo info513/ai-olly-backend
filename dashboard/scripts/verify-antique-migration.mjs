@@ -97,7 +97,19 @@ async function main() {
   const did = (await rows("select id from destinations where slug='split'"))[0]?.id;
   eq(await n("select count(*) n from destination_pois where destination_id=$1 and legacy_airtable_record_id is not null", [did]), 22, "22 POIs");
   eq(await n("select count(*) n from destination_routes where destination_id=$1 and legacy_airtable_record_id is not null", [did]), 6, "6 routes");
-  eq(await n("select count(*) n from destination_events where destination_id=$1 and legacy_airtable_record_id is not null", [did]), 11, "11 events");
+  // destination_events holds two source tables (hotel EVENTS + Split Today) — scope by source ids.
+  const evIds = readJson(join(MIG, "raw", "events.json")).records.map((r) => r.id);
+  const stIds = readJson(join(MIG, "raw", "split_today.json")).records.map((r) => r.id);
+  eq((await rows("select count(*)::int n from destination_events where destination_id=$1 and legacy_airtable_record_id = any($2)", [did, evIds]))[0].n, 11, "11 hotel events");
+  eq((await rows("select count(*)::int n from destination_events where destination_id=$1 and legacy_airtable_record_id = any($2)", [did, stIds]))[0].n, 49, "49 Split Today events (content completion)");
+  (await rows("select count(*)::int n from destination_events where destination_id=$1 and legacy_airtable_record_id = any($2) and status='archived'", [did, stIds]))[0].n > 0 ? ok("expired Split Today events archived") : bad("no Split Today events archived");
+
+  // content completion (rooms/POI/routes/knowledge)
+  (await rows("select count(*)::int n from room_types where hotel_id=$1 and minibar_available and kettle_available and blackout_system and underfloor_heating", [hid]))[0].n === 5 ? ok("all 5 room types have structured minibar/kettle/blackout/underfloor") : bad("room structured fields incomplete");
+  (await rows("select count(*)::int n from hotel_poi_settings where hotel_id=$1 and walking_time_minutes is not null", [hid]))[0].n === 22 ? ok("22 POIs have walking time") : bad("POI walking time incomplete");
+  (await rows("select count(*)::int n from destination_routes where destination_id=$1 and waypoints->>'pois_linked'='true'", [did]))[0].n === 6 ? ok("6 routes have linked POI waypoints") : bad("route waypoints incomplete");
+  (await rows("select count(*)::int n from knowledge_articles where hotel_id=$1 and status='published'", [hid]))[0].n >= 7 ? ok("hotel knowledge articles present (>=7)") : bad("knowledge articles missing");
+  (await rows("select count(*)::int n from knowledge_aliases where hotel_id=$1", [hid]))[0].n > 0 ? ok("knowledge aliases populated") : bad("no knowledge aliases");
   eq(await n("select count(*) n from hotel_poi_settings where hotel_id=$1", [hid]), 22, "22 hotel POI presentation settings");
 
   // ai + prices + media
