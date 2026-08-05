@@ -2,7 +2,7 @@
   "name": "ai-olly-dashboard",
   "version": "0.1.0",
   "private": true,
-  "description": "AI OLLY Dashboard — Sprint 1: Dashboard Shell (mocked, no backend). Additive app; does not touch the guest PWA or the Render server.",
+  "description": "AI OLLY Dashboard \u2014 Sprint 1: Dashboard Shell (mocked, no backend). Additive app; does not touch the guest PWA or the Render server.",
   "scripts": {
     "dev": "next dev -p 3100",
     "build": "next build",
@@ -16,6 +16,7 @@
     "setup:dev-newsletter": "node scripts/setup-dev-newsletter.mjs",
     "setup:dev-analytics": "node scripts/setup-dev-analytics.mjs",
     "setup:dev-platform-destinations": "node scripts/setup-dev-platform-destinations.mjs",
+    "setup:dev-platform-pois": "node scripts/setup-dev-platform-pois.mjs",
     "verify:content": "node scripts/verify-content.mjs",
     "verify:ai": "node scripts/verify-ai.mjs",
     "verify:reception": "node scripts/verify-reception.mjs",
@@ -23,6 +24,7 @@
     "verify:newsletter": "node scripts/verify-newsletter.mjs",
     "verify:analytics": "node scripts/verify-analytics.mjs",
     "verify:platform-destinations": "node scripts/verify-platform-destinations.mjs",
+    "verify:platform-pois": "node scripts/verify-platform-pois.mjs",
     "audit:security": "node scripts/security-audit-content.mjs",
     "audit:security-ai": "node scripts/security-audit-ai.mjs",
     "audit:security-reception": "node scripts/security-audit-reception.mjs",
@@ -30,6 +32,7 @@
     "audit:security-newsletter": "node scripts/security-audit-newsletter.mjs",
     "audit:security-analytics": "node scripts/security-audit-analytics.mjs",
     "audit:security-platform-destinations": "node scripts/security-audit-platform-destinations.mjs",
+    "audit:security-platform-pois": "node scripts/security-audit-platform-pois.mjs",
     "verify:migration": "node scripts/verify-antique-migration.mjs",
     "audit:security-migration": "node scripts/security-audit-migration.mjs",
     "scan:secrets": "node scripts/scan-bundle-secrets.mjs"
