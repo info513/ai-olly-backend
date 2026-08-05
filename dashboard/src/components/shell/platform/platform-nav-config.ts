@@ -16,7 +16,7 @@ export interface PlatformNavItem {
 export const PLATFORM_NAV: PlatformNavItem[] = [
   { label: "Dashboard", href: "/platform", icon: LayoutDashboard, ready: true },
   { label: "Destinations", href: "/platform/destinations", icon: MapPin, ready: true },
-  { label: "POIs", href: "/platform/pois", icon: Landmark, ready: false },
+  { label: "POIs", href: "/platform/pois", icon: Landmark, ready: true },
   { label: "Routes", href: "/platform/routes", icon: Route, ready: false },
   { label: "Whispers", href: "/platform/whispers", icon: Sparkles, ready: false },
   { label: "Events", href: "/platform/events", icon: CalendarDays, ready: false },
