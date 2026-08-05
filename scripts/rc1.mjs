@@ -58,14 +58,15 @@ const STAGES = [
   { name: "migration-consistency", kind: "static", ...node("scripts/check-migrations.mjs") },
 
   // ── integration: dashboard verify ──
-  ...["content", "ai", "reception", "assets", "newsletter", "analytics"].map((m) => ({
+  ...["content", "ai", "reception", "assets", "newsletter", "analytics", "platform-destinations"].map((m) => ({
     name: `verify:${m}`, kind: "integration", need: "db", ...npmRun(`verify:${m}`, DASH),
   })),
   { name: "verify:migration", kind: "integration", need: "migration", ...npmRun("verify:migration", DASH) },
 
   // ── integration: dashboard security audits ──
   ...[["security", "content"], ["security-ai", "ai"], ["security-reception", "reception"],
-      ["security-assets", "assets"], ["security-newsletter", "newsletter"], ["security-analytics", "analytics"]]
+      ["security-assets", "assets"], ["security-newsletter", "newsletter"], ["security-analytics", "analytics"],
+      ["security-platform-destinations", "platform-destinations"]]
     .map(([s]) => ({ name: `audit:${s}`, kind: "integration", need: "db", ...npmRun(`audit:${s}`, DASH) })),
   { name: "audit:security-migration", kind: "integration", need: "migration", ...npmRun("audit:security-migration", DASH) },
 
