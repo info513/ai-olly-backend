@@ -52,6 +52,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (resolving) return <ShellLoader label="Loading your hotel…" />;
   if (!session || noTenant || forbidden) return <ShellLoader label="Redirecting…" />;
 
+  // Platform CMS routes provide their own workspace shell (platform sidebar + destination
+  // context). We only gate access here; the nested platform layout renders the chrome.
+  if (isPlatformRoute) return <>{children}</>;
+
   return (
     <div className="flex h-screen overflow-hidden bg-surface-base">
       <AppSidebar mobileOpen={navOpen} onMobileOpenChange={setNavOpen} />

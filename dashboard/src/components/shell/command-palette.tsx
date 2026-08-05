@@ -7,6 +7,7 @@ import {
   UserPlus, Users, MessageSquare, LogIn, LogOut, Search, CornerDownLeft, PlayCircle,
   Images, Upload, ImageIcon, FileText, Link2Off, Send, Mail, Filter, ShieldAlert,
   HeartPulse, Activity, RefreshCw,
+  DatabaseZap, MapPin, Landmark, Route, CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 import { useCommand } from "@/providers/command-provider";
@@ -54,11 +55,18 @@ const ACTIONS: Action[] = [
   { id: "analytics", label: "Analytics overview", icon: Activity, href: "/analytics", group: "Go", module: "analytics" },
   { id: "ai-handoffs", label: "View AI handoffs", icon: Activity, href: "/analytics/ai", group: "Go", module: "analytics" },
   { id: "refresh-analytics", label: "Refresh analytics (dev)", icon: RefreshCw, href: "/analytics/health", group: "Go", module: "analytics" },
+  // Platform CMS (platform_admin only) — Phase-1 shell entries; module modules route to placeholders.
+  { id: "platform-home", label: "Platform CMS", icon: DatabaseZap, href: "/platform", group: "Go", module: "platform" },
+  { id: "platform-destinations", label: "Platform: Destinations", icon: MapPin, href: "/platform/destinations", group: "Go", module: "platform" },
+  { id: "platform-pois", label: "Platform: POIs", icon: Landmark, href: "/platform/pois", group: "Go", module: "platform" },
+  { id: "platform-routes", label: "Platform: Routes", icon: Route, href: "/platform/routes", group: "Go", module: "platform" },
+  { id: "platform-whispers", label: "Platform: Whispers", icon: Sparkles, href: "/platform/whispers", group: "Go", module: "platform" },
+  { id: "platform-events", label: "Platform: Events", icon: CalendarDays, href: "/platform/events", group: "Go", module: "platform" },
 ];
 
 export function CommandPalette() {
   const { open, setOpen } = useCommand();
-  const { currentHotel } = useHotel();
+  const { currentHotel, isPlatformAdmin } = useHotel();
   const { can } = usePermissions();
   const [query, setQuery] = React.useState("");
   const router = useRouter();
@@ -66,7 +74,7 @@ export function CommandPalette() {
 
   const go = (href: string) => { setOpen(false); setQuery(""); router.push(href); };
 
-  const actions = ACTIONS.filter((a) => can(a.module));
+  const actions = ACTIONS.filter((a) => (a.module === "platform" ? isPlatformAdmin : can(a.module)));
   const filteredActions = query ? actions.filter((a) => a.label.toLowerCase().includes(query.toLowerCase())) : actions;
 
   return (

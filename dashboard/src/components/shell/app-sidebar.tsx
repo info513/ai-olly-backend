@@ -61,10 +61,10 @@ function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: 
         );
       })}
 
-      {/* Platform-admin-only DEV tools — hidden from every hotel role. */}
+      {/* Platform-admin-only entry into the Platform CMS — hidden from every hotel role. */}
       {isPlatformAdmin && (() => {
-        const href = "/platform/migration";
-        const active = pathname.startsWith(href);
+        const href = "/platform";
+        const active = pathname === "/platform" || pathname.startsWith("/platform/");
         const link = (
           <Link href={href} onClick={onNavigate} aria-current={active ? "page" : undefined}
             className={cn("group relative mt-1 flex items-center gap-3 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors",
@@ -72,12 +72,12 @@ function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: 
               active ? "bg-brand-navy/60 text-ink-primary" : "text-ink-secondary hover:bg-surface-overlay hover:text-ink-primary")}>
             {active && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-cream" />}
             <DatabaseZap className="h-[18px] w-[18px] shrink-0" />
-            {!collapsed && (<><span className="flex-1">Migration</span>
-              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600">dev</span></>)}
+            {!collapsed && (<><span className="flex-1">Platform CMS</span>
+              <span className="rounded bg-brand-cream/15 px-1.5 py-0.5 text-[10px] font-medium text-brand-cream">admin</span></>)}
           </Link>
         );
         return collapsed ? (
-          <Tooltip><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right">Migration (dev)</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right">Platform CMS</TooltipContent></Tooltip>
         ) : link;
       })()}
     </nav>
