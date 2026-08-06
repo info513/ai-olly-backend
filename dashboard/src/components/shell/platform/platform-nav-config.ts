@@ -19,7 +19,7 @@ export const PLATFORM_NAV: PlatformNavItem[] = [
   { label: "POIs", href: "/platform/pois", icon: Landmark, ready: true },
   { label: "Routes", href: "/platform/routes", icon: Route, ready: true },
   { label: "Whispers", href: "/platform/whispers", icon: Sparkles, ready: true },
-  { label: "Events", href: "/platform/events", icon: CalendarDays, ready: false },
+  { label: "Events", href: "/platform/events", icon: CalendarDays, ready: true },
   { label: "Live Feed", href: "/platform/live-feed", icon: Rss, ready: false },
   { label: "Media", href: "/platform/media", icon: Images, ready: false },
   { label: "AI Knowledge", href: "/platform/ai-knowledge", icon: Brain, ready: false },
