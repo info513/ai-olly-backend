@@ -58,7 +58,7 @@ const STAGES = [
   { name: "migration-consistency", kind: "static", ...node("scripts/check-migrations.mjs") },
 
   // ── integration: dashboard verify ──
-  ...["content", "ai", "reception", "assets", "newsletter", "analytics", "platform-destinations", "platform-pois", "platform-routes", "platform-whispers", "platform-events", "platform-live-feed", "platform-ai-knowledge"].map((m) => ({
+  ...["content", "ai", "reception", "assets", "newsletter", "analytics", "platform-destinations", "platform-pois", "platform-routes", "platform-whispers", "platform-events", "platform-live-feed", "platform-ai-knowledge", "platform-media"].map((m) => ({
     name: `verify:${m}`, kind: "integration", need: "db", ...npmRun(`verify:${m}`, DASH),
   })),
   { name: "verify:migration", kind: "integration", need: "migration", ...npmRun("verify:migration", DASH) },
@@ -66,7 +66,7 @@ const STAGES = [
   // ── integration: dashboard security audits ──
   ...[["security", "content"], ["security-ai", "ai"], ["security-reception", "reception"],
       ["security-assets", "assets"], ["security-newsletter", "newsletter"], ["security-analytics", "analytics"],
-      ["security-platform-destinations", "platform-destinations"], ["security-platform-pois", "platform-pois"], ["security-platform-routes", "platform-routes"], ["security-platform-whispers", "platform-whispers"], ["security-platform-events", "platform-events"], ["security-platform-live-feed", "platform-live-feed"], ["security-platform-ai-knowledge", "platform-ai-knowledge"]]
+      ["security-platform-destinations", "platform-destinations"], ["security-platform-pois", "platform-pois"], ["security-platform-routes", "platform-routes"], ["security-platform-whispers", "platform-whispers"], ["security-platform-events", "platform-events"], ["security-platform-live-feed", "platform-live-feed"], ["security-platform-ai-knowledge", "platform-ai-knowledge"], ["security-platform-media", "platform-media"]]
     .map(([s]) => ({ name: `audit:${s}`, kind: "integration", need: "db", ...npmRun(`audit:${s}`, DASH) })),
   { name: "audit:security-migration", kind: "integration", need: "migration", ...npmRun("audit:security-migration", DASH) },
 
