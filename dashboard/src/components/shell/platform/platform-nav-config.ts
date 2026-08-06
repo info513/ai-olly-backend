@@ -22,7 +22,7 @@ export const PLATFORM_NAV: PlatformNavItem[] = [
   { label: "Events", href: "/platform/events", icon: CalendarDays, ready: true },
   { label: "Live Feed", href: "/platform/live-feed", icon: Rss, ready: true },
   { label: "Media", href: "/platform/media", icon: Images, ready: false },
-  { label: "AI Knowledge", href: "/platform/ai-knowledge", icon: Brain, ready: false },
+  { label: "AI Knowledge", href: "/platform/ai-knowledge", icon: Brain, ready: true },
   { label: "Translations", href: "/platform/translations", icon: Languages, ready: false },
   { label: "Content Health", href: "/platform/content-health", icon: HeartPulse, ready: false },
   { label: "Settings", href: "/platform/settings", icon: Settings, ready: false },
