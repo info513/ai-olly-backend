@@ -18,7 +18,7 @@ export const PLATFORM_NAV: PlatformNavItem[] = [
   { label: "Destinations", href: "/platform/destinations", icon: MapPin, ready: true },
   { label: "POIs", href: "/platform/pois", icon: Landmark, ready: true },
   { label: "Routes", href: "/platform/routes", icon: Route, ready: true },
-  { label: "Whispers", href: "/platform/whispers", icon: Sparkles, ready: false },
+  { label: "Whispers", href: "/platform/whispers", icon: Sparkles, ready: true },
   { label: "Events", href: "/platform/events", icon: CalendarDays, ready: false },
   { label: "Live Feed", href: "/platform/live-feed", icon: Rss, ready: false },
   { label: "Media", href: "/platform/media", icon: Images, ready: false },
