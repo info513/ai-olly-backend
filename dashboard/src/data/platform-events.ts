@@ -16,6 +16,7 @@ export interface DEvent {
   starts_at: string | null; ends_at: string | null; all_day: boolean; location_name: string | null; latitude: number | null; longitude: number | null; recurrence: string | null;
   source_type: ContentSourceType; source_name: string | null; source_url: string | null; imported_at: string | null; last_verified_at: string | null; verification_status: VerificationStatus;
   rights_notes: string | null; featured_default: boolean; canonical_asset_id: string | null;
+  is_live_feed: boolean; feed_source: string | null; feed_dedup_key: string | null; feed_imported_at: string | null;
   status: ContentStatus; active: boolean; sort_order: number; published_at: string | null; published_snapshot: Record<string, unknown> | null; created_at: string; updated_at: string;
 }
 export interface EventVersion { id: string; version_number: number; status: ContentStatus; change_summary: string | null; created_by: string | null; published_at: string | null; created_at: string; snapshot: Record<string, unknown>; }
