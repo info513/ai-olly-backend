@@ -18,6 +18,7 @@
     "setup:dev-platform-destinations": "node scripts/setup-dev-platform-destinations.mjs",
     "setup:dev-platform-pois": "node scripts/setup-dev-platform-pois.mjs",
     "setup:dev-platform-routes": "node scripts/setup-dev-platform-routes.mjs",
+    "setup:dev-platform-whispers": "node scripts/setup-dev-platform-whispers.mjs",
     "verify:content": "node scripts/verify-content.mjs",
     "verify:ai": "node scripts/verify-ai.mjs",
     "verify:reception": "node scripts/verify-reception.mjs",
@@ -27,6 +28,7 @@
     "verify:platform-destinations": "node scripts/verify-platform-destinations.mjs",
     "verify:platform-pois": "node scripts/verify-platform-pois.mjs",
     "verify:platform-routes": "node scripts/verify-platform-routes.mjs",
+    "verify:platform-whispers": "node scripts/verify-platform-whispers.mjs",
     "audit:security": "node scripts/security-audit-content.mjs",
     "audit:security-ai": "node scripts/security-audit-ai.mjs",
     "audit:security-reception": "node scripts/security-audit-reception.mjs",
@@ -36,6 +38,7 @@
     "audit:security-platform-destinations": "node scripts/security-audit-platform-destinations.mjs",
     "audit:security-platform-pois": "node scripts/security-audit-platform-pois.mjs",
     "audit:security-platform-routes": "node scripts/security-audit-platform-routes.mjs",
+    "audit:security-platform-whispers": "node scripts/security-audit-platform-whispers.mjs",
     "verify:migration": "node scripts/verify-antique-migration.mjs",
     "audit:security-migration": "node scripts/security-audit-migration.mjs",
     "scan:secrets": "node scripts/scan-bundle-secrets.mjs"
