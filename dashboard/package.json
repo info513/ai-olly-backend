@@ -23,6 +23,7 @@
     "setup:dev-platform-live-feed": "node scripts/setup-dev-platform-live-feed.mjs",
     "setup:dev-platform-ai-knowledge": "node scripts/setup-dev-platform-ai-knowledge.mjs",
     "setup:dev-platform-media": "node scripts/setup-dev-platform-media.mjs",
+    "setup:dev-hotel-presentation": "node scripts/setup-dev-hotel-presentation.mjs",
     "verify:content": "node scripts/verify-content.mjs",
     "verify:ai": "node scripts/verify-ai.mjs",
     "verify:reception": "node scripts/verify-reception.mjs",
@@ -37,6 +38,7 @@
     "verify:platform-live-feed": "node scripts/verify-platform-live-feed.mjs",
     "verify:platform-ai-knowledge": "node scripts/verify-platform-ai-knowledge.mjs",
     "verify:platform-media": "node scripts/verify-platform-media.mjs",
+    "verify:hotel-presentation": "node scripts/verify-hotel-presentation.mjs",
     "audit:security": "node scripts/security-audit-content.mjs",
     "audit:security-ai": "node scripts/security-audit-ai.mjs",
     "audit:security-reception": "node scripts/security-audit-reception.mjs",
@@ -51,6 +53,7 @@
     "audit:security-platform-live-feed": "node scripts/security-audit-platform-live-feed.mjs",
     "audit:security-platform-ai-knowledge": "node scripts/security-audit-platform-ai-knowledge.mjs",
     "audit:security-platform-media": "node scripts/security-audit-platform-media.mjs",
+    "audit:security-hotel-presentation": "node scripts/security-audit-hotel-presentation.mjs",
     "verify:migration": "node scripts/verify-antique-migration.mjs",
     "audit:security-migration": "node scripts/security-audit-migration.mjs",
     "scan:secrets": "node scripts/scan-bundle-secrets.mjs"
