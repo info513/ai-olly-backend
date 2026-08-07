@@ -30,10 +30,15 @@ async function main() {
   console.log("Antique Split migration — security audit\n");
 
   // ── A) DEV-ref guards ───────────────────────────────────────────────────────
+  // The ref is pinned once in the parameterization layer (scripts/migration/targets.mjs
+  // for the CLI, src/server/dev-guard.ts for the routes) and enforced by _lib
+  // (assertDevSupabase) / authz (assertDevProject). Verify the pin + the enforcement wiring.
   const lib = src(join(REPO, "scripts/migration/_lib.mjs"));
+  const targets = src(join(REPO, "scripts/migration/targets.mjs"));
   const authz = src(join(DASH, "src/server/migration/authz.ts"));
-  lib.includes(`DEV_SUPABASE_REF = "${DEV_REF}"`) ? ok("_lib pins the aiolly-dev ref") : bad("_lib DEV ref missing/changed");
-  authz.includes(`DEV_SUPABASE_REF = "${DEV_REF}"`) ? ok("server authz pins the aiolly-dev ref") : bad("authz DEV ref missing");
+  const devGuard = src(join(DASH, "src/server/dev-guard.ts"));
+  (targets.includes(`DEV_SUPABASE_REF = "${DEV_REF}"`) && lib.includes("assertDevSupabase")) ? ok("_lib pins the aiolly-dev ref (via targets registry)") : bad("_lib DEV ref missing/changed");
+  (devGuard.includes(`DEV_SUPABASE_REF = "${DEV_REF}"`) && authz.includes("assertDevProject")) ? ok("server authz pins the aiolly-dev ref (via dev-guard)") : bad("authz DEV ref missing");
   /assertDevSupabase\(\)\s*\{[^}]*throw/.test(lib.replace(/\n/g, " ")) ? ok("assertDevSupabase throws on non-dev ref") : bad("assertDevSupabase does not throw");
   readEnv("SUPABASE_URL").includes(DEV_REF) ? ok("current SUPABASE_URL is the dev ref") : bad("current ref is not dev");
   // logic: a production-looking ref is refused

@@ -54,6 +54,7 @@
     "audit:security-platform-ai-knowledge": "node scripts/security-audit-platform-ai-knowledge.mjs",
     "audit:security-platform-media": "node scripts/security-audit-platform-media.mjs",
     "audit:security-hotel-presentation": "node scripts/security-audit-hotel-presentation.mjs",
+    "audit:security-integrity": "node scripts/security-integrity-hardening.mjs",
     "verify:migration": "node scripts/verify-antique-migration.mjs",
     "audit:security-migration": "node scripts/security-audit-migration.mjs",
     "scan:secrets": "node scripts/scan-bundle-secrets.mjs"

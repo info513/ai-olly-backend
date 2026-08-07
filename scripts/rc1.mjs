@@ -21,8 +21,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(here, "..");
 const DASH = join(REPO, "dashboard");
 const argv = process.argv.slice(2);
-const STATIC_ONLY = argv.includes("--static");
 const LIST = argv.includes("--list");
+// STRICT (release-candidate) mode: integration/security/migration prerequisites MUST
+// be present and the target MUST be aiolly-dev; any required stage that would skip
+// fails the gate. Phase 11 / release verification uses this. STRICT overrides --static.
+const STRICT = argv.includes("--strict");
+const STATIC_ONLY = argv.includes("--static") && !STRICT;
 
 // ── environment detection (scripts read repo .env; CI writes it from secrets) ─
 function envFile(p) {
@@ -40,6 +44,8 @@ const HAS_DB = !!(val("SUPABASE_DB_URL") && val("SUPABASE_SERVICE_ROLE_KEY"));
 const HAS_AIRTABLE = !!val("AIRTABLE_API_KEY");
 const HAS_MIGRATION_ARTIFACTS = existsSync(join(REPO, "migration/antique-split/manifests/export-manifest.json"))
   && existsSync(join(REPO, "migration/antique-split/normalized/tokens.local.json"));
+const DEV_SUPABASE_REF = "mcgrccvvybgcozeqlisj"; // aiolly-dev — the only allowed strict target
+const TARGET_REF = (/https?:\/\/([a-z0-9]+)\.supabase\.co/.exec(val("SUPABASE_URL") || val("NEXT_PUBLIC_SUPABASE_URL") || "") || [])[1] || null;
 const eslintConfigured = ["dashboard/.eslintrc.json", "dashboard/.eslintrc.js", "dashboard/.eslintrc",
   "dashboard/eslint.config.js", "dashboard/eslint.config.mjs"].some((p) => existsSync(join(REPO, p)));
 
@@ -62,11 +68,12 @@ const STAGES = [
     name: `verify:${m}`, kind: "integration", need: "db", ...npmRun(`verify:${m}`, DASH),
   })),
   { name: "verify:migration", kind: "integration", need: "migration", ...npmRun("verify:migration", DASH) },
+  { name: "verify:migration-semantic", kind: "integration", need: "db", ...npmRun("verify:migration-semantic", REPO) },
 
   // ── integration: dashboard security audits ──
   ...[["security", "content"], ["security-ai", "ai"], ["security-reception", "reception"],
       ["security-assets", "assets"], ["security-newsletter", "newsletter"], ["security-analytics", "analytics"],
-      ["security-platform-destinations", "platform-destinations"], ["security-platform-pois", "platform-pois"], ["security-platform-routes", "platform-routes"], ["security-platform-whispers", "platform-whispers"], ["security-platform-events", "platform-events"], ["security-platform-live-feed", "platform-live-feed"], ["security-platform-ai-knowledge", "platform-ai-knowledge"], ["security-platform-media", "platform-media"], ["security-hotel-presentation", "hotel-presentation"]]
+      ["security-platform-destinations", "platform-destinations"], ["security-platform-pois", "platform-pois"], ["security-platform-routes", "platform-routes"], ["security-platform-whispers", "platform-whispers"], ["security-platform-events", "platform-events"], ["security-platform-live-feed", "platform-live-feed"], ["security-platform-ai-knowledge", "platform-ai-knowledge"], ["security-platform-media", "platform-media"], ["security-hotel-presentation", "hotel-presentation"], ["security-integrity", "integrity-hardening"]]
     .map(([s]) => ({ name: `audit:${s}`, kind: "integration", need: "db", ...npmRun(`audit:${s}`, DASH) })),
   { name: "audit:security-migration", kind: "integration", need: "migration", ...npmRun("audit:security-migration", DASH) },
 
@@ -94,9 +101,23 @@ if (LIST) {
   process.exit(0);
 }
 
+// ── STRICT preflight (Part 9) ─────────────────────────────────────────────────
+// A release-candidate gate must not silently pass while integration/security/
+// migration stages skip. Require the prerequisites up front and fail fast otherwise.
+if (STRICT) {
+  const missing = [];
+  if (!HAS_DB) missing.push("Supabase integration secrets (SUPABASE_DB_URL + SUPABASE_SERVICE_ROLE_KEY)");
+  if (TARGET_REF !== DEV_SUPABASE_REF) missing.push(`aiolly-dev target — refusing ref "${TARGET_REF}"`);
+  if (!HAS_MIGRATION_ARTIFACTS) missing.push("migration verification artifacts (run export + normalize locally first)");
+  if (missing.length) {
+    console.error(`AI OLLY — RC1 STRICT preflight FAILED. Release verification requires:\n   - ${missing.join("\n   - ")}\n`);
+    process.exit(1);
+  }
+}
+
 // ── run ─────────────────────────────────────────────────────────────────────
-console.log(`AI OLLY — RC1 quality gate ${STATIC_ONLY ? "(static only)" : ""}`);
-console.log(`  secrets present: db=${HAS_DB} airtable=${HAS_AIRTABLE} migration-artifacts=${HAS_MIGRATION_ARTIFACTS}\n`);
+console.log(`AI OLLY — RC1 quality gate ${STRICT ? "(STRICT / release-candidate)" : STATIC_ONLY ? "(static only)" : ""}`);
+console.log(`  secrets present: db=${HAS_DB} airtable=${HAS_AIRTABLE} migration-artifacts=${HAS_MIGRATION_ARTIFACTS} target=${TARGET_REF ?? "none"}\n`);
 const results = [];
 const t0 = Date.now();
 
@@ -136,6 +157,14 @@ if (fail.length) {
   console.log("\n  RESULT: ❌ FAIL");
   process.exit(1);
 }
-const note = integrationSkipped ? ` (${integrationSkipped} integration stage(s) skipped — no secrets/artifacts)` : (skipped.length ? " (lint not configured)" : "");
+// STRICT: any skipped integration/security/migration stage is a release-gate failure.
+if (STRICT && integrationSkipped) {
+  console.log(`\n  RESULT: ❌ FAIL (STRICT — ${integrationSkipped} required integration stage(s) skipped)`);
+  console.log("  Skipped:", skipped.filter((r) => byName.get(r.name) === "integration").map((r) => r.name).join(", "));
+  process.exit(1);
+}
+const note = STRICT ? " (STRICT — all required stages ran)"
+  : integrationSkipped ? ` (${integrationSkipped} integration stage(s) skipped — no secrets/artifacts)`
+  : (skipped.length ? " (lint not configured)" : "");
 console.log(`  RESULT: ✅ PASS${note}`);
 process.exit(0);

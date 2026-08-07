@@ -12,6 +12,11 @@ on:
   pull_request:
     branches: [feature/ai-olly-platform-2, main]
   workflow_dispatch:
+    inputs:
+      strict:
+        description: "STRICT release-candidate gate — fails if integration/security/migration prerequisites (aiolly-dev secrets + migration artifacts) are missing. Use for Phase-11 / release verification."
+        type: boolean
+        default: false
 
 # Least-privilege: read-only checkout, no deploy/write scopes.
 permissions:
@@ -86,8 +91,14 @@ jobs:
             echo "No integration secrets configured → integration stages will SKIP (static gate only)."
           fi
 
-      - name: Run RC1 gate (npm run rc1)
-        run: npm run rc1
+      - name: Run RC1 gate (npm run rc1 / rc1:strict)
+        run: |
+          if [ "${{ inputs.strict }}" = "true" ]; then
+            echo "Running STRICT release-candidate gate."
+            npm run rc1:strict
+          else
+            npm run rc1
+          fi
 
       - name: No generated-code / working-tree drift
         run: |

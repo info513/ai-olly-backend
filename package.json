@@ -19,6 +19,8 @@
     "verify:supabase:packagec": "node scripts/verify-supabase-package-c.js",
     "check:migrations": "node scripts/check-migrations.mjs",
     "rc1": "node scripts/rc1.mjs",
+    "rc1:strict": "node scripts/rc1.mjs --strict",
+    "verify:migration-semantic": "node scripts/migration/semantic-verify.mjs",
     "rc1:static": "node scripts/rc1.mjs --static",
     "rc1:list": "node scripts/rc1.mjs --list"
   },

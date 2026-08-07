@@ -12,19 +12,27 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, join } from "node:path";
+import { resolveMigrationTarget, DEFAULT_TARGET } from "./targets.mjs";
 
 export const HERE = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(HERE, "../..");
-export const WORKSPACE = join(REPO_ROOT, "migration", "antique-split");
+
+// ── Active target (Part 11) ───────────────────────────────────────────────────
+// Selected by the MIGRATION_TARGET env var; defaults to antique-split so the
+// existing pipeline is unchanged. All per-hotel specifics come from the registry.
+export const TARGET = resolveMigrationTarget(process.env.MIGRATION_TARGET || DEFAULT_TARGET);
+export const MIGRATION_TARGET_NAME = TARGET.name;
+
+export const WORKSPACE = join(REPO_ROOT, "migration", TARGET.workspaceDir);
 export const RAW_DIR = join(WORKSPACE, "raw");
 export const NORM_DIR = join(WORKSPACE, "normalized");
 export const MANIFEST_DIR = join(WORKSPACE, "manifests");
 export const REPORT_DIR = join(WORKSPACE, "reports");
 
-// ── Approved targets ────────────────────────────────────────────────────────
-export const DEV_SUPABASE_REF = "mcgrccvvybgcozeqlisj"; // aiolly-dev — ONLY allowed ref
-export const HOTEL_SLUG = "antique-split";
-export const IMPORT_VERSION = "antique-v1";
+// ── Approved targets (from the active target; guards below are invariant) ─────
+export const DEV_SUPABASE_REF = TARGET.devSupabaseRef; // aiolly-dev — ONLY allowed ref
+export const HOTEL_SLUG = TARGET.hotelSlug;
+export const IMPORT_VERSION = TARGET.importVersion;
 
 // ── env ──────────────────────────────────────────────────────────────────────
 export function readEnv(key, { required = true } = {}) {
@@ -129,38 +137,10 @@ export function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-// ── Source table registry ──────────────────────────────────────────────────────
-// scope: how each row maps to a tenant. content:false → count/metadata only (PII).
-export const BASE_ID = "appon9UYjX6KU9cr1"; // Antique Split production base (read-only)
-
-export const TABLES = [
-  { key: "hotel",            id: "tblvDAXTN6kmeQt8o", name: "HOTELI",              slugField: "Slug",              pii: false },
-  { key: "rooms",            id: "tblbHFokE9BP1rkOf", name: "SOBE",                slugField: "Hotel Slug (text)", pii: false },
-  { key: "room_guide",       id: "tbls3oojfqN8pyYoJ", name: "ROOM GUIDE",          slugField: null,                pii: false, hasToken: true },
-  { key: "services",         id: "tbloZwmqS0vqrCSL9", name: "SERVICES",            slugField: "Hotel Slug (text)", pii: false },
-  { key: "services_out",     id: "tblTu1AeUPaS7RN77", name: "SERVICES (Out)",      slugField: null,                pii: false },
-  { key: "poi",              id: "tbl5mNNhWjuFMOJva", name: "POI",                 slugField: null,                pii: false },
-  { key: "routes",           id: "tbl1IWdCiWIUqrtkH", name: "ROUTES",              slugField: null,                pii: false },
-  { key: "partners",         id: "tblYvQnrS4Z70x7hM", name: "PARTNERS",            slugField: "Hotel Slug",        pii: false },
-  { key: "events",           id: "tbl90CM2v6XY7xNYv", name: "EVENTS",              slugField: "HotelSlug",         pii: false },
-  { key: "novosti",          id: "tblscuDZTJ8LEut5j", name: "NOVOSTI",             slugField: "HotelSlug",         pii: false },
-  { key: "split_today",      id: "tbl3zaxUDfURrvHR6", name: "Split Today Events",  slugField: null,                pii: false },
-  { key: "ai_intent",        id: "tbl6fZUo99dd2Y5kw", name: "AI_INTENT_PATTERNS",  slugField: null,                pii: false },
-  { key: "ai_output_rules",  id: "tbl2cHJu94SCHmOtk", name: "AI_OUTPUT_RULES",     slugField: null,                pii: false },
-  { key: "ai_context",       id: "tbl9PF8mcEwOG7iGh", name: "AI_CONTEXT",          slugField: null,                pii: false },
-  { key: "ai_disambig",      id: "tblPJhMzIbjzpE1j5", name: "AI_DISAMBIGUATION",   slugField: null,                pii: false },
-  { key: "ai_fallback",      id: "tblpwW4XF9XUbsS51", name: "AI_FALLBACK",         slugField: null,                pii: false },
-  { key: "ai_slug_scope",    id: "tblzcRXlr7kf0kgSj", name: "AI_SLUG_SCOPE",       slugField: "Slug",              pii: false },
-  { key: "unanswered",       id: "tblD97FfQMkkXSEW3", name: "UNANSWERED_QUESTIONS",slugField: "Hotel Slug",        pii: false, aiContentOnly: true },
-  // PII / guest tables — COUNT ONLY, content never written to disk.
-  { key: "guests",           id: "tblzuEUTUpCQiNfPd", name: "GUESTS",              slugField: "HotelSlug",         pii: true },
-  { key: "stays",            id: "tbl1J16CqhqYopPJO", name: "STAYS",               slugField: "HotelSlug",         pii: true },
-  { key: "privole",          id: "tblJLmNCN8Ma1MGR0", name: "PRIVOLE",             slugField: "HotelSlug",         pii: true },
-  { key: "requests",         id: "tblYdzb9pRBFTRKFL", name: "REQUESTS",            slugField: "Hotel Slug",        pii: true },
-  { key: "feedback",         id: "tblG7coH5JjaaWtJo", name: "FEEDBACK",            slugField: "HotelSlug",         pii: true },
-  { key: "push",             id: "tblmy7YXI2dT4REbz", name: "PUSH_SUBSCRIPTIONS",  slugField: "HotelSlug",         pii: true },
-  { key: "ai_logs",          id: "tbl3wXLAUoYamQ91Z", name: "AI_RESPONSE_LOGS",    slugField: "Hotel Slug",        pii: true },
-];
+// ── Source table registry (from the active target) ─────────────────────────────
+// scope: how each row maps to a tenant. pii:true → count/metadata only (never written).
+export const BASE_ID = TARGET.baseId; // production Airtable base for the target (read-only)
+export const TABLES = TARGET.tables;
 
 export function tableByKey(key) {
   const t = TABLES.find((x) => x.key === key);
