@@ -49,8 +49,10 @@ const {
   // Push notifications (VAPID)
   VAPID_PUBLIC_KEY,
   VAPID_PRIVATE_KEY,
-  WEBHOOK_SECRET = 'antique-split-webhook-2026',
-  RECEPTION_PIN  = 'recepcija2026',
+  // No production fallbacks — see the production secrets guard below. Dev may set
+  // these explicitly in a local .env; production must supply real values.
+  WEBHOOK_SECRET,
+  RECEPTION_PIN,
 
   // CORS
   CORS_ORIGINS = '',
@@ -140,6 +142,27 @@ async function savePushSubscriptionToAirtable(hotelSlug, room, subscription) {
 if (!OPENAI_API_KEY || !AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
   console.error('❗ Missing env vars: OPENAI_API_KEY, AIRTABLE_API_KEY, AIRTABLE_BASE_ID');
   process.exit(1);
+}
+
+// ── Production secrets guard (S-08) ───────────────────────────────────────────
+// WEBHOOK_SECRET and RECEPTION_PIN previously had hardcoded fallbacks — a secret
+// shipped in source. Fallbacks removed. In production the server must fail to boot
+// if they are missing (never silently run with an empty/guessable secret). In dev
+// they may be set via a local .env; if unset, the guarded routes fail closed
+// (secret !== undefined → 403; !RECEPTION_PIN → 401).
+const IS_PROD = process.env.NODE_ENV === 'production'
+  || !!process.env.RENDER || !!process.env.RENDER_GIT_COMMIT || !!process.env.RENDER_EXTERNAL_URL;
+if (IS_PROD) {
+  const missingSecrets = [];
+  if (!WEBHOOK_SECRET) missingSecrets.push('WEBHOOK_SECRET');
+  if (!RECEPTION_PIN)  missingSecrets.push('RECEPTION_PIN');
+  if (missingSecrets.length) {
+    console.error(`❗ Production requires: ${missingSecrets.join(', ')} (no fallback). Set them in the environment.`);
+    process.exit(1);
+  }
+} else {
+  if (!WEBHOOK_SECRET) console.warn('⚠️  WEBHOOK_SECRET unset (dev) — webhook routes will reject all requests.');
+  if (!RECEPTION_PIN)  console.warn('⚠️  RECEPTION_PIN unset (dev) — reception PIN auth will reject all requests.');
 }
 
 // Render build marker

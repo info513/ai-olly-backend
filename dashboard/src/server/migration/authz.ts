@@ -13,23 +13,14 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { resolve, join } from "node:path";
+import { assertDevProject, supabaseRef, DEV_SUPABASE_REF } from "@/server/dev-guard";
 
-export const DEV_SUPABASE_REF = "mcgrccvvybgcozeqlisj"; // aiolly-dev — ONLY allowed ref
+export { DEV_SUPABASE_REF, supabaseRef };
 
-export function supabaseRef(url: string | undefined): string | null {
-  const m = /^https?:\/\/([a-z0-9]+)\.supabase\.co/.exec(url ?? "");
-  return m ? m[1] : null;
-}
-
-/** Throws (as an HTTP-shaped object) unless the target Supabase project is aiolly-dev. */
+/** Throws (HTTP-shaped) unless the target Supabase project is aiolly-dev and the
+ *  runtime is not production. Delegates to the shared dev-guard (S-09). */
 export function assertDevRef(): { ok: true; ref: string } {
-  const ref = supabaseRef(process.env.NEXT_PUBLIC_SUPABASE_URL);
-  if (ref !== DEV_SUPABASE_REF) {
-    const err: any = new Error(`Migration tools are DEV-only. Refusing ref "${ref}".`);
-    err.status = 403;
-    throw err;
-  }
-  return { ok: true, ref };
+  return assertDevProject();
 }
 
 export interface Caller { userId: string; email: string | null }

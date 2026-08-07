@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getBrevoAdapter } from "@/server/integrations/brevo";
+import { assertDevProject } from "@/server/dev-guard";
 
 // ============================================================================
 // DEV-ONLY synthetic webhook ingestion (Sprint 7, Part 15).
@@ -21,6 +22,11 @@ export const runtime = "nodejs";
 const VALID: string[] = ["sent", "delivered", "opened", "clicked", "bounced", "unsubscribed", "complained", "deferred"];
 
 export async function POST(req: Request) {
+  // DEV-ONLY guard (S-09): reject in production / non-aiolly-dev BEFORE any
+  // service-role side effect. No email is ever sent regardless.
+  try { assertDevProject(); }
+  catch (e: any) { return NextResponse.json({ error: e?.message ?? "DEV-only endpoint." }, { status: e?.status ?? 403 }); }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
