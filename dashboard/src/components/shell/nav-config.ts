@@ -1,6 +1,7 @@
 import {
   Home,
   FileText,
+  LayoutList,
   Sparkles,
   ConciergeBell,
   Users,
@@ -25,6 +26,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { label: "Home", href: "/home", icon: Home, ready: true },
   { label: "Content", href: "/content", icon: FileText, ready: false },
+  { label: "Presentation", href: "/presentation", icon: LayoutList, ready: true },
   { label: "AI", href: "/ai", icon: Sparkles, ready: true },
   { label: "Reception", href: "/reception", icon: ConciergeBell, ready: true },
   { label: "Guests", href: "/guests", icon: Users, ready: true },
