@@ -25,7 +25,7 @@ function ShellLoader({ label }: { label: string }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { session, loading: authLoading } = useAuth();
-  const { loading: hotelLoading, hotels, isPlatformAdmin } = useHotel();
+  const { loading: hotelLoading, hotels, isPlatformAdmin, profile } = useHotel();
   const { can } = usePermissions();
   const router = useRouter();
   const pathname = usePathname();
@@ -36,7 +36,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const resolving = authLoading || (session && hotelLoading);
   const moduleKey = moduleKeyFromPath(pathname);
-  const noTenant = Boolean(session) && !hotelLoading && !isPlatformAdmin && hotels.length === 0;
+  // A globally suspended profile (profiles.active=false) loses ALL access — the DB
+  // already denies every hotel/platform read (S-01); this mirrors it in the UI so a
+  // suspended user cannot regain a usable workspace by loading the shell.
+  const suspended = Boolean(session) && !hotelLoading && profile != null && profile.active === false;
+  const noTenant = suspended || (Boolean(session) && !hotelLoading && !isPlatformAdmin && hotels.length === 0);
   // Platform-admin-only DEV routes (e.g. /platform/migration) bypass hotel-role modules.
   const isPlatformRoute = pathname.startsWith("/platform");
   const forbidden = Boolean(session) && !hotelLoading && !noTenant &&

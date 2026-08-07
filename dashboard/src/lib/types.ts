@@ -14,6 +14,7 @@ export interface Profile {
   email: string | null;
   displayName: string | null;
   isPlatformAdmin: boolean;
+  active: boolean;
 }
 
 export interface AuthUser {

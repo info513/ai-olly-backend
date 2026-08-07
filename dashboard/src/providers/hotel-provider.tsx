@@ -31,7 +31,7 @@ async function loadContext(userId: string): Promise<{ profile: Profile | null; h
   const supabase = getSupabaseBrowserClient();
 
   const [{ data: prof }, { data: memberships, error }] = await Promise.all([
-    supabase.from("profiles").select("user_id,email,display_name,is_platform_admin").eq("user_id", userId).maybeSingle(),
+    supabase.from("profiles").select("user_id,email,display_name,is_platform_admin,active").eq("user_id", userId).maybeSingle(),
     supabase
       .from("hotel_memberships")
       .select("role, hotel:hotels(id,name,slug, destination:destinations(name))")
@@ -51,7 +51,7 @@ async function loadContext(userId: string): Promise<{ profile: Profile | null; h
     .sort((a: HotelMembershipItem, b: HotelMembershipItem) => a.name.localeCompare(b.name));
 
   const profile: Profile | null = prof
-    ? { userId: prof.user_id, email: prof.email, displayName: prof.display_name, isPlatformAdmin: !!prof.is_platform_admin }
+    ? { userId: prof.user_id, email: prof.email, displayName: prof.display_name, isPlatformAdmin: !!prof.is_platform_admin, active: prof.active !== false }
     : null;
 
   return { profile, hotels };
