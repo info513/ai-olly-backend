@@ -75,6 +75,7 @@ export default function DestinationEditorPage() {
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
 
   if (isError) return <ErrorState message={(error as any)?.message} />;
+  if (!isLoading && !dest) return <ErrorState message="This destination doesn’t exist or was removed." />;
   if (isLoading || !dest || !form) return <LoadingState />;
 
   const localeTags = form.supported_locales.split(",").map((s) => s.trim()).filter(Boolean);

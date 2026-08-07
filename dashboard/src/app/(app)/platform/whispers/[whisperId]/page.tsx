@@ -53,6 +53,7 @@ export default function WhisperEditorPage() {
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
 
   if (isError) return <ErrorState message={(error as any)?.message} />;
+  if (!isLoading && !whisper) return <ErrorState message="This whisper doesn’t exist or was removed." />;
   if (isLoading || !whisper || !form) return <LoadingState />;
 
   const keyValid = isValidWhisperKey(form.key);

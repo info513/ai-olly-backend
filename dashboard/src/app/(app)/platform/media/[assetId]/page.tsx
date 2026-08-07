@@ -38,6 +38,7 @@ export default function PlatformMediaDetailPage() {
   React.useEffect(() => { if (q.data) { setForm(q.data); setDirty(false); } }, [q.data?.id, q.data?.updatedAt]);
 
   if (q.isError) return <div className="mx-auto max-w-[1100px] p-6"><ErrorState error={q.error} onRetry={() => q.refetch()} /></div>;
+  if (!q.isLoading && !q.data) return <div className="mx-auto max-w-[1100px] p-6"><ErrorState error={new Error("This media doesn’t exist or was removed.")} onRetry={() => q.refetch()} /></div>;
   if (q.isLoading || !q.data) return <div className="mx-auto max-w-[1100px] p-6"><SectionLoader rows={6} /></div>;
   const a = q.data;
 

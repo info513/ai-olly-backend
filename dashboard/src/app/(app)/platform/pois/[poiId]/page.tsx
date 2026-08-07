@@ -75,6 +75,7 @@ export default function PoiEditorPage() {
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
 
   if (isError) return <ErrorState message={(error as any)?.message} />;
+  if (!isLoading && !poi) return <ErrorState message="This POI doesn’t exist or was removed." />;
   if (isLoading || !poi || !form) return <LoadingState />;
 
   const keyValid = isValidPoiKey(form.key);

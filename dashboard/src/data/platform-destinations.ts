@@ -162,7 +162,7 @@ export function useDestination(id?: string) {
     queryKey: dqk.one(id),
     enabled: !!id,
     queryFn: async (): Promise<Destination> => {
-      const { data, error } = await sb().from("destinations").select("*").eq("id", id).single();
+      const { data, error } = await sb().from("destinations").select("*").eq("id", id).maybeSingle();
       if (error) throw error;
       return data as Destination;
     },

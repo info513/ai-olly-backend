@@ -60,7 +60,7 @@ export function useWhispers(destinationId?: string, filters: WhisperFilters = {}
   });
 }
 export function useWhisper(id?: string) {
-  return useQuery({ queryKey: wqk.one(id), enabled: !!id, queryFn: async (): Promise<Whisper> => { const { data, error } = await sb().from("destination_whispers").select("*").eq("id", id).single(); if (error) throw error; return data as Whisper; } });
+  return useQuery({ queryKey: wqk.one(id), enabled: !!id, queryFn: async (): Promise<Whisper> => { const { data, error } = await sb().from("destination_whispers").select("*").eq("id", id).maybeSingle(); if (error) throw error; return data as Whisper; } });
 }
 export function useWhisperHotelUsage(whisperId?: string, destinationId?: string) {
   return useQuery({

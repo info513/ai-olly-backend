@@ -91,6 +91,7 @@ export default function RouteEditorPage() {
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
 
   if (isError) return <ErrorState message={(error as any)?.message} />;
+  if (!isLoading && !route) return <ErrorState message="This route doesn’t exist or was removed." />;
   if (isLoading || !route || !form) return <LoadingState />;
 
   const keyValid = isValidRouteKey(form.key);

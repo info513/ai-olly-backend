@@ -51,7 +51,7 @@ export function useDestArticles(destinationId?: string, filters: ArticleFilters 
     },
   });
 }
-export function useDestArticle(id?: string) { return useQuery({ queryKey: akqk.one(id), enabled: !!id, queryFn: async (): Promise<DestArticle> => { const { data, error } = await sb().from("knowledge_articles").select("*").eq("id", id).single(); if (error) throw error; return data as DestArticle; } }); }
+export function useDestArticle(id?: string) { return useQuery({ queryKey: akqk.one(id), enabled: !!id, queryFn: async (): Promise<DestArticle> => { const { data, error } = await sb().from("knowledge_articles").select("*").eq("id", id).maybeSingle(); if (error) throw error; return data as DestArticle; } }); }
 export function useKCategories() { return useQuery({ queryKey: akqk.cats(), queryFn: async (): Promise<KCategory[]> => { const { data, error } = await sb().from("knowledge_categories").select("id,key,name").is("hotel_id", null).eq("active", true).order("sort_order"); if (error) throw error; return (data ?? []) as KCategory[]; } }); }
 
 type ArticleInput = Partial<Omit<DestArticle, "id" | "created_at" | "updated_at" | "published_snapshot" | "status">>;

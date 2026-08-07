@@ -52,6 +52,7 @@ export default function ArticleEditorPage() {
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
 
   if (isError) return <ErrorState message={(error as any)?.message} />;
+  if (!isLoading && !art) return <ErrorState message="This article doesn’t exist or was removed." />;
   if (isLoading || !art || !form) return <LoadingState />;
 
   const keyValid = isValidArticleKey(form.key);

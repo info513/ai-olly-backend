@@ -156,9 +156,9 @@ export function usePoi(id?: string) {
     queryKey: pqk.one(id),
     enabled: !!id,
     queryFn: async (): Promise<Poi> => {
-      const { data, error } = await sb().from("destination_pois").select("*").eq("id", id).single();
+      const { data, error } = await sb().from("destination_pois").select("*").eq("id", id).maybeSingle();
       if (error) throw error;
-      return data as Poi;
+      return (data ?? null) as Poi;
     },
   });
 }

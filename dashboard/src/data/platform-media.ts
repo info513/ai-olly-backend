@@ -87,9 +87,10 @@ export function usePlatformAsset(id?: string) {
   return useQuery({
     queryKey: pmk.item(id),
     enabled: !!id,
-    queryFn: async (): Promise<AssetDetail> => {
-      const { data, error } = await sb().from("assets").select(SELECT).eq("id", id).single();
+    queryFn: async (): Promise<AssetDetail | null> => {
+      const { data, error } = await sb().from("assets").select(SELECT).eq("id", id).maybeSingle();
       if (error) throw error;
+      if (!data) return null;
       const counts = await usageCounts([id!]);
       return mapDetail(data, counts.get(id!) ?? 0);
     },

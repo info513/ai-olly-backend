@@ -52,7 +52,7 @@ export function useEvents(destinationId?: string, filters: EventFilters = {}) {
     },
   });
 }
-export function useEvent(id?: string) { return useQuery({ queryKey: eqk.one(id), enabled: !!id, queryFn: async (): Promise<DEvent> => { const { data, error } = await sb().from("destination_events").select("*").eq("id", id).single(); if (error) throw error; return data as DEvent; } }); }
+export function useEvent(id?: string) { return useQuery({ queryKey: eqk.one(id), enabled: !!id, queryFn: async (): Promise<DEvent> => { const { data, error } = await sb().from("destination_events").select("*").eq("id", id).maybeSingle(); if (error) throw error; return data as DEvent; } }); }
 export function useEventHotelUsage(eventId?: string, destinationId?: string) {
   return useQuery({ queryKey: eqk.usage(eventId), enabled: !!eventId, queryFn: async (): Promise<EventHotelUsage> => {
     const client = sb(); const [settings, hotels] = await Promise.all([client.from("hotel_event_settings").select("hotel_id,visible,featured,hotel_recommendation").eq("event_id", eventId), destinationId ? client.from("hotels").select("id", { count: "exact", head: true }).eq("destination_id", destinationId) : Promise.resolve({ count: 0 } as any)]);

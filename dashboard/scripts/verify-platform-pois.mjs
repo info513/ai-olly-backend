@@ -171,6 +171,22 @@ async function main() {
       (n >= 20) ? ok(`imported Split POIs still resolve for Antique (${n})`) : bad(`Split POIs regressed for Antique (${n})`);
     } else ok("antique-split hotel not present (skipped regression check)");
 
+    // ── 19. NOT-FOUND REGRESSION (QA FIX-3): by-id detail GETs must use maybeSingle ──
+    // .single() on a missing row returns a 406 that left the editor stuck on skeletons
+    // instead of a not-found state. Guard that no platform detail hook regresses to it.
+    { const { readdirSync, readFileSync } = await import("node:fs");
+      const dir = decodeURIComponent(import.meta.url).replace(/^file:\/\//, "").replace(/scripts\/[^/]+$/, "src/data");
+      let offenders = [];
+      for (const f of readdirSync(dir)) {
+        if (!/^platform-.*\.ts$/.test(f)) continue;
+        const src = readFileSync(dir + "/" + f, "utf8");
+        if (/\.eq\("id", id\)\.single\(\)/.test(src)) offenders.push(f);
+      }
+      offenders.length === 0 ? ok("all platform by-id detail GETs use maybeSingle (not-found safe)") : bad(`by-id .single() regressed in: ${offenders.join(", ")}`);
+      // behaviour: a random non-existent POI resolves to null, not an error
+      const miss = await svc.from("destination_pois").select("id").eq("id", "00000000-0000-0000-0000-000000000000").maybeSingle();
+      (!miss.error && miss.data === null) ? ok("missing POI id resolves to null (clean not-found)") : bad("missing POI id did not resolve to null"); }
+
   } finally {
     await cleanup();
     await sql.end();

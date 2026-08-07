@@ -174,7 +174,7 @@ export function useRoute(id?: string) {
     queryKey: rqk.one(id),
     enabled: !!id,
     queryFn: async (): Promise<Route> => {
-      const { data, error } = await sb().from("destination_routes").select("*").eq("id", id).single();
+      const { data, error } = await sb().from("destination_routes").select("*").eq("id", id).maybeSingle();
       if (error) throw error;
       return data as Route;
     },

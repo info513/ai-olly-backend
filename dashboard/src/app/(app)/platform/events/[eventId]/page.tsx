@@ -53,6 +53,7 @@ export default function EventEditorPage() {
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
 
   if (isError) return <ErrorState message={(error as any)?.message} />;
+  if (!isLoading && !ev) return <ErrorState message="This event doesn’t exist or was removed." />;
   if (isLoading || !ev || !form) return <LoadingState />;
 
   const keyValid = isValidEventKey(form.key);
