@@ -196,7 +196,7 @@ export function usePublicAssets(destinationId?: string) {
     enabled: !!destinationId,
     queryFn: async (): Promise<PublicAsset[]> => {
       const { data, error } = await sb().from("assets")
-        .select("id,display_name,original_filename,asset_type,owner_scope,external_url,public_access,status,deleted_at,destination_id")
+        .select("id,display_name,original_filename,asset_type,owner_scope,external_url,bucket_name,storage_path,public_access,status,deleted_at,destination_id")
         .eq("public_access", true).in("owner_scope", ["platform", "destination"])
         .is("deleted_at", null).order("updated_at", { ascending: false }).limit(200);
       if (error) throw error;
@@ -204,7 +204,13 @@ export function usePublicAssets(destinationId?: string) {
         .filter((a: any) => a.status !== "archived" && (a.destination_id === null || a.destination_id === destinationId))
         .map((a: any) => ({
           id: a.id, label: a.display_name || a.original_filename || "Untitled asset",
-          asset_type: a.asset_type, preview_url: a.external_url ?? null, owner_scope: a.owner_scope,
+          // External assets carry their URL directly; storage-uploaded public assets
+          // (external_url null) derive it from the public-media bucket + storage_path.
+          asset_type: a.asset_type, owner_scope: a.owner_scope,
+          preview_url: a.external_url
+            ?? (a.bucket_name === "public-media" && a.storage_path && a.public_access
+              ? sb().storage.from("public-media").getPublicUrl(a.storage_path).data.publicUrl
+              : null),
         }));
     },
   });
