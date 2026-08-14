@@ -4637,30 +4637,18 @@ html, body {
   color: rgba(232,212,160,.60);
 }
 
-/* ── Split photography on home tiles + POI hero (media-split.js) ───────────────
+/* ── Split photography (media-split.js) ───────────────────────────────────────
    Photos are applied as element background-image with a dark gradient overlay so
-   the existing icon/label text stays legible. Tiles opt in via .has-photo. */
-.v2-tile.has-photo,
+   existing text stays legible. Home MODULE tiles stay clean (no photos); only
+   Near Me category cards, POI cards/hero, and module LANDING heroes opt in. */
 .nm-card.has-photo {
   color: #fff;
+  background-color: transparent;
   border-color: rgba(255,255,255,0.14);
 }
-.v2-tile.has-photo .v2-tile__label,
 .nm-card.has-photo .nm-card-label { color: #fff; }
-.v2-tile.has-photo .v2-tile__icon,
-.nm-card.has-photo .nm-card-icon { color: #fff; }
-.v2-tile.has-photo .v2-tile__icon svg,
+.nm-card.has-photo .nm-card-icon,
 .nm-card.has-photo .nm-card-icon svg { stroke: #fff; color: #fff; }
-/* Photo tiles drop their flat background tint so the image shows through. */
-.v2-tile.has-photo { background-color: transparent; }
-.nm-card.has-photo { background-color: transparent; }
-/* POI detail hero already positions its text over a dark gradient; nothing extra
-   needed beyond the inline cover image, but keep text pinned above the photo. */
+/* POI detail + module landing heroes: cover photo already carries a dark
+   gradient overlay inline; just anchor a fallback colour under it. */
 .screen-hero--has-photo { background-color: #0b1a24; }
-
-/* Photo on the default 2-column module cards (home-menu-preview-card). */
-.home-menu-preview-card.has-photo { background-color: transparent; border-color: rgba(255,255,255,0.14); }
-.home-menu-preview-card.has-photo .home-menu-preview-title,
-.home-menu-preview-card.has-photo .home-menu-preview-subtitle { color: #fff; }
-.home-menu-preview-card.has-photo .home-menu-preview-icon svg,
-.home-menu-preview-card.has-photo .home-menu-preview-chevron svg { stroke: #fff; color: #fff; }

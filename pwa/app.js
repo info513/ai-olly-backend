@@ -2051,17 +2051,27 @@ function _setTilePhoto(el, url) {
   el.style.backgroundSize = 'cover';
   el.style.backgroundPosition = 'center';
 }
+function _setHeroPhoto(el, url) {
+  el.classList.add('screen-hero--has-photo');
+  el.style.backgroundImage =
+    "linear-gradient(180deg, rgba(6,17,23,0.34) 0%, rgba(6,17,23,0.52) 45%, rgba(6,17,23,0.86) 100%), url('" + url + "')";
+  el.style.backgroundSize = 'cover';
+  el.style.backgroundPosition = 'center';
+}
 function _applySplitMediaTiles() {
   if (!window.SPLIT_MEDIA) return;
+  // Near Me category cards (pharmacy, ATM, supermarket, ferry/bus) get a photo.
+  // The home MODULE tiles (Room Guide, Concierge, …) intentionally stay clean —
+  // photos there hurt the app's seriousness.
   document.querySelectorAll('.nm-card').forEach(function (card) {
     var m = (card.getAttribute('onclick') || '').match(/openNearMeCategory\('([^']+)'\)/);
     if (m) { var u = window.SPLIT_MEDIA.nearMeImage(m[1]); if (u) _setTilePhoto(card, u); }
   });
-  // Module tiles: both the classic .v2-tile grid and the default 2-column
-  // .home-menu-preview-card layout use onclick="openModule('...')".
-  document.querySelectorAll('.v2-tile, .home-menu-preview-card').forEach(function (tile) {
-    var m = (tile.getAttribute('onclick') || '').match(/openModule\('([^']+)'\)/);
-    if (m) { var u = window.SPLIT_MEDIA.moduleImage(m[1]); if (u) _setTilePhoto(tile, u); }
+  // Module LANDING-screen heroes DO get a photo (the header banner shown after
+  // tapping the tile), matched by their .screen-hero--<module> class.
+  ['room-guide', 'services', 'near-me', 'concierge', 'help'].forEach(function (key) {
+    var el = document.querySelector('.screen-hero--' + key);
+    if (el) { var u = window.SPLIT_MEDIA.moduleImage(key); if (u) _setHeroPhoto(el, u); }
   });
 }
 document.addEventListener('DOMContentLoaded', _applySplitMediaTiles);
@@ -3338,6 +3348,4 @@ function _initHomeMenu() {
   var section = document.getElementById('home-menu-section');
   if (!section) return;
   section.innerHTML = _buildPreviewMenuHTML();
-  // Decorate the freshly-rendered module cards with Split photography.
-  if (typeof _applySplitMediaTiles === 'function') _applySplitMediaTiles();
 }
