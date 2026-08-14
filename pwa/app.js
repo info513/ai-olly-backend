@@ -936,7 +936,17 @@ function _populatePoiDetail(poi) {
   if (hero) {
     // Apply category variant; clear any inline style left from a previous POI
     hero.className = 'screen-hero ' + (POI_HERO_CAT_CLASS[poi.category] || 'screen-hero--poi');
-    hero.style.background = '';
+    // Real Split photo when we have one; else keep the category gradient.
+    const _poiImg = (window.SPLIT_MEDIA && window.SPLIT_MEDIA.poiImage(poi.name)) || null;
+    if (_poiImg) {
+      hero.style.backgroundImage =
+        "linear-gradient(180deg, rgba(6,17,23,0.34) 0%, rgba(6,17,23,0.52) 45%, rgba(6,17,23,0.86) 100%), url('" + _poiImg + "')";
+      hero.style.backgroundSize = 'cover';
+      hero.style.backgroundPosition = 'center';
+      hero.classList.add('screen-hero--has-photo');
+    } else {
+      hero.style.background = '';
+    }
   }
 
   // Populate hero text elements
@@ -2032,6 +2042,30 @@ function boot() {
 
 document.addEventListener('DOMContentLoaded', boot);
 
+// ── Split photography on the static home tiles (Near Me categories + module
+// tiles). POI cards/detail pull their own photos inline via SPLIT_MEDIA. ──────
+function _setTilePhoto(el, url) {
+  el.classList.add('has-photo');
+  el.style.backgroundImage =
+    "linear-gradient(180deg, rgba(6,17,23,0.32) 0%, rgba(6,17,23,0.80) 100%), url('" + url + "')";
+  el.style.backgroundSize = 'cover';
+  el.style.backgroundPosition = 'center';
+}
+function _applySplitMediaTiles() {
+  if (!window.SPLIT_MEDIA) return;
+  document.querySelectorAll('.nm-card').forEach(function (card) {
+    var m = (card.getAttribute('onclick') || '').match(/openNearMeCategory\('([^']+)'\)/);
+    if (m) { var u = window.SPLIT_MEDIA.nearMeImage(m[1]); if (u) _setTilePhoto(card, u); }
+  });
+  // Module tiles: both the classic .v2-tile grid and the default 2-column
+  // .home-menu-preview-card layout use onclick="openModule('...')".
+  document.querySelectorAll('.v2-tile, .home-menu-preview-card').forEach(function (tile) {
+    var m = (tile.getAttribute('onclick') || '').match(/openModule\('([^']+)'\)/);
+    if (m) { var u = window.SPLIT_MEDIA.moduleImage(m[1]); if (u) _setTilePhoto(tile, u); }
+  });
+}
+document.addEventListener('DOMContentLoaded', _applySplitMediaTiles);
+
 // ── Split Today / Events ──────────────────────────────────────────────────
 
 let activeEventsTab = 'today'; // 'today' | 'upcoming' | 'alwayson'
@@ -3055,14 +3089,19 @@ function _v2RenderStepsFromDoor() {
     var cat  = poi.category || '';
     var dist = poi.dist     || '';
     var id   = poi.id       || '';
-    var bg   = _V2_POI_GRADIENTS[cat] || 'linear-gradient(155deg, #14222d 0%, #1a3445 100%)';
+    var grad = _V2_POI_GRADIENTS[cat] || 'linear-gradient(155deg, #14222d 0%, #1a3445 100%)';
+    // Real Split photo when available; category gradient as fallback.
+    var img  = (window.SPLIT_MEDIA && window.SPLIT_MEDIA.poiImage(name)) || null;
+    var bgStyle = img
+      ? "background-image:linear-gradient(180deg,rgba(6,17,23,0.05) 0%,rgba(6,17,23,0.6) 100%),url('" + img + "');background-size:cover;background-position:center;"
+      : "background:" + grad + ";";
     // Each card opens the specific POI detail; safe string — Airtable IDs are alphanumeric
     var clickHandler = id
       ? 'onclick="_openAlwaysOnPoi(\'' + id + '\')"'
       : 'onclick="gotoRoot(\'city-map\')"';
     return (
       '<div class="v2-poi-card" ' + clickHandler + '>' +
-        '<div class="v2-poi-card__bg" style="background:' + bg + '"></div>' +
+        '<div class="v2-poi-card__bg" style="' + bgStyle + '"></div>' +
         (dist ? '<div class="v2-poi-card__dist">' + _v2Esc(dist) + '</div>' : '') +
         '<div class="v2-poi-card__body">' +
           '<div class="v2-poi-card__name">' + _v2Esc(name) + '</div>' +
@@ -3299,4 +3338,6 @@ function _initHomeMenu() {
   var section = document.getElementById('home-menu-section');
   if (!section) return;
   section.innerHTML = _buildPreviewMenuHTML();
+  // Decorate the freshly-rendered module cards with Split photography.
+  if (typeof _applySplitMediaTiles === 'function') _applySplitMediaTiles();
 }
