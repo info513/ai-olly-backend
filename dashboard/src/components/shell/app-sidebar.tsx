@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PanelLeftClose, PanelLeft, DatabaseZap, X } from "lucide-react";
+import { PanelLeftClose, PanelLeft, DatabaseZap, X, ArrowRight } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { NAV_GROUPS } from "./nav-config";
 import { HotelSwitcher } from "./hotel-switcher";
@@ -99,24 +99,24 @@ function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: 
         );
       })}
 
-      {/* Platform-admin-only entry into the Platform CMS — hidden from every hotel role. */}
+      {/* Platform-admin-only WORKSPACE SWITCH — deliberately separated from the hotel
+          jobs above so the two workspaces never blur together (hidden from hotel roles). */}
       {isPlatformAdmin && (() => {
         const href = "/platform";
-        const active = pathname === "/platform" || pathname.startsWith("/platform/");
         const link = (
-          <Link href={href} onClick={onNavigate} aria-current={active ? "page" : undefined}
-            className={cn("group relative mt-1 flex items-center gap-3 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors",
-              collapsed && "justify-center px-0",
-              active ? "bg-brand-navy/60 text-ink-primary" : "text-ink-secondary hover:bg-surface-overlay hover:text-ink-primary")}>
-            {active && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-cream" />}
+          <Link href={href} onClick={onNavigate}
+            className={cn("group flex items-center gap-3 rounded-md border border-brand-cream/25 bg-brand-cream/[0.06] px-2.5 py-2 text-[13px] font-medium text-brand-cream transition-colors hover:bg-brand-cream/[0.12]",
+              collapsed && "justify-center px-0")}>
             <DatabaseZap className="h-[18px] w-[18px] shrink-0" />
-            {!collapsed && (<><span className="flex-1">Platform CMS</span>
-              <span className="rounded bg-brand-cream/15 px-1.5 py-0.5 text-[10px] font-medium text-brand-cream">admin</span></>)}
+            {!collapsed && (<><span className="flex-1">Switch to Platform</span><ArrowRight className="h-4 w-4 shrink-0 opacity-60" /></>)}
           </Link>
         );
-        return collapsed ? (
-          <Tooltip><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right">Platform CMS</TooltipContent></Tooltip>
-        ) : link;
+        return (
+          <div className="mt-2 border-t border-border-subtle pt-2">
+            {!collapsed && <div className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-tertiary">Other workspace</div>}
+            {collapsed ? <Tooltip><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right">Switch to Platform</TooltipContent></Tooltip> : link}
+          </div>
+        );
       })()}
     </nav>
   );

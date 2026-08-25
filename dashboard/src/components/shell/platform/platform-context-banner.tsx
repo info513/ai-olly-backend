@@ -27,6 +27,7 @@ export function PlatformContextBanner() {
           <ChevronRight className="h-3.5 w-3.5 text-ink-tertiary" />
           <Crumb label={currentDestination.countryCode || "—"} tone="country" />
           <ChevronRight className="h-3.5 w-3.5 text-ink-tertiary" />
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-tertiary">Editing</span>
           <Crumb label={currentDestination.name} tone="destination" />
         </>
       )}

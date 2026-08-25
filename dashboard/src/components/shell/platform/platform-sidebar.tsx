@@ -57,8 +57,9 @@ function Body({ onNavigate }: { onNavigate?: () => void }) {
       <div className="px-3 pb-2 pt-1"><DestinationSwitcher /></div>
       <NavLinks onNavigate={onNavigate} />
       <div className="border-t border-border-subtle p-2">
-        <Link href="/home" onClick={onNavigate} className="mb-1 flex items-center gap-2 rounded-md px-2.5 py-2 text-[13px] font-medium text-ink-secondary transition-colors hover:bg-surface-overlay hover:text-ink-primary">
-          <ArrowLeft className="h-[18px] w-[18px] shrink-0" /> Exit to hotel workspace
+        <div className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-tertiary">Other workspace</div>
+        <Link href="/home" onClick={onNavigate} className="mb-1 flex items-center gap-2 rounded-md border border-border-subtle px-2.5 py-2 text-[13px] font-medium text-ink-secondary transition-colors hover:border-border-strong hover:bg-surface-overlay hover:text-ink-primary">
+          <ArrowLeft className="h-[18px] w-[18px] shrink-0" /> Switch to Hotel
         </Link>
         <UserMenu collapsed={false} />
       </div>
