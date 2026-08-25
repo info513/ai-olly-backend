@@ -110,7 +110,11 @@ async function main() {
   (await rows("select count(*)::int n from destination_routes where destination_id=$1 and waypoints->>'pois_linked'='true'", [did]))[0].n === 6 ? ok("6 routes have linked POI waypoints") : bad("route waypoints incomplete");
   (await rows("select count(*)::int n from knowledge_articles where hotel_id=$1 and status='published'", [hid]))[0].n >= 7 ? ok("hotel knowledge articles present (>=7)") : bad("knowledge articles missing");
   (await rows("select count(*)::int n from knowledge_aliases where hotel_id=$1", [hid]))[0].n > 0 ? ok("knowledge aliases populated") : bad("no knowledge aliases");
-  eq(await n("select count(*) n from hotel_poi_settings where hotel_id=$1", [hid]), 22, "22 hotel POI presentation settings");
+  // Pattern-B coverage invariant: every canonical Split POI (incl. the 4 Phase-11
+  // additions — Grgur Ninski, Sv. Frane, Palace Walls, Streets) has an Antique
+  // presentation setting. Compare against the live Split POI count, not a fixed 22.
+  { const poiTotal = await n("select count(*) n from destination_pois where destination_id=$1", [did]);
+    eq(await n("select count(*) n from hotel_poi_settings where hotel_id=$1", [hid]), poiTotal, `hotel POI presentation settings cover every Split POI (${poiTotal})`); }
 
   // ai + prices + media
   (await n("select count(*) n from ai_configs where hotel_id=$1", [hid])) === 1 ? ok("ai_configs: exactly one config for hotel") : bad("ai_configs count wrong");

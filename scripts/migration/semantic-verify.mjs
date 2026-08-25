@@ -33,16 +33,30 @@ async function main() {
     { const routes = (await sql.query(`select id, coalesce(published_snapshot->'waypoints', waypoints) wp from public.destination_routes where destination_id = $1 and status <> 'archived'`, [dest])).rows;
       let withStops = 0, crossDest = 0, orderBad = 0, badId = 0;
       for (const r of routes) {
-        const stops = r.wp?.stops || [];
-        if (!stops.length) continue; withStops++;
-        const ids = stops.map((s) => s.poi_id).filter(Boolean);
-        if (ids.length) {
-          const q = await sql.query(`select id, destination_id from public.destination_pois where id = any($1::uuid[])`, [ids]);
-          const found = new Map(q.rows.map((x) => [x.id, x.destination_id]));
-          for (const id of ids) { if (!found.has(id)) badId++; else if (found.get(id) !== dest) crossDest++; }
+        const wp = r.wp || {};
+        const stops = wp.stops || [];
+        if (stops.length) {
+          // Format A — {stops:[{poi_id, order}]} (id-based)
+          withStops++;
+          const ids = stops.map((s) => s.poi_id).filter(Boolean);
+          if (ids.length) {
+            const q = await sql.query(`select id, destination_id from public.destination_pois where id = any($1::uuid[])`, [ids]);
+            const found = new Map(q.rows.map((x) => [x.id, x.destination_id]));
+            for (const id of ids) { if (!found.has(id)) badId++; else if (found.get(id) !== dest) crossDest++; }
+          }
+          const orders = stops.map((s, i) => s.order ?? i);
+          for (let i = 1; i < orders.length; i++) if (orders[i] < orders[i - 1]) orderBad++;
+        } else if (Array.isArray(wp.order) || Array.isArray(wp.pois)) {
+          // Format B — {pois:[key], order:[key], pois_linked} (key-based ordered list)
+          const keys = ((wp.order && wp.order.length ? wp.order : wp.pois) || []).filter(Boolean);
+          if (!keys.length) continue; withStops++;
+          const q = await sql.query(`select key, destination_id from public.destination_pois where key = any($1::text[])`, [keys]);
+          const found = new Map(q.rows.map((x) => [x.key, x.destination_id]));
+          for (const k of keys) { if (!found.has(k)) badId++; else if (found.get(k) !== dest) crossDest++; }
+          // order must contain exactly the same POI set as pois (no dropped/added stop)
+          if (Array.isArray(wp.pois) && Array.isArray(wp.order) &&
+              [...wp.pois].sort().join("|") !== [...wp.order].sort().join("|")) orderBad++;
         }
-        const orders = stops.map((s, i) => s.order ?? i);
-        for (let i = 1; i < orders.length; i++) if (orders[i] < orders[i - 1]) orderBad++;
       }
       (crossDest === 0) ? ok(`routes: all waypoint POIs are same-destination (${withStops} routes with stops)`) : bad(`routes: ${crossDest} cross-destination waypoint POIs`);
       (badId === 0) ? ok("routes: every waypoint POI id resolves to a real POI (identity-stable)") : bad(`routes: ${badId} dangling waypoint POI ids`);
