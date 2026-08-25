@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BedDouble, ConciergeBell, FileText, AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
+import { BedDouble, ConciergeBell, FileText, AlertTriangle, ArrowRight, CheckCircle2, Images, Sparkles, Zap, UploadCloud } from "lucide-react";
 import { useHotel } from "@/providers/hotel-provider";
 import { useContentSummary } from "@/data/content";
 import { PageHeader } from "@/components/content/page-header";
@@ -17,33 +17,38 @@ export default function ContentLanding() {
   return (
     <div className="mx-auto max-w-[1200px] p-6">
       <PageHeader
-        title="Content"
-        subtitle={`Rooms and Services guests see at ${currentHotel?.name ?? "your hotel"}.`}
+        title="Hotel Content"
+        subtitle={`Everything guests see about ${currentHotel?.name ?? "your hotel"} in Olly. Change it here and it reaches the guest app.`}
       />
 
       {isError ? (
         <ErrorState error={error} onRetry={() => refetch()} />
       ) : (
         <>
-          {/* Two module cards */}
           <div className="grid gap-4 sm:grid-cols-2">
             <ModuleCard
-              href="/content/rooms"
-              icon={BedDouble}
-              title="Rooms"
-              desc="Room types, rooms, the Room Guide and the resolved guest view."
+              href="/content/rooms" icon={BedDouble} title="Rooms & Room Guide" live
+              desc="Room details, Wi-Fi, equipment and the guest Room Guide. Room rates live here too."
               stat={isLoading ? null : `${data?.roomCount ?? 0} rooms · ${data?.roomTypeCount ?? 0} types`}
             />
             <ModuleCard
-              href="/content/services"
-              icon={ConciergeBell}
-              title="Services"
-              desc="Categories, services, draft → preview → publish, history and resolved view."
+              href="/content/services" icon={ConciergeBell} title="Services" live={false}
+              desc="Breakfast, transfers, extras and their prices — draft, preview, then publish."
               stat={isLoading ? null : `${data?.serviceCount ?? 0} services`}
+            />
+            <ModuleCard
+              href="/assets" icon={Images} title="Photos & Media" live
+              desc="Images and files used across your hotel content."
+              stat="Library"
+            />
+            <ModuleCard
+              href="/presentation" icon={Sparkles} title="Recommendations" live
+              desc="How your hotel presents Split's places, routes and events to guests."
+              stat="Maintained by AI OLLY Platform · you control presentation"
             />
           </div>
 
-          {/* Attention row */}
+          {/* Attention row — services publishing pipeline */}
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <StatTile icon={FileText} tone="info" label="Drafts waiting" value={isLoading ? null : data?.draftsWaiting ?? 0} href="/content/services?status=draft" />
             <StatTile icon={AlertTriangle} tone="danger" label="Critical needs attention" value={isLoading ? null : data?.criticalNeedsAttention ?? 0} href="/content/services?critical=1" />
@@ -66,13 +71,19 @@ export default function ContentLanding() {
               )}
             </Card>
           </div>
+
+          <div className="mt-4 flex items-center gap-2 text-[12px] text-ink-tertiary">
+            <UploadCloud className="h-4 w-4" />
+            Rooms, rates and photos go live the moment you save. Services go live when you publish.
+          </div>
         </>
       )}
     </div>
   );
 }
 
-function ModuleCard({ href, icon: Icon, title, desc, stat }: { href: string; icon: typeof BedDouble; title: string; desc: string; stat: string | null }) {
+/** `live` = changes are live on save; otherwise the area uses a draft → publish flow. */
+function ModuleCard({ href, icon: Icon, title, desc, stat, live }: { href: string; icon: typeof BedDouble; title: string; desc: string; stat: string | null; live: boolean }) {
   return (
     <Link href={href}>
       <Card className="group h-full p-5 transition-colors hover:border-border-strong">
@@ -80,9 +91,13 @@ function ModuleCard({ href, icon: Icon, title, desc, stat }: { href: string; ico
           <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-navy text-brand-cream">
             <Icon className="h-5 w-5" />
           </span>
-          <ArrowRight className="h-4 w-4 text-ink-tertiary opacity-0 transition-opacity group-hover:opacity-100" />
+          {live ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success"><Zap className="h-3 w-3" /> Live on save</span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-info/15 px-2 py-0.5 text-[10px] font-medium text-info"><FileText className="h-3 w-3" /> Requires publish</span>
+          )}
         </div>
-        <div className="mt-4 font-display text-[20px] text-ink-primary">{title}</div>
+        <div className="mt-4 flex items-center gap-2 font-display text-[20px] text-ink-primary">{title}<ArrowRight className="h-4 w-4 text-ink-tertiary opacity-0 transition-opacity group-hover:opacity-100" /></div>
         <p className="mt-1 text-[13px] text-ink-secondary">{desc}</p>
         <div className="mt-3 text-[12px] text-ink-tertiary">{stat ?? <Skeleton className="h-4 w-24" />}</div>
       </Card>

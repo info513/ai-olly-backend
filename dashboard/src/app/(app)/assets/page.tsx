@@ -22,8 +22,8 @@ export default function AssetsHome() {
   return (
     <div className="mx-auto max-w-[1200px] p-6">
       <PageHeader
-        title="Assets"
-        subtitle={`Media library and files for ${currentHotel?.name ?? "your hotel"}.`}
+        title="Photos & Media"
+        subtitle={`Images and files used across ${currentHotel?.name ?? "your hotel"}'s content.`}
         actions={<Link href="/assets/upload" className="inline-flex h-9 items-center gap-1.5 rounded-md bg-brand-cream px-3 text-[13px] font-semibold text-brand-navy hover:bg-brand-creamSoft"><Plus className="h-4 w-4" /> Upload</Link>}
       />
 

@@ -22,8 +22,8 @@ export default function PresentationHome() {
   return (
     <div className="mx-auto max-w-4xl space-y-5 p-4 sm:p-6">
       <header>
-        <h1 className="text-xl font-semibold text-ink-primary">Presentation</h1>
-        <p className="mt-1 text-sm text-ink-tertiary">Curate how shared destination content appears to <span className="font-medium text-ink-secondary">{currentHotel?.name ?? "your hotel"}</span>’s guests — what’s shown, what’s featured, the order, and your own recommendations.</p>
+        <h1 className="text-xl font-semibold text-ink-primary">Recommendations</h1>
+        <p className="mt-1 text-sm text-ink-tertiary">Choose how Split's places, routes and events appear to <span className="font-medium text-ink-secondary">{currentHotel?.name ?? "your hotel"}</span>’s guests — what’s shown, what’s featured, the order, and your own notes. The facts stay maintained by AI OLLY; you control the presentation.</p>
       </header>
 
       <PlatformMaintainedBanner />
