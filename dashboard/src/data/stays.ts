@@ -111,7 +111,7 @@ function useStayPatch(hotelId?: string) {
       if (error) throw error;
       return id;
     },
-    onSuccess: (id) => { qc.invalidateQueries({ queryKey: sk.stays(hotelId) }); qc.invalidateQueries({ queryKey: sk.stay(id) }); qc.invalidateQueries({ queryKey: ["reception", "guestStays"] }); },
+    onSuccess: (id) => { qc.invalidateQueries({ queryKey: sk.stays(hotelId) }); qc.invalidateQueries({ queryKey: sk.stay(id) }); qc.invalidateQueries({ queryKey: ["reception", "guestStays"] }); qc.invalidateQueries({ queryKey: ["reception", "today"] }); },
   });
 }
 

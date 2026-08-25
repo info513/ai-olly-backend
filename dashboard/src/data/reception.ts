@@ -154,9 +154,12 @@ export interface TodayData {
   activeStays: RequestSummaryLike[];
   newRequests: RequestSummary[];
   overdueRequests: RequestSummary[];
+  inProgressRequests: RequestSummary[];
   consentMissing: RequestSummaryLike[];
+  /** stayIds that still have an open request — used to flag check-out blockers. */
+  openRequestStayIds: string[];
   recentFeedback: { id: string; rating: number | null; category: string | null; followUp: boolean; createdAt: string }[];
-  counts: { arrivals: number; departures: number; active: number; newReq: number; overdue: number; consentMissing: number };
+  counts: { arrivals: number; departures: number; active: number; newReq: number; overdue: number; inProgress: number; consentMissing: number };
 }
 export interface RequestSummaryLike {
   stayId: string; roomNumber: string | null; guestName: string | null; status: string;
@@ -204,11 +207,15 @@ export function useReceptionToday(hotelId?: string) {
       const requests = (reqR.data ?? []).map(mapRequest);
       const newRequests = requests.filter((r) => r.status === "new");
       const overdueRequests = requests.filter((r) => isRequestOverdue(r));
+      const inProgressRequests = requests.filter((r) => r.status === "in_progress");
+      // Any still-open request (already filtered to open statuses server-side) pins a
+      // check-out blocker to its stay.
+      const openRequestStayIds = Array.from(new Set(requests.map((r) => r.stayId).filter((x): x is string => !!x)));
 
       return {
-        arrivals, departures, activeStays, newRequests, overdueRequests, consentMissing,
+        arrivals, departures, activeStays, newRequests, overdueRequests, inProgressRequests, consentMissing, openRequestStayIds,
         recentFeedback: (fbR.data ?? []).map((f: any) => ({ id: f.id, rating: f.rating, category: f.category, followUp: f.follow_up_requested, createdAt: f.created_at })),
-        counts: { arrivals: arrivals.length, departures: departures.length, active: activeStays.length, newReq: newRequests.length, overdue: overdueRequests.length, consentMissing: consentMissing.length },
+        counts: { arrivals: arrivals.length, departures: departures.length, active: activeStays.length, newReq: newRequests.length, overdue: overdueRequests.length, inProgress: inProgressRequests.length, consentMissing: consentMissing.length },
       };
     },
   });
