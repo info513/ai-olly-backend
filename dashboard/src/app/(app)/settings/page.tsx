@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Users, Sparkles, FileSignature, ArrowRight, Hammer } from "lucide-react";
+import { Building2, Users, Sparkles, FileSignature, ArrowRight, Hammer, PlugZap } from "lucide-react";
 import { useHotel } from "@/providers/hotel-provider";
 import { PageHeader } from "@/components/content/page-header";
 import { Card } from "@/components/ui/card";
@@ -21,6 +21,12 @@ const GROUPS: { title: string; items: { icon: typeof Building2; label: string; d
     items: [
       { icon: Sparkles, label: "Olly settings", desc: "Facts and approved wording Olly uses.", href: "/ai/configuration" },
       { icon: FileSignature, label: "Consent templates", desc: "Consent text, versions and administration.", href: "/consent/templates" },
+    ],
+  },
+  {
+    title: "Integrations",
+    items: [
+      { icon: PlugZap, label: "Property management (Rentlio)", desc: "Connect your PMS so reservations become stays. Admins only.", href: "/settings/integrations" },
     ],
   },
 ];
