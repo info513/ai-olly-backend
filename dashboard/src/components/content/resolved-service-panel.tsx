@@ -16,7 +16,7 @@ export function ResolvedServicePanel({ hotelId }: { hotelId?: string }) {
   return (
     <div>
       <div className="mb-3 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-ink-tertiary">
-        <Eye className="h-4 w-4" /> Resolved services — what guests get now
+        <Eye className="h-4 w-4" /> What guests see now
       </div>
       {isError ? (
         <ErrorState error={error} onRetry={() => refetch()} />

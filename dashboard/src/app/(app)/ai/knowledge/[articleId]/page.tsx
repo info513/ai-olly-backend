@@ -88,7 +88,7 @@ export default function ArticleEditor() {
   return (
     <div className="mx-auto max-w-[1200px] p-6 pb-24">
       <PageHeader
-        crumbs={[{ label: "AI", href: "/ai" }, { label: "Knowledge", href: "/ai/knowledge" }, { label: a.title }]}
+        crumbs={[{ label: "Olly", href: "/ai" }, { label: "What Olly knows", href: "/ai/knowledge" }, { label: a.title }]}
         title={<span className="flex items-center gap-3">{form.title || a.title} <StatusPill status={a.status} />{pending && <Badge tone="warning" dot>Unpublished changes</Badge>}</span>}
         subtitle={<span className="flex items-center gap-2"><ScopeBadge scope={a.source_type} /> <span className="font-mono text-[12px] text-ink-tertiary">{a.key}</span> · <span className="uppercase text-[12px] text-ink-tertiary">{a.locale}</span></span>}
         backHref="/ai/knowledge"

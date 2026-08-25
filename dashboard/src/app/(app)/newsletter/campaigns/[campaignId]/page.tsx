@@ -69,7 +69,7 @@ export default function CampaignDetail() {
   return (
     <div className="mx-auto max-w-[1100px] p-6">
       <PageHeader
-        crumbs={[{ label: "Newsletter", href: "/newsletter" }, { label: "Campaigns", href: "/newsletter/campaigns" }, { label: c.name }]}
+        crumbs={[{ label: "Marketing", href: "/newsletter" }, { label: "Campaigns", href: "/newsletter/campaigns" }, { label: c.name }]}
         title={<span className="flex items-center gap-3">{c.name} <CampaignStatusPill status={c.status} /></span>}
         subtitle={c.status === "scheduled" && c.scheduledAt ? `Scheduled for ${new Date(c.scheduledAt).toLocaleString()}` : c.status === "sent" && c.sentAt ? `Sent ${new Date(c.sentAt).toLocaleString()}` : undefined}
         backHref="/newsletter/campaigns"

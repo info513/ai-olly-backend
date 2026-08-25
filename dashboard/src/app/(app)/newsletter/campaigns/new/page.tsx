@@ -59,7 +59,7 @@ export default function NewCampaign() {
 
   return (
     <div className="mx-auto max-w-[820px] p-6">
-      <PageHeader crumbs={[{ label: "Newsletter", href: "/newsletter" }, { label: "Campaigns", href: "/newsletter/campaigns" }, { label: "New" }]} title="New campaign" subtitle="Pick a published template and a segment, preview the consent-filtered audience, then save a draft or schedule." backHref="/newsletter/campaigns" />
+      <PageHeader crumbs={[{ label: "Marketing", href: "/newsletter" }, { label: "Campaigns", href: "/newsletter/campaigns" }, { label: "New" }]} title="New campaign" subtitle="Pick a published template and a segment, preview the consent-filtered audience, then save a draft or schedule." backHref="/newsletter/campaigns" />
 
       {!canManage ? <PermissionDenied message="Only hotel admins and marketing can create campaigns." /> : (
         <div className="space-y-4">

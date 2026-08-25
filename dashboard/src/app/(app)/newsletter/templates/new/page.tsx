@@ -40,7 +40,7 @@ export default function NewTemplate() {
 
   return (
     <div className="mx-auto max-w-[720px] p-6">
-      <PageHeader crumbs={[{ label: "Newsletter", href: "/newsletter" }, { label: "Templates", href: "/newsletter/templates" }, { label: "New" }]} title="New template" subtitle="Starts as a draft. Publish to make it usable in campaigns." backHref="/newsletter/templates" />
+      <PageHeader crumbs={[{ label: "Marketing", href: "/newsletter" }, { label: "Email designs", href: "/newsletter/templates" }, { label: "New" }]} title="New template" subtitle="Starts as a draft. Publish to make it usable in campaigns." backHref="/newsletter/templates" />
       {!canManage ? <PermissionDenied message="Only hotel admins and marketing can create templates." /> : (
         <Card className="p-5">
           <div className="space-y-4">

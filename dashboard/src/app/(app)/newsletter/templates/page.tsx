@@ -22,7 +22,7 @@ export default function TemplatesList() {
   return (
     <div className="mx-auto max-w-[1000px] p-6">
       <PageHeader
-        crumbs={[{ label: "Newsletter", href: "/newsletter" }, { label: "Templates" }]}
+        crumbs={[{ label: "Marketing", href: "/newsletter" }, { label: "Email designs" }]}
         title="Email designs"
         subtitle="Structured email templates. Draft → publish → history; scheduled campaigns freeze their own snapshot."
         actions={canManage && <Link href="/newsletter/templates/new" className="inline-flex h-9 items-center gap-1.5 rounded-md bg-brand-cream px-3 text-[13px] font-semibold text-brand-navy hover:bg-brand-creamSoft"><Plus className="h-4 w-4" /> New template</Link>}

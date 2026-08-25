@@ -72,18 +72,27 @@ export default function ReceptionToday() {
           </div>
 
           <div className="grid gap-5 lg:grid-cols-2">
-            {/* Requests needing attention */}
-            <Section id="requests" title="Requests needing attention" count={d.overdueRequests.length + d.newRequests.length} href="/reception/requests">
-              {d.overdueRequests.length === 0 && d.newRequests.length === 0 ? (
-                <Empty>No new or overdue requests. </Empty>
-              ) : (
-                <div className="divide-y divide-border-subtle">
-                  {[...d.overdueRequests, ...d.newRequests.filter((n) => !d.overdueRequests.some((o) => o.id === n.id))].slice(0, 8).map((r) => (
-                    <RequestRow key={r.id} r={r} overdue={d.overdueRequests.some((o) => o.id === r.id)} busy={busy === r.id} onAction={advanceRequest} />
-                  ))}
-                </div>
-              )}
-            </Section>
+            {/* Requests needing attention — new + overdue that aren't already being
+                worked on (those live in the 'Being worked on' lane, so no duplicates). */}
+            {(() => {
+              const attention = [
+                ...d.overdueRequests.filter((r) => r.status !== "in_progress"),
+                ...d.newRequests.filter((n) => !d.overdueRequests.some((o) => o.id === n.id)),
+              ];
+              return (
+                <Section id="requests" title="Requests needing attention" count={attention.length} href="/reception/requests">
+                  {attention.length === 0 ? (
+                    <Empty>No new or overdue requests. </Empty>
+                  ) : (
+                    <div className="divide-y divide-border-subtle">
+                      {attention.slice(0, 8).map((r) => (
+                        <RequestRow key={r.id} r={r} overdue={d.overdueRequests.some((o) => o.id === r.id)} busy={busy === r.id} onAction={advanceRequest} />
+                      ))}
+                    </div>
+                  )}
+                </Section>
+              );
+            })()}
 
             {/* Being worked on */}
             <Section id="in-progress" title="Being worked on" count={d.inProgressRequests.length}>

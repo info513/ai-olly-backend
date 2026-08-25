@@ -77,7 +77,7 @@ export default function ServicesList() {
         {(["list", "resolved"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={cn("relative px-3 py-2 text-[13px] font-medium transition-colors", tab === t ? "text-ink-primary" : "text-ink-tertiary hover:text-ink-secondary")}>
-            {t === "list" ? "All services" : "Resolved preview"}
+            {t === "list" ? "All services" : "Guest view"}
             {tab === t && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand-cream" />}
           </button>
         ))}

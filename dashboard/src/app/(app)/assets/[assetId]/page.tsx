@@ -61,7 +61,7 @@ export default function AssetDetailPage() {
   return (
     <div className="mx-auto max-w-[1100px] p-6">
       <PageHeader
-        crumbs={[{ label: "Assets", href: "/assets" }, { label: a.displayName }]}
+        crumbs={[{ label: "Photos & Media", href: "/assets" }, { label: a.displayName }]}
         title={<span className="flex items-center gap-3">{form.displayName || a.displayName} <StatusBadge status={a.status} />{a.isPrivate && <PrivateBadge />}</span>}
         subtitle={<span className="flex items-center gap-2"><ScopeBadge scope={a.scope} /> {ASSET_TYPE_LABEL[a.assetType]}{a.mimeType ? ` · ${a.mimeType}` : ""}</span>}
         backHref="/assets"

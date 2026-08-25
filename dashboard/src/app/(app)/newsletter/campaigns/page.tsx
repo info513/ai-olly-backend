@@ -35,7 +35,7 @@ export default function CampaignsList() {
   return (
     <div className="mx-auto max-w-[1200px] p-6">
       <PageHeader
-        crumbs={[{ label: "Newsletter", href: "/newsletter" }, { label: "Campaigns" }]}
+        crumbs={[{ label: "Marketing", href: "/newsletter" }, { label: "Campaigns" }]}
         title="Campaigns"
         subtitle="Build, preview the consent-filtered audience, and schedule. Scheduling freezes a snapshot — no real send in this environment."
         actions={canManage && <Link href="/newsletter/campaigns/new" className="inline-flex h-9 items-center gap-1.5 rounded-md bg-brand-cream px-3 text-[13px] font-semibold text-brand-navy hover:bg-brand-creamSoft"><Plus className="h-4 w-4" /> New campaign</Link>}

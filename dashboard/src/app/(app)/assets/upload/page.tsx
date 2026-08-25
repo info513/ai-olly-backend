@@ -46,7 +46,7 @@ export default function UploadPage() {
   if (!canUploadMedia) {
     return (
       <div className="mx-auto max-w-[720px] p-6">
-        <PageHeader crumbs={[{ label: "Assets", href: "/assets" }, { label: "Upload" }]} title="Upload asset" backHref="/assets" />
+        <PageHeader crumbs={[{ label: "Photos & Media", href: "/assets" }, { label: "Upload" }]} title="Upload asset" backHref="/assets" />
         <PermissionDenied message="Your role can view assets but not upload media. Reception can capture consent signatures from the Consent flow." />
       </div>
     );
@@ -54,7 +54,7 @@ export default function UploadPage() {
 
   return (
     <div className="mx-auto max-w-[760px] p-6">
-      <PageHeader crumbs={[{ label: "Assets", href: "/assets" }, { label: "Upload" }]} title="Upload asset" subtitle="Add an image, document, audio, or an external video reference." backHref="/assets" />
+      <PageHeader crumbs={[{ label: "Photos & Media", href: "/assets" }, { label: "Upload" }]} title="Upload asset" subtitle="Add an image, document, audio, or an external video reference." backHref="/assets" />
       <div className="mb-4 flex items-center gap-1 border-b border-border-subtle">
         {(["file", "external"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={cn("relative px-3 py-2 text-[13px] font-medium transition-colors", tab === t ? "text-ink-primary" : "text-ink-tertiary hover:text-ink-secondary")}>

@@ -59,7 +59,7 @@ export default function TemplateEditor() {
   return (
     <div className="mx-auto max-w-[1200px] p-6 pb-24">
       <PageHeader
-        crumbs={[{ label: "Newsletter", href: "/newsletter" }, { label: "Templates", href: "/newsletter/templates" }, { label: t.name }]}
+        crumbs={[{ label: "Marketing", href: "/newsletter" }, { label: "Email designs", href: "/newsletter/templates" }, { label: t.name }]}
         title={<span className="flex items-center gap-3">{form.name || t.name} <StatusPill status={t.status} />{pending && <Badge tone="warning" dot>Unpublished changes</Badge>}</span>}
         subtitle={<span className="flex items-center gap-2">{isCanonical ? <Badge tone="brand">Platform</Badge> : <Badge tone="neutral">Hotel</Badge>} <span className="font-mono text-[12px] text-ink-tertiary">{t.key}</span> · <span className="uppercase text-[12px] text-ink-tertiary">{t.locale}</span></span>}
         backHref="/newsletter/templates"

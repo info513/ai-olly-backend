@@ -44,7 +44,7 @@ export default function SubscriberDetail() {
   return (
     <div className="mx-auto max-w-[1000px] p-6">
       <PageHeader
-        crumbs={[{ label: "Newsletter", href: "/newsletter" }, { label: "Subscribers", href: "/newsletter/subscribers" }, { label: s.email }]}
+        crumbs={[{ label: "Marketing", href: "/newsletter" }, { label: "Contacts", href: "/newsletter/subscribers" }, { label: s.email }]}
         title={<span className="flex items-center gap-3">{[s.firstName, s.lastName].filter(Boolean).join(" ") || s.email} <SubscriberStatusPill status={s.status} /></span>}
         subtitle={<span className="flex items-center gap-2"><ConsentPill state={s.consentState} /></span>}
         backHref="/newsletter/subscribers"

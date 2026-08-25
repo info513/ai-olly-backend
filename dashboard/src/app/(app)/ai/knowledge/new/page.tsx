@@ -47,7 +47,7 @@ export default function NewArticle() {
   return (
     <div className="mx-auto max-w-[720px] p-6">
       <PageHeader
-        crumbs={[{ label: "AI", href: "/ai" }, { label: "Knowledge", href: "/ai/knowledge" }, { label: "New article" }]}
+        crumbs={[{ label: "Olly", href: "/ai" }, { label: "What Olly knows", href: "/ai/knowledge" }, { label: "New article" }]}
         title="New knowledge article"
         subtitle="Starts as a draft — nothing reaches the AI until you publish."
         backHref="/ai/knowledge"

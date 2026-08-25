@@ -43,7 +43,7 @@ export default function SegmentDetail() {
   return (
     <div className="mx-auto max-w-[1000px] p-6">
       <PageHeader
-        crumbs={[{ label: "Newsletter", href: "/newsletter" }, { label: "Segments", href: "/newsletter/segments" }, { label: seg.name }]}
+        crumbs={[{ label: "Marketing", href: "/newsletter" }, { label: "Audiences", href: "/newsletter/segments" }, { label: seg.name }]}
         title={<span className="flex items-center gap-3">{seg.name} <SegmentTypeBadge type={seg.type} /></span>}
         subtitle={seg.type === "rule" ? ruleSummary(seg.rules) : `Static list · ${seg.key}`}
         backHref="/newsletter/segments"

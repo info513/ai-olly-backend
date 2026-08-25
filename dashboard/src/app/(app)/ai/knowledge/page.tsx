@@ -64,7 +64,7 @@ export default function KnowledgeList() {
   return (
     <div className="mx-auto max-w-[1200px] p-6">
       <PageHeader
-        crumbs={[{ label: "AI", href: "/ai" }, { label: "Knowledge" }]}
+        crumbs={[{ label: "Olly", href: "/ai" }, { label: "What Olly knows" }]}
         title="What Olly knows"
         subtitle="Everything Olly can tell guests — platform defaults, destination tips, and your hotel's own answers."
         actions={canAuthor(role) && <Link href="/ai/knowledge/new" className="inline-flex h-9 items-center gap-1.5 rounded-md bg-brand-cream px-3 text-[13px] font-semibold text-brand-navy hover:bg-brand-creamSoft"><Plus className="h-4 w-4" /> New article</Link>}

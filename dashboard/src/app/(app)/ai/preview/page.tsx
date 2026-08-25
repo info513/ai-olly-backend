@@ -40,7 +40,7 @@ export default function AiPreviewPage() {
   return (
     <div className="mx-auto max-w-[1200px] p-6">
       <PageHeader
-        crumbs={[{ label: "AI", href: "/ai" }, { label: "Preview" }]}
+        crumbs={[{ label: "Olly", href: "/ai" }, { label: "Try Olly" }]}
         title="Try Olly"
         subtitle="Ask a question and see exactly what Olly would answer — live vs your unpublished drafts. This never contacts the real guest assistant."
       />
