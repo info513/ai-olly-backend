@@ -47,7 +47,7 @@ export default function SubscribersList() {
     <div className="mx-auto max-w-[1200px] p-6">
       <PageHeader
         crumbs={[{ label: "Newsletter", href: "/newsletter" }, { label: "Subscribers" }]}
-        title="Subscribers"
+        title="Contacts"
         subtitle="Consent-linked marketing subscribers. A stay is never treated as consent."
         actions={canManage && <Button variant="primary" onClick={() => setNewOpen(true)}><Plus className="h-4 w-4" /> Add subscriber</Button>}
         backHref="/newsletter"

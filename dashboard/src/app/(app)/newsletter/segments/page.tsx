@@ -31,7 +31,7 @@ export default function SegmentsList() {
     <div className="mx-auto max-w-[1000px] p-6">
       <PageHeader
         crumbs={[{ label: "Newsletter", href: "/newsletter" }, { label: "Segments" }]}
-        title="Segments"
+        title="Audiences"
         subtitle="Audiences. Active marketing consent is always enforced at send time — no segment can override it."
         actions={canManage && <Button variant="primary" onClick={() => setNewOpen(true)}><Plus className="h-4 w-4" /> New segment</Button>}
         backHref="/newsletter"
