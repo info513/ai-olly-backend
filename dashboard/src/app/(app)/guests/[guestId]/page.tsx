@@ -3,11 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Mail, Phone, Globe, MapPin, ShieldOff, Copy, BedDouble, ConciergeBell, MessageSquare, FileSignature } from "lucide-react";
+import { Mail, Phone, Globe, MapPin, ShieldOff, Copy, BedDouble, ConciergeBell, MessageSquare, FileSignature, CalendarRange, Building2, LogIn, LogOut } from "lucide-react";
 import { useHotel } from "@/providers/hotel-provider";
 import { usePermissions } from "@/providers/permission-provider";
 import { useGuest, usePseudonymizeGuest, useDuplicateSuggestions } from "@/data/guests";
-import { useGuestStays } from "@/data/stays";
+import { useGuestStays, useUpdateStay } from "@/data/stays";
 import { useGuestRequests } from "@/data/reception";
 import { useGuestConsents } from "@/data/consents";
 import { useFeedback } from "@/data/feedback";
@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { relativeTime } from "@/lib/utils";
 
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : "—");
+const OPEN_REQ = ["new", "acknowledged", "in_progress"];
 
 export default function GuestProfile() {
   const { guestId } = useParams<{ guestId: string }>();
@@ -34,8 +35,10 @@ export default function GuestProfile() {
   const fbQ = useFeedback(currentHotel?.id);
   const dupQ = useDuplicateSuggestions(currentHotel?.id);
   const pseudonymize = usePseudonymizeGuest(currentHotel?.id);
+  const stayUpd = useUpdateStay(currentHotel?.id);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
+  const [busy, setBusy] = React.useState(false);
 
   const mayPseudonymize = role === "platform_admin" || role === "hotel_admin";
 
@@ -43,12 +46,21 @@ export default function GuestProfile() {
   if (gq.isLoading || !gq.data) return <div className="mx-auto max-w-[1100px] p-6"><SectionLoader rows={6} /></div>;
   const g = gq.data;
 
-  const stayIds = new Set((staysQ.data ?? []).map((s) => s.id));
+  const stays = staysQ.data ?? [];
+  const stayIds = new Set(stays.map((s) => s.id));
   const guestFeedback = (fbQ.data ?? []).filter((f) => f.stayId && stayIds.has(f.stayId));
-  const dups = (dupQ.data ?? []).filter((d) => (d.guestId === guestId || d.candidateGuestId === guestId) && d.status === "pending");
-  const activeStay = (staysQ.data ?? []).find((s) => s.status === "checked_in" || s.status === "reserved");
+  const dups = (dupQ.data ?? []).filter((dd) => (dd.guestId === guestId || dd.candidateGuestId === guestId) && dd.status === "pending");
+  // The stay that matters now: in-house first, then an upcoming reservation.
+  const activeStay = stays.find((s) => s.status === "checked_in") ?? stays.find((s) => s.status === "reserved");
   const latestConsent = (consentsQ.data ?? [])[0];
+  const consentGranted = latestConsent?.status === "granted";
+  const openReq = (reqQ.data ?? []).filter((r) => OPEN_REQ.includes(r.status));
+  const bookingSource = activeStay?.externalSource ?? g.externalSource ?? "Manual";
 
+  const runStay = async (fn: () => Promise<unknown>) => {
+    setErr(null); setBusy(true);
+    try { await fn(); } catch (e) { setErr(humanizeError(e)); } finally { setBusy(false); }
+  };
   const doPseudonymize = async () => {
     setErr(null);
     try { await pseudonymize.mutateAsync(guestId); setConfirmOpen(false); }
@@ -65,6 +77,22 @@ export default function GuestProfile() {
         actions={mayPseudonymize && !g.pseudonymized && <Button variant="ghost" onClick={() => setConfirmOpen(true)}><ShieldOff className="h-4 w-4" /> Pseudonymize</Button>}
       />
 
+      {/* Human-first summary: who, where, when, status — at a glance. */}
+      <div className="mb-5 flex flex-wrap items-center gap-2 text-[13px]">
+        {activeStay ? (
+          <>
+            <SummaryChip icon={BedDouble}>{activeStay.roomNumber ? `Room ${activeStay.roomNumber}` : "No room"}</SummaryChip>
+            <SummaryChip icon={CalendarRange}>{fmtDate(activeStay.arrivalAt)} – {fmtDate(activeStay.departureAt)}</SummaryChip>
+            <StayStatusPill status={activeStay.status} />
+          </>
+        ) : (
+          <span className="text-ink-tertiary">No current stay</span>
+        )}
+        <ConsentPill hasConsent={consentGranted} revoked={latestConsent?.status === "revoked"} />
+        {openReq.length > 0 && <SummaryChip icon={ConciergeBell} tone="warning">{openReq.length} open request{openReq.length > 1 ? "s" : ""}</SummaryChip>}
+        <SummaryChip icon={Building2}>{bookingSource}</SummaryChip>
+      </div>
+
       {err && <p className="mb-4 text-[12px] text-danger">{err}</p>}
       {dups.length > 0 && (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning-soft/30 px-4 py-3">
@@ -73,8 +101,34 @@ export default function GuestProfile() {
         </div>
       )}
 
+      {/* Current stay — the operational focus, with the actions reception needs. */}
+      {activeStay && (
+        <Card className="mb-6 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary">Current stay</div>
+              <div className="mt-1.5 flex items-center gap-2"><span className="font-display text-[18px] text-ink-primary">Room {activeStay.roomNumber ?? "—"}</span><StayStatusPill status={activeStay.status} /></div>
+              <div className="mt-1 text-[13px] text-ink-secondary">{fmtDate(activeStay.arrivalAt)} – {fmtDate(activeStay.departureAt)}</div>
+              <div className="mt-1 text-[12px] text-ink-tertiary">Booking source: {bookingSource}{activeStay.externalId ? ` · ${activeStay.externalId}` : ""}</div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {!consentGranted && (
+                <Button asChild variant="primary"><Link href={`/consent/capture/${activeStay.id}`}><FileSignature className="h-4 w-4" /> Capture consent</Link></Button>
+              )}
+              {activeStay.status === "reserved" && (
+                <Button variant={consentGranted ? "primary" : "secondary"} loading={busy} onClick={() => runStay(() => stayUpd.checkIn(activeStay.id))}><LogIn className="h-4 w-4" /> Check in</Button>
+              )}
+              {activeStay.status === "checked_in" && (
+                <Button variant="secondary" loading={busy} onClick={() => runStay(() => stayUpd.checkOut(activeStay.id))}><LogOut className="h-4 w-4" /> Check out</Button>
+              )}
+              <Button asChild variant="ghost"><Link href={`/stays/${activeStay.id}`}>Open stay</Link></Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-        {/* Left — identity */}
+        {/* Left — identity & consent state */}
         <div className="space-y-4">
           <Card className="p-5">
             <div className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-ink-tertiary">Contact</div>
@@ -96,7 +150,7 @@ export default function GuestProfile() {
             {consentsQ.isLoading ? <SectionLoader rows={1} /> : latestConsent ? (
               <div className="space-y-2">
                 <ConsentPill hasConsent={latestConsent.status === "granted"} revoked={latestConsent.status === "revoked"} />
-                <Link href={`/consent/${latestConsent.id}`} className="block text-[12px] text-ink-tertiary hover:text-ink-secondary">{latestConsent.consentType} v{latestConsent.consentVersion} · {fmtDate(latestConsent.signedAt)} →</Link>
+                <Link href={`/consent/${latestConsent.id}`} className="block text-[12px] text-ink-tertiary hover:text-ink-secondary">{latestConsent.consentType} v{latestConsent.consentVersion} · {fmtDate(latestConsent.signedAt)} → view signed record</Link>
               </div>
             ) : (
               <div className="space-y-2"><ConsentPill hasConsent={false} />{activeStay && <Link href={`/consent/capture/${activeStay.id}`} className="block text-[12px] font-medium text-brand-cream hover:underline">Capture consent →</Link>}</div>
@@ -104,14 +158,17 @@ export default function GuestProfile() {
           </Card>
         </div>
 
-        {/* Right — activity */}
+        {/* Right — stay history & contextual activity */}
         <div className="space-y-4">
-          <Panel icon={BedDouble} title="Stays" count={staysQ.data?.length}>
-            {staysQ.isLoading ? <SectionLoader rows={2} /> : (staysQ.data ?? []).length === 0 ? <Empty>No stays recorded.</Empty> : (
+          <Panel icon={BedDouble} title="Stay history" count={stays.length}>
+            {staysQ.isLoading ? <SectionLoader rows={2} /> : stays.length === 0 ? <Empty>No stays recorded.</Empty> : (
               <div className="divide-y divide-border-subtle">
-                {staysQ.data!.map((s) => (
+                {stays.map((s) => (
                   <Link key={s.id} href={`/stays/${s.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-overlay/40">
-                    <div className="min-w-0 flex-1"><div className="text-[13px] text-ink-primary">Room {s.roomNumber ?? "—"}</div><div className="text-[12px] text-ink-tertiary">{fmtDate(s.arrivalAt)} – {fmtDate(s.departureAt)}</div></div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] text-ink-primary">Room {s.roomNumber ?? "—"}</div>
+                      <div className="text-[12px] text-ink-tertiary">{fmtDate(s.arrivalAt)} – {fmtDate(s.departureAt)}{s.externalSource ? ` · ${s.externalSource}` : ""}</div>
+                    </div>
                     <StayStatusPill status={s.status} />
                   </Link>
                 ))}
@@ -133,7 +190,7 @@ export default function GuestProfile() {
             )}
           </Panel>
 
-          <Panel icon={FileSignature} title="Consent records" count={consentsQ.data?.length}>
+          <Panel icon={FileSignature} title="Consent & signatures" count={consentsQ.data?.length}>
             {consentsQ.isLoading ? <SectionLoader rows={1} /> : (consentsQ.data ?? []).length === 0 ? <Empty>No consent records.</Empty> : (
               <div className="divide-y divide-border-subtle">
                 {consentsQ.data!.map((c) => (
@@ -170,6 +227,15 @@ export default function GuestProfile() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function SummaryChip({ icon: Icon, children, tone }: { icon: typeof Mail; children: React.ReactNode; tone?: "warning" }) {
+  const cls = tone === "warning" ? "border-warning/40 text-warning" : "border-border-subtle text-ink-secondary";
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${cls}`}>
+      <Icon className="h-3.5 w-3.5" />{children}
+    </span>
   );
 }
 

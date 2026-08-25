@@ -24,6 +24,7 @@ const mapStay = (s: any): StaySummary => ({
   id: s.id, status: s.status as StayStatus, roomId: s.room_id, roomNumber: s.room?.room_number ?? null,
   guestId: s.guest_id, guestName: guestName(s.guest), arrivalAt: s.arrival_at, departureAt: s.departure_at,
   checkedInAt: s.checked_in_at, checkedOutAt: s.checked_out_at,
+  externalSource: s.external_source ?? null, externalId: s.external_id ?? null,
 });
 
 const STAY_SELECT = "id,hotel_id,room_id,guest_id,status,arrival_at,departure_at,checked_in_at,checked_out_at,external_source,external_id,created_at,updated_at, room:rooms(room_number), guest:guests(first_name,last_name,pseudonymized_at)";

@@ -60,6 +60,8 @@ export interface StaySummary {
   departureAt: string | null;
   checkedInAt: string | null;
   checkedOutAt: string | null;
+  externalSource: string | null;  // reservation source (Manual / Booking.com / Rentlio …)
+  externalId: string | null;      // external reservation id (Rentlio-ready)
 }
 
 export interface StayDetail extends StaySummary {
