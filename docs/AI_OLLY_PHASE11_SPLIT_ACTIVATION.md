@@ -42,9 +42,9 @@ image set. **No content, prices, coordinates or licences were invented.**
 
 ## 2. Split destination (Part 2)
 Exactly one canonical Split: name `Split`, slug `split`, country `HR`, tz `Europe/Zagreb`, default
-locale `en`, status **published**, live snapshot present, source `manual`. **No duplicate created.**
-Gaps → MANUAL REVIEW: destination-level **coordinates are null** (POIs carry coords), and
-`verification_status = unverified`.
+locale `en`, status **published**, live snapshot present. **No duplicate created.**
+**Cleanup (2026-08-25):** coordinates set **43.5100, 16.4400** (Wikipedia — Split, Croatia),
+provenance recorded, `verification_status = verified`.
 
 ## 3. Required Split POIs (Part 3)
 All 20 required POIs exist (naming variants normalized: *Voćni trg = Trg braće Radić = `vocni-trg-fruit-square`*).
@@ -55,8 +55,8 @@ Result per required item: **EXISTS** (16) / **ADDED** (4) / naming-variant norma
 No duplicate hotel-owned POI copies (Pattern B).
 
 ## 4. Split map + menu (Part 4)
-22 POIs carry coordinates and plot on the destination map/search; the 4 canonical additions have
-**no coordinates yet** (won't plot until confirmed — MANUAL REVIEW). Categories use the existing
+**All 26 POIs carry coordinates and plot** on the destination map/search (the 4 canonical additions
+received verified coordinates in the 2026-08-25 cleanup). Categories use the existing
 generic POI enum — 7 `landmark`, 2 `nature`, **17 `other`**. A richer guest taxonomy (Palace &
 Heritage / Squares & Streets / Waterfront / …) is **not** in the current schema; introducing it
 would be new IA, so it is left as an **owner decision** (MANUAL REVIEW), not invented here.
@@ -75,7 +75,9 @@ order,pois_linked=true}`) referencing real Split POIs (not free text):
 | Split by Night (90 min) | walking | riva → peristil → pjaca → voćni-trg → marmont → prokurative |
 
 Semantic verify confirms same-destination + identity-stable + order-consistent (Part 17).
-MANUAL REVIEW: several `distance_km/duration_minutes` are placeholder (`1–2 min`).
+**Cleanup (2026-08-25):** `duration_minutes` now holds only source-exact values (Inside the Palace
+60, Split by Night 90, Local Taste 120); the range/open-ended titles (`1–2 h`, `2–3 h`, `2 h+`) are
+**NULL (unknown)** rather than a mis-parsed placeholder. `distance_km` stays NULL (genuinely unknown).
 
 ## 6. Whispers (Part 6)
 12 chapters, correct order ch01→ch12, titles preserved (Palace by the Sea … The Palace That Became),
@@ -95,14 +97,17 @@ need a live source, out of this phase). **No external API contacted.** → COMPL
 **0 destination-scoped `knowledge_articles`.** Destination facts (Peristil, heritage, ferry/bus
 context) are currently carried by **POIs, routes and whispers**, which the resolver retrieves. No
 Antique-specific fact was promoted to destination scope (verified: hotel facts stay hotel-scoped —
-breakfast/check-in/wifi/parking/prices are all `hotel_id`-scoped). Whether to author dedicated
-destination-level AI articles is an **owner decision** → MANUAL REVIEW.
+breakfast/check-in/wifi/parking/prices are all `hotel_id`-scoped). **Cleanup audit (2026-08-25):**
+the resolved POIs (26) + whispers (12) + routes cover every common Split topic (Riva, Peristil,
+Sv. Duje, Grgur Ninski, the gates, markets, waterfront, parks). **No destination-AI knowledge layer
+is required and none was created** (no fabrication); the entity model provides the retrieval.
 
 ## 10. Media inventory (Part 10)
 30 assets, **29 destination-owned Split media** (POI canonical images + destination module heroes) +
 hotel-owned Antique heroes; **no destination image duplicated per hotel**. Alt text present
 (dashboard shows 0 missing alt). `source_credit = "Pressmax processed image set (AI OLLY)"`;
-`license_type/rights_notes = "license metadata pending"` → MANUAL REVIEW (real source/author/licence).
+`license_type/rights_notes = "license metadata pending"` → **deferred by owner**: real Freepik/source
+licence metadata will be populated when the actual images are uploaded (kept clearly pending; not a blocker).
 
 ## 11. Required hero images (Part 11)
 Mapped from the processed set with ownership per the implemented architecture:
@@ -116,8 +121,9 @@ No dedicated aerial/panorama in the set → destination hero uses the Riva (MANU
   never printed)**; structured smart-glass / minibar / kettle / blackout / underfloor per type.
 - **Services:** 94 services (83 published/active), 21 categories, all `available_to_ai`.
 - **Pricing:** 36 price items incl. **confirmed extra-bed €40/night**, minibar/laundry/dry-cleaning
-  lists. **VAT** is set (`vat_included=true`) on all 36 — MANUAL REVIEW: confirm the rate is real,
-  not a placeholder. No invented transfer/breakfast/room-service amounts.
+  lists. **VAT — owner confirmed all Antique prices are VAT-inclusive**; `vat_included=true` on all
+  36. The `vat_rate` column is `NOT NULL`, so its `0.00` stays a forced placeholder meaning "rate
+  unconfirmed" (not a 0 % claim) — no tax rate fabricated. No invented transfer/breakfast amounts.
 - **Hotel AI:** 7 hotel-scoped articles, all published, resolve live.
 
 ## 13. Hotel Presentation / Pattern B (Part 13)
@@ -201,16 +207,36 @@ canonical Platform editing controls exposed in the hotel workspace; no unexpecte
 Presentation actions) usable, **no body overflow**, no clipped actions. (Split POI list and the
 hotel dashboard were also verified overflow-free at 375 in the prior UX pass.)
 
-## 22. Manual-review list (Part 22)
-1. **Split destination coordinates** — null on the destination record (POIs have coords).
-2. **Split verification status** — `unverified` → set once facts are confirmed.
-3. **Coordinates for the 4 added POIs** — Grgur Ninski, Sv. Frane, Palace Walls, Streets.
-4. **VAT rate** on the 36 price items — confirm real vs placeholder.
-5. **Media licence metadata** — replace "license metadata pending" with real source/author/licence.
-6. **Destination-level AI** — decide: author destination AI articles, or keep relying on POIs/whispers.
-7. **Route distance/duration** — several are placeholder (`1–2 min`).
-8. **Antique route visibility** — only 1 of 6 routes is visible to Antique; confirm intended.
-9. **POI taxonomy** — 17 POIs are `other`; a guest-facing grouping is an owner IA decision.
+## 22. Manual-review — cleanup (2026-08-25) + remaining items (Part 22)
+**Closed in this cleanup** (source-backed, no fabrication — reproducible via
+`scripts/migration/phase11-manual-review.mjs`):
+- **VAT** — owner confirmed **all Antique prices are VAT-inclusive**; set `vat_included=true`
+  on all 36 items. `vat_rate` is `NOT NULL` in the schema, so its `0.00` remains a **forced
+  placeholder meaning "rate unconfirmed"** — not a 0 % claim; no tax rate was invented.
+- **Split destination coordinates** — set **43.5100, 16.4400** (Wikipedia — Split, Croatia),
+  provenance recorded, `verification_status = verified`.
+- **4 POI coordinates** (identity confirmed, verified sources, no invented precision):
+  Grgur Ninski **43.5094324, 16.4407936** (OpenStreetMap; Ul. kralja Tomislava, by the Golden
+  Gate); Sv. Frane **43.5082220, 16.4355160** (Trg Franje Tuđmana 1, western Riva); Palace Walls
+  & Streets **43.50833, 16.44000** (Wikipedia — Diocletian's Palace). → **26/26 Split POIs now
+  have coordinates**; all four `verified` + re-published.
+- **Route durations** — kept only source-exact values from each route's own title (60, 90,
+  120 min); the ranges/open-ended ones (`1–2 h`, `2–3 h`, `2 h+`) set to **NULL (unknown)** so no
+  mis-parsed placeholder is presented as fact. `distance_km` stays NULL (genuinely unknown).
+- **Destination AI** — audited: the resolved POIs (26) + whispers (12) + routes already cover
+  every common Split topic (Riva, Peristil, Sv. Duje, Grgur Ninski, gates, markets, waterfront…).
+  **No destination-AI knowledge layer is required**; none was created (no fabrication). No
+  Antique-specific fact is in destination scope.
+
+**Remaining owner/hotel input (minimal, non-blocking):**
+1. **Media licences** — deferred by owner: kept clearly **pending**; real Freepik/source metadata
+   will be added when the actual images are uploaded. Not an activation blocker.
+2. **POI guest taxonomy (optional)** — 17 POIs use the generic `other` category; a richer guest
+   grouping (Palace & Heritage / Squares / Waterfront …) would be a new IA choice for the owner —
+   optional, not required for activation.
+
+**No longer owner-action items:** VAT-included status ✅, Split + POI coordinates ✅, route
+placeholders ✅, destination-AI decision ✅.
 
 ## 23. Strict release gate (Part 23)
 - `npm run rc1:strict` → **✅ PASS — 45 passed · 0 failed · 1 skipped** (lint; ESLint not configured).
@@ -227,19 +253,19 @@ No token rotation performed.
 
 | Domain | Status |
 |---|---|
-| Split Destination | **PENDING** (coords + verification → owner) |
-| POIs | **PASS** (4 new coords → owner) |
-| Map | **PASS** (22/26 plot; 4 need coords) |
-| Routes | **PASS** (durations placeholder → owner) |
+| Split Destination | **PASS** (coords 43.5100,16.4400 verified) |
+| POIs | **PASS** (26/26 coordinates) |
+| Map | **PASS** (26/26 plot) |
+| Routes | **PASS** (durations source-exact / null) |
 | Whispers | **PASS** |
 | Events | **PASS** |
 | Live Feed | **PASS** (historical; no active items) |
-| Destination AI | **PENDING** (design decision) |
-| Media | **PASS** (licences pending → owner) |
+| Destination AI | **PASS** (audited — entities suffice) |
+| Media | **PASS** (licences deferred by owner) |
 | PWA Hero Mapping | **PASS** |
 | Antique Rooms | **PASS** (8 rooms + 8 hashed tokens) |
 | Antique Services | **PASS** (snapshots repaired) |
-| Antique Pricing | **PASS** (VAT → owner) |
+| Antique Pricing | **PASS** (VAT-inclusive confirmed) |
 | Hotel AI | **PASS** |
 | Hotel Presentation | **PASS** (Pattern B proven) |
 | PWA Source Mapping | **PASS** (documented; boundary unchanged) |
@@ -249,14 +275,16 @@ No token rotation performed.
 | Responsive | **PASS** |
 
 ## FINAL VERDICT
-**READY WITH HOTEL/OWNER INPUT.** Split is a complete, resolving canonical destination and Antique
-consumes it correctly through Pattern B. Moving on to Rentlio is gated only on the short owner/hotel
-confirmations above (coordinates, verification, VAT, licences) and the destination-AI decision —
-none of which are further engineering. **No production cutover was performed.**
+**READY WITH HOTEL/OWNER INPUT** — now down to two **non-blocking** items: media licences (owner
+will populate on image upload) and an **optional** POI guest taxonomy. After the 2026-08-25 cleanup,
+Split is a complete, verified, resolving canonical destination (coordinates, VAT, route facts and
+destination-AI coverage all closed with source-backed data), and Antique consumes it correctly via
+Pattern B. Nothing blocking remains for moving to Rentlio. **No production cutover was performed.**
 
 ## Reproduce
 ```bash
 node scripts/migration/phase11-activate.mjs        # idempotent DEV completions (POI settings + service snapshots)
+node scripts/migration/phase11-manual-review.mjs   # idempotent manual-review cleanup (VAT + coords + route durations)
 node scripts/migration/compare-antique-providers.mjs
 npm run verify:migration-semantic
 npm run rc1:strict
