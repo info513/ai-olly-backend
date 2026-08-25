@@ -5,11 +5,13 @@ import Link from "next/link";
 import {
   LogIn, LogOut, BedDouble, MessageSquareWarning, AlertTriangle, ShieldAlert, Sparkles, FileText,
   Images, Send, ArrowRight, Activity, ConciergeBell, PlusCircle, HeartPulse, Clock, CheckCircle2, ChevronRight,
+  Loader2, Wrench,
 } from "lucide-react";
 import { useHotel } from "@/providers/hotel-provider";
 import { usePermissions } from "@/providers/permission-provider";
-import { useReceptionToday, type TodayData, type RequestSummaryLike } from "@/data/reception";
-import type { RequestSummary } from "@/data/reception-types";
+import { useReceptionToday, useRequestActions, type TodayData, type RequestSummaryLike } from "@/data/reception";
+import type { RequestSummary, RequestStatus } from "@/data/reception-types";
+import { useUnanswered } from "@/data/unanswered";
 import { useHomeAi, useHomeContent } from "@/data/home";
 import { useAssetsSummary } from "@/data/assets";
 import { useNewsletterSummary } from "@/data/newsletter";
@@ -57,51 +59,60 @@ export default function HomePage() {
 
 // ── Role homes ────────────────────────────────────────────────────────────────
 
-/** Reception: the operational start of the shift — today's movements and what
- *  blocks a clean check-in/out, each row linking straight to the action. */
-function ReceptionHome({ hotelId }: { hotelId?: string }) {
+const NEXT_ACTION: Partial<Record<RequestStatus, { label: string; status: RequestStatus }>> = {
+  new: { label: "Acknowledge", status: "acknowledged" },
+  acknowledged: { label: "Begin", status: "in_progress" },
+  in_progress: { label: "Complete", status: "resolved" },
+};
+
+/** The shared operational block: a one-line pulse for context, then the named
+ *  people and problems that need a decision now — each with a direct action. */
+function OperationalAttention({ hotelId }: { hotelId?: string }) {
   const q = useReceptionToday(hotelId);
+  const actions = useRequestActions(hotelId);
   const d = q.data;
   const loading = q.isLoading || !d;
   const c = d?.counts;
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const advance = async (id: string, status: RequestStatus) => {
+    setBusy(id); try { await actions.setStatus.mutateAsync({ id, status }); } catch { /* react-query surfaces it */ } finally { setBusy(null); }
+  };
   return (
-    <div className="space-y-6">
-      {loading || !c ? <StatRow n={6} /> : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <Stat icon={LogIn} label="Arriving" value={c.arrivals} href="/reception#arrivals" tone={c.arrivals ? "info" : "muted"} />
-          <Stat icon={LogOut} label="Departing" value={c.departures} href="/reception#departures" tone={c.departures ? "info" : "muted"} />
-          <Stat icon={BedDouble} label="In house" value={c.active} href="/reception#active" tone="muted" />
-          <Stat icon={MessageSquareWarning} label="New requests" value={c.newReq} href="/reception/requests?filter=new" tone={c.newReq ? "warning" : "muted"} />
-          <Stat icon={AlertTriangle} label="Overdue" value={c.overdue} href="/reception/requests?filter=overdue" tone={c.overdue ? "danger" : "muted"} />
-          <Stat icon={ShieldAlert} label="Consent missing" value={c.consentMissing} href="/reception#consent" tone={c.consentMissing ? "warning" : "muted"} />
-        </div>
+    <div className="space-y-4">
+      {c && (
+        <p className="-mt-3 text-[13px] text-ink-tertiary">
+          {c.active} in house · {c.arrivals} arriving · {c.departures} departing today ·{" "}
+          <Link href="/reception" className="text-ink-secondary hover:text-ink-primary">Open Today →</Link>
+        </p>
       )}
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <MovementCard
-            title="Arrivals today" icon={LogIn} href="/reception#arrivals"
-            loading={loading} items={d?.arrivals ?? []} kind="arrival"
-            empty="No arrivals today." />
-          <MovementCard
-            title="Departures today" icon={LogOut} href="/reception#departures"
-            loading={loading} items={d?.departures ?? []} kind="departure"
-            empty="No departures today." />
-        </div>
-        <div className="space-y-6">
-          <AttentionCard loading={loading} data={d} />
-          <QuickActions role="reception" canWrite />
-        </div>
-      </div>
+      <NeedsAttentionNow loading={loading} data={d} busy={busy} onAdvance={advance} />
     </div>
   );
 }
 
-/** Hotel admin: the broad operational overview across the whole hotel. */
+/** Reception: the shift starts with concrete people and problems, then today's
+ *  movements — not a wall of counts. */
+function ReceptionHome({ hotelId }: { hotelId?: string }) {
+  const q = useReceptionToday(hotelId);
+  const d = q.data;
+  const loading = q.isLoading || !d;
+  return (
+    <div className="space-y-6">
+      <OperationalAttention hotelId={hotelId} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <MovementCard title="Arrivals today" icon={LogIn} href="/reception#arrivals" loading={loading} items={d?.arrivals ?? []} kind="arrival" empty="No arrivals today." />
+        <MovementCard title="Departures today" icon={LogOut} href="/reception#departures" loading={loading} items={d?.departures ?? []} kind="departure" empty="No departures today." />
+      </div>
+      <QuickActions role="reception" canWrite />
+    </div>
+  );
+}
+
+/** Hotel admin: leads with the same concrete worklist, then a broader overview. */
 function AdminHome({ hotelId, role }: { hotelId?: string; role: string | null }) {
   return (
     <div className="space-y-6">
-      <TodaySection hotelId={hotelId} />
+      <OperationalAttention hotelId={hotelId} />
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <AiSection hotelId={hotelId} />
@@ -120,36 +131,98 @@ function AdminHome({ hotelId, role }: { hotelId?: string; role: string | null })
   );
 }
 
-/** Editor: content to finish and questions Olly couldn't answer. */
+/** Editor: leads with the actual questions Olly couldn't answer (a worklist, each
+ *  linking to where you write the answer), then content still needing work. */
 function EditorHome({ hotelId }: { hotelId?: string }) {
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <div className="space-y-6 lg:col-span-2">
-        <ContentSection hotelId={hotelId} />
-        <AiSection hotelId={hotelId} />
-        <AssetsSection hotelId={hotelId} />
-      </div>
-      <div className="space-y-6">
-        <QuickActions role="editor" canWrite />
-        <RecentActivitySection hotelId={hotelId} />
+    <div className="space-y-6">
+      <UnansweredWorklist hotelId={hotelId} />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <ContentSection hotelId={hotelId} />
+          <AssetsSection hotelId={hotelId} />
+        </div>
+        <div className="space-y-6">
+          <QuickActions role="editor" canWrite />
+          <RecentActivitySection hotelId={hotelId} />
+        </div>
       </div>
     </div>
   );
 }
 
-/** Marketing: campaign state, audience and consent health. */
+/** Real unanswered guest questions with a direct 'Answer' action — not a count. */
+function UnansweredWorklist({ hotelId }: { hotelId?: string }) {
+  const q = useUnanswered(hotelId);
+  const open = (q.data ?? []).filter((u: any) => !u.resolution_article_id).slice(0, 6);
+  return (
+    <ListCard title="Questions Olly couldn't answer" icon={MessageSquareWarning} href="/ai/unanswered" count={q.isLoading ? undefined : open.length}>
+      {q.isLoading ? <RowsSkeleton n={3} /> : open.length === 0 ? (
+        <div className="flex items-center gap-2 px-4 py-8 text-[13px] text-ink-tertiary"><CheckCircle2 className="h-4 w-4 text-success" /> Olly has an answer for every recent question.</div>
+      ) : (
+        <ul className="divide-y divide-border-subtle">
+          {open.map((u: any) => (
+            <li key={u.id} className="flex items-center gap-3 px-4 py-2.5">
+              <MessageSquareWarning className="h-4 w-4 shrink-0 text-warning" />
+              <Link href="/ai/unanswered" className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-medium text-ink-primary">{u.original_question || u.normalized_question || "Guest question"}</span>
+                <span className="block truncate text-[12px] text-ink-tertiary">Asked {u.occurrence_count ?? 1}×</span>
+              </Link>
+              <Link href="/ai/knowledge/new" className="shrink-0 rounded-md bg-brand-cream px-2.5 py-1.5 text-[12px] font-semibold text-brand-navy transition-colors hover:bg-brand-creamSoft">Answer</Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </ListCard>
+  );
+}
+
+/** Marketing: the actual last campaign and any consent issue blocking a send —
+ *  each with a direct action — ahead of supporting numbers. */
 function MarketingHome({ hotelId }: { hotelId?: string }) {
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <div className="space-y-6 lg:col-span-2">
-        <NewsletterSection hotelId={hotelId} />
-        <AssetsSection hotelId={hotelId} />
-      </div>
-      <div className="space-y-6">
-        <QuickActions role="marketing" canWrite />
-        <RecentActivitySection hotelId={hotelId} />
+    <div className="space-y-6">
+      <MarketingLead hotelId={hotelId} />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <AssetsSection hotelId={hotelId} />
+        </div>
+        <div className="space-y-6">
+          <QuickActions role="marketing" canWrite />
+          <RecentActivitySection hotelId={hotelId} />
+        </div>
       </div>
     </div>
+  );
+}
+
+function MarketingLead({ hotelId }: { hotelId?: string }) {
+  const q = useNewsletterSummary(hotelId);
+  const d = q.data;
+  return (
+    <ListCard title="Campaigns" icon={Send} href="/newsletter">
+      {q.isLoading || !d ? <RowsSkeleton n={2} /> : (
+        <div className="space-y-2.5 p-4">
+          {d.lastCampaign ? (
+            <Link href={`/newsletter/campaigns/${d.lastCampaign.id}`} className="flex items-center gap-3 rounded-md border border-border-subtle px-3 py-2.5 transition-colors hover:border-border-strong">
+              <Send className="h-4 w-4 shrink-0 text-ink-tertiary" />
+              <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium text-ink-primary">{d.lastCampaign.name}</span><span className="block truncate text-[12px] text-ink-tertiary">Last campaign · {d.lastCampaign.status}</span></span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-ink-tertiary" />
+            </Link>
+          ) : (
+            <p className="px-1 py-2 text-[13px] text-ink-tertiary">No campaigns yet.</p>
+          )}
+          {d.consentMissing > 0 && (
+            <div className="flex items-center gap-3 rounded-md border border-warning/40 bg-warning-soft/20 px-3 py-2.5">
+              <ShieldAlert className="h-4 w-4 shrink-0 text-warning" />
+              <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium text-ink-primary">{d.consentMissing} contact{d.consentMissing > 1 ? "s" : ""} need consent</span><span className="block truncate text-[12px] text-ink-tertiary">Can't be emailed until resolved</span></span>
+              <Link href="/newsletter/subscribers?filter=consent-missing" className="shrink-0 rounded-md border border-border-strong px-2.5 py-1.5 text-[12px] font-medium text-ink-secondary transition-colors hover:text-ink-primary">Review</Link>
+            </div>
+          )}
+          <Link href="/newsletter/campaigns/new" className="flex items-center justify-center gap-1.5 rounded-md bg-brand-cream px-3 py-2 text-[13px] font-semibold text-brand-navy transition-colors hover:bg-brand-creamSoft"><Send className="h-4 w-4" /> New campaign</Link>
+        </div>
+      )}
+    </ListCard>
   );
 }
 
@@ -230,32 +303,35 @@ function MovementCard({
 
 /** Everything that needs a decision now: overdue and new requests, plus stays in
  *  house without consent. Each links straight to where the work happens. */
-function AttentionCard({ loading, data }: { loading: boolean; data?: TodayData }) {
+/** The hero of the reception Home: concrete people and problems, each with the one
+ *  direct action that resolves it — a named worklist, not a counter. */
+function NeedsAttentionNow({ loading, data, busy, onAdvance }: {
+  loading: boolean; data?: TodayData; busy: string | null; onAdvance: (id: string, status: RequestStatus) => void;
+}) {
   const overdue = data?.overdueRequests ?? [];
   const fresh = (data?.newRequests ?? []).filter((r) => !overdue.some((o) => o.id === r.id));
   const consent = data?.consentMissing ?? [];
-  const nothing = !loading && overdue.length === 0 && fresh.length === 0 && consent.length === 0;
+  const total = overdue.length + fresh.length + consent.length;
+  const nothing = !loading && total === 0;
 
   return (
-    <ListCard title="Needs attention" icon={AlertTriangle}>
+    <ListCard title="Needs attention now" icon={AlertTriangle} count={loading ? undefined : total}>
       {loading ? <RowsSkeleton n={3} /> : nothing ? (
-        <div className="flex items-center gap-2 px-4 py-6 text-[13px] text-ink-tertiary">
-          <CheckCircle2 className="h-4 w-4 text-success" /> You're all caught up.
+        <div className="flex items-center gap-2 px-4 py-8 text-[13px] text-ink-tertiary">
+          <CheckCircle2 className="h-4 w-4 text-success" /> You're all caught up — no requests or consent gaps right now.
         </div>
       ) : (
         <ul className="divide-y divide-border-subtle">
-          {overdue.map((r) => <RequestRow key={r.id} r={r} tone="danger" note="Overdue" />)}
-          {fresh.map((r) => <RequestRow key={r.id} r={r} tone="warning" note="New" />)}
+          {overdue.map((r) => <RequestAttnRow key={r.id} r={r} note="Overdue" tone="danger" busy={busy === r.id} onAdvance={onAdvance} />)}
+          {fresh.map((r) => <RequestAttnRow key={r.id} r={r} note="New" tone="warning" busy={busy === r.id} onAdvance={onAdvance} />)}
           {consent.map((s) => (
-            <li key={`c-${s.stayId}`}>
-              <Link href={`/consent/capture/${s.stayId}`} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-surface-overlay/40">
-                <ShieldAlert className="h-4 w-4 shrink-0 text-warning" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] text-ink-primary">Consent missing</span>
-                  <span className="block truncate text-[12px] text-ink-tertiary">{[s.roomNumber ? `Room ${s.roomNumber}` : null, s.guestName].filter(Boolean).join(" · ") || "In-house guest"}</span>
-                </span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-ink-tertiary" />
+            <li key={`c-${s.stayId}`} className="flex items-center gap-3 px-4 py-2.5">
+              <ShieldAlert className="h-4 w-4 shrink-0 text-warning" />
+              <Link href={`/stays/${s.stayId}`} className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-medium text-ink-primary">{s.guestName ?? "In-house guest"}{s.roomNumber ? ` · Room ${s.roomNumber}` : ""}</span>
+                <span className="block truncate text-[12px] text-ink-tertiary">Consent missing</span>
               </Link>
+              <Link href={`/consent/capture/${s.stayId}`} className="shrink-0 rounded-md bg-brand-cream px-2.5 py-1.5 text-[12px] font-semibold text-brand-navy transition-colors hover:bg-brand-creamSoft">Capture consent</Link>
             </li>
           ))}
         </ul>
@@ -264,42 +340,29 @@ function AttentionCard({ loading, data }: { loading: boolean; data?: TodayData }
   );
 }
 
-function RequestRow({ r, tone, note }: { r: RequestSummary; tone: "danger" | "warning"; note: string }) {
+function RequestAttnRow({ r, note, tone, busy, onAdvance }: {
+  r: RequestSummary; note: string; tone: "danger" | "warning"; busy: boolean; onAdvance: (id: string, status: RequestStatus) => void;
+}) {
   const dot = tone === "danger" ? "text-danger" : "text-warning";
+  const next = NEXT_ACTION[r.status];
   return (
-    <li>
-      <Link href={`/reception/requests/${r.id}`} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-surface-overlay/40">
-        <MessageSquareWarning className={`h-4 w-4 shrink-0 ${dot}`} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] text-ink-primary">{r.title || "Request"}</span>
-          <span className="block truncate text-[12px] text-ink-tertiary">{[note, r.roomNumber ? `Room ${r.roomNumber}` : null].filter(Boolean).join(" · ")}</span>
-        </span>
-        <ChevronRight className="h-4 w-4 shrink-0 text-ink-tertiary" />
+    <li className="flex items-center gap-3 px-4 py-2.5">
+      <MessageSquareWarning className={`h-4 w-4 shrink-0 ${dot}`} />
+      <Link href={`/reception/requests/${r.id}`} className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium text-ink-primary">{r.title || "Request"}</span>
+        <span className="block truncate text-[12px] text-ink-tertiary">{[note, r.roomNumber ? `Room ${r.roomNumber}` : null].filter(Boolean).join(" · ")}</span>
       </Link>
+      {next && (
+        <button type="button" disabled={busy} onClick={() => onAdvance(r.id, next.status)}
+          className="inline-flex h-8 min-w-[92px] shrink-0 items-center justify-center gap-1.5 rounded-md bg-brand-cream px-2.5 text-[12px] font-semibold text-brand-navy transition-colors hover:bg-brand-creamSoft disabled:opacity-60">
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <>{next.status === "in_progress" && <Wrench className="h-3.5 w-3.5" />}{next.label}</>}
+        </button>
+      )}
     </li>
   );
 }
 
 // ── KPI-style sections (admin / editor / marketing / read-only) ────────────────
-function TodaySection({ hotelId }: { hotelId?: string }) {
-  const q = useReceptionToday(hotelId);
-  const c = q.data?.counts;
-  return (
-    <Section title="Today" href="/reception" cta="Open reception">
-      {q.isLoading || !c ? <StatRow n={6} /> : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <Stat icon={LogIn} label="Arriving" value={c.arrivals} href="/reception#arrivals" tone={c.arrivals ? "info" : "muted"} />
-          <Stat icon={LogOut} label="Departing" value={c.departures} href="/reception#departures" tone={c.departures ? "info" : "muted"} />
-          <Stat icon={BedDouble} label="In house" value={c.active} href="/reception#active" tone="muted" />
-          <Stat icon={MessageSquareWarning} label="New requests" value={c.newReq} href="/reception/requests?filter=new" tone={c.newReq ? "warning" : "muted"} />
-          <Stat icon={AlertTriangle} label="Overdue" value={c.overdue} href="/reception/requests?filter=overdue" tone={c.overdue ? "danger" : "muted"} />
-          <Stat icon={ShieldAlert} label="Consent missing" value={c.consentMissing} href="/reception#consent" tone={c.consentMissing ? "warning" : "muted"} />
-        </div>
-      )}
-    </Section>
-  );
-}
-
 function AiSection({ hotelId }: { hotelId?: string }) {
   const q = useHomeAi(hotelId);
   const d = q.data;
