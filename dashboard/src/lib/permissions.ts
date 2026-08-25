@@ -33,9 +33,12 @@ export const MODULE_ACCESS: Record<string, Role[]> = {
   guests: ["platform_admin", "hotel_admin", "reception"],
   stays: ["platform_admin", "hotel_admin", "reception"],
   consent: ["platform_admin", "hotel_admin", "reception"],
-  assets: ["platform_admin", "hotel_admin", "editor", "marketing", "reception", "read_only"],
-  newsletter: ["platform_admin", "hotel_admin", "marketing", "editor", "reception", "read_only"],
-  analytics: ["platform_admin", "hotel_admin", "reception", "editor", "marketing", "read_only"],
+  // Photos & Media lives under Hotel Content — reception no longer needs it in their rail.
+  assets: ["platform_admin", "hotel_admin", "editor", "marketing", "read_only"],
+  // Marketing is a marketing/admin job — not part of Reception or Editor daily work.
+  newsletter: ["platform_admin", "hotel_admin", "marketing", "read_only"],
+  // Insights (analytics) is not Reception's operational surface; they work from Today.
+  analytics: ["platform_admin", "hotel_admin", "editor", "marketing", "read_only"],
   settings: ["platform_admin", "hotel_admin"],
 };
 
