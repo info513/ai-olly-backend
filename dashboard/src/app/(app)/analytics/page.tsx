@@ -33,7 +33,7 @@ export default function AnalyticsOverview() {
   const ch = latest(content.data ?? []);
 
   return (
-    <AnalyticsShell title="Analytics" subtitle={`Overview for ${range.label.toLowerCase()}.`}>
+    <AnalyticsShell title="Insights" subtitle={`Overview for ${range.label.toLowerCase()}.`}>
       {/* Hotel health banner */}
       <Link href="/analytics/health" className="mb-5 block">
         <Card className="flex items-center gap-4 p-5 transition-colors hover:border-border-strong">

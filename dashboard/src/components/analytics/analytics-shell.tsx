@@ -10,12 +10,12 @@ import { cn } from "@/lib/utils";
 const TABS: { href: string; label: string; roles?: string[] }[] = [
   { href: "/analytics", label: "Overview" },
   { href: "/analytics/health", label: "Hotel Health" },
-  { href: "/analytics/ai", label: "AI", roles: ["platform_admin", "hotel_admin", "editor", "read_only"] },
-  { href: "/analytics/content", label: "Content", roles: ["platform_admin", "hotel_admin", "editor", "read_only"] },
+  { href: "/analytics/ai", label: "Olly", roles: ["platform_admin", "hotel_admin", "editor", "read_only"] },
+  { href: "/analytics/content", label: "Hotel Content", roles: ["platform_admin", "hotel_admin", "editor", "read_only"] },
   { href: "/analytics/reception", label: "Reception", roles: ["platform_admin", "hotel_admin", "reception", "read_only"] },
   { href: "/analytics/stays", label: "Guests & Stays", roles: ["platform_admin", "hotel_admin", "reception", "read_only"] },
-  { href: "/analytics/assets", label: "Assets" },
-  { href: "/analytics/newsletter", label: "Newsletter", roles: ["platform_admin", "hotel_admin", "marketing", "read_only"] },
+  { href: "/analytics/assets", label: "Photos", roles: ["platform_admin", "hotel_admin", "editor", "marketing", "read_only"] },
+  { href: "/analytics/newsletter", label: "Marketing", roles: ["platform_admin", "hotel_admin", "marketing", "read_only"] },
 ];
 
 /** Range from the URL (?range, ?from, ?to). Shared across analytics tabs. */

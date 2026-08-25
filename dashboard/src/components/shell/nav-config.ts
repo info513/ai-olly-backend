@@ -109,7 +109,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Settings",
     href: "/settings",
     icon: Settings,
-    ready: false,
+    ready: true,
   },
 ];
 
