@@ -35,7 +35,7 @@ export default function AiQualityPage() {
     <div className="mx-auto max-w-[1100px] p-6">
       <PageHeader
         crumbs={[{ label: "AI", href: "/ai" }, { label: "Quality" }]}
-        title="AI Quality"
+        title="Olly performance"
         subtitle="Measured from real logs and your live knowledge. Every number shows the exact formula it came from — no mystery scores."
       />
 

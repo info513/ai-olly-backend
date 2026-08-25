@@ -41,8 +41,8 @@ export default function AiPreviewPage() {
     <div className="mx-auto max-w-[1200px] p-6">
       <PageHeader
         crumbs={[{ label: "AI", href: "/ai" }, { label: "Preview" }]}
-        title="Test the AI"
-        subtitle="Ask a question and see exactly what the AI would answer — Live vs your unpublished drafts. This never contacts the production guest assistant."
+        title="Try Olly"
+        subtitle="Ask a question and see exactly what Olly would answer — live vs your unpublished drafts. This never contacts the real guest assistant."
       />
 
       <Card className="p-5">

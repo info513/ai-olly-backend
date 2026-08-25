@@ -40,11 +40,11 @@ export default function AiHome() {
   return (
     <div className="mx-auto max-w-[1200px] p-6">
       <PageHeader
-        title="AI"
-        subtitle={`How ${currentHotel?.name ?? "your hotel"}'s AI concierge answers guests — knowledge, coverage and quality.`}
+        title="Olly"
+        subtitle={`How Olly answers ${currentHotel?.name ?? "your hotel"}'s guests — what it knows, what it couldn't answer, and a place to try it.`}
         actions={
           <div className="flex items-center gap-2">
-            <Link href="/ai/preview" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border-strong px-3 text-[13px] font-medium text-ink-secondary hover:text-ink-primary"><PlayCircle className="h-4 w-4" /> Test the AI</Link>
+            <Link href="/ai/preview" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border-strong px-3 text-[13px] font-medium text-ink-secondary hover:text-ink-primary"><PlayCircle className="h-4 w-4" /> Try Olly</Link>
             {canAuthor && <Link href="/ai/knowledge/new" className="inline-flex h-9 items-center gap-1.5 rounded-md bg-brand-cream px-3 text-[13px] font-semibold text-brand-navy hover:bg-brand-creamSoft"><Plus className="h-4 w-4" /> Add answer</Link>}
           </div>
         }
@@ -52,14 +52,14 @@ export default function AiHome() {
 
       {/* Priority metric row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric icon={Gauge} tone="info" label="Knowledge coverage" value={loading ? null : pct(coverage.value)}
+        <Metric icon={Gauge} tone="info" label="What Olly can answer" value={loading ? null : pct(coverage.value)}
           hint={`${coverage.resolvedCount} live answers · ${coverage.openUnanswered} open gaps`} href="/ai/quality" />
-        <Metric icon={MessageSquareWarning} tone={health.unresolvedUnanswered ? "warning" : "neutral"} label="Unanswered questions"
+        <Metric icon={MessageSquareWarning} tone={health.unresolvedUnanswered ? "warning" : "neutral"} label="Questions Olly couldn't answer"
           value={loading ? null : String(health.unresolvedUnanswered)} hint="Guest questions with no answer yet" href="/ai/unanswered" />
-        <Metric icon={Sparkles} tone="neutral" label="Safe handoff rate" value={qualityQ.isLoading ? null : pct(handoff)}
-          hint="Questions routed to a human" href="/ai/quality" />
-        <Metric icon={AlertTriangle} tone={health.expiredCritical ? "danger" : "neutral"} label="Expired critical knowledge"
-          value={loading ? null : String(health.expiredCritical)} hint="Critical articles past their validity" href="/ai/knowledge?filter=expired-critical" />
+        <Metric icon={Sparkles} tone="neutral" label="Handed to reception" value={qualityQ.isLoading ? null : pct(handoff)}
+          hint="Questions Olly passed to a person" href="/ai/quality" />
+        <Metric icon={AlertTriangle} tone={health.expiredCritical ? "danger" : "neutral"} label="Answers past their date"
+          value={loading ? null : String(health.expiredCritical)} hint="Important answers that need refreshing" href="/ai/knowledge?filter=expired-critical" />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -69,7 +69,7 @@ export default function AiHome() {
           <div className="space-y-2.5">
             <AttentionRow icon={FileText} label="Drafts to review" value={loading ? null : health.draftCount} href="/ai/knowledge?status=draft" />
             <AttentionRow icon={AlertTriangle} label="Critical, not yet published" value={loading ? null : health.criticalPending} href="/ai/knowledge?filter=critical-pending" tone={health.criticalPending ? "danger" : undefined} />
-            <AttentionRow icon={Sparkles} label="AI-visible, missing approved answer" value={loading ? null : health.missingApprovedAnswer} href="/ai/knowledge?filter=missing-answer" tone={health.missingApprovedAnswer ? "warning" : undefined} />
+            <AttentionRow icon={Sparkles} label="Shown to guests, no approved answer" value={loading ? null : health.missingApprovedAnswer} href="/ai/knowledge?filter=missing-answer" tone={health.missingApprovedAnswer ? "warning" : undefined} />
           </div>
         </Card>
 
@@ -97,10 +97,10 @@ export default function AiHome() {
         <Card className="p-5">
           <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary">Quick actions</div>
           <div className="space-y-2">
-            <QuickAction icon={PlayCircle} label="Test the AI" desc="Ask a question, see the live answer" href="/ai/preview" />
-            {canAuthor && <QuickAction icon={Plus} label="Add an answer" desc="Create a new knowledge article" href="/ai/knowledge/new" />}
-            <QuickAction icon={MessageSquareWarning} label="Review unanswered" desc="Turn gaps into answers" href="/ai/unanswered" />
-            <QuickAction icon={BookOpen} label="Browse knowledge" desc="All articles, filters & search" href="/ai/knowledge" />
+            <QuickAction icon={PlayCircle} label="Try Olly" desc="Ask a question, see the live answer" href="/ai/preview" />
+            {canAuthor && <QuickAction icon={Plus} label="Add an answer" desc="Teach Olly something new" href="/ai/knowledge/new" />}
+            <QuickAction icon={MessageSquareWarning} label="Questions Olly couldn't answer" desc="Turn gaps into answers" href="/ai/unanswered" />
+            <QuickAction icon={BookOpen} label="What Olly knows" desc="Everything Olly can tell guests" href="/ai/knowledge" />
           </div>
         </Card>
       </div>

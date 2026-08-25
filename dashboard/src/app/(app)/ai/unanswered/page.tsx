@@ -44,8 +44,8 @@ export default function UnansweredPage() {
     <div className="mx-auto max-w-[1000px] p-6">
       <PageHeader
         crumbs={[{ label: "AI", href: "/ai" }, { label: "Unanswered" }]}
-        title="Unanswered questions"
-        subtitle="Guest questions the AI couldn't answer, grouped and de-duplicated. Turn each gap into a published answer."
+        title="Questions Olly couldn't answer"
+        subtitle="Guest questions Olly couldn't answer, grouped and de-duplicated. Turn each gap into a published answer."
       />
 
       <div className="mb-4 flex flex-wrap gap-1.5">

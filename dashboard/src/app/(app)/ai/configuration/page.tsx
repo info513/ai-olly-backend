@@ -66,8 +66,8 @@ export default function AiConfigurationPage() {
     <div className="mx-auto max-w-[860px] p-6 pb-24">
       <PageHeader
         crumbs={[{ label: "AI", href: "/ai" }, { label: "Configuration" }]}
-        title="AI Configuration"
-        subtitle="Facts and approved wording your AI uses."
+        title="Olly settings"
+        subtitle="Facts and approved wording Olly uses."
         actions={configQ.data && <span className="flex items-center gap-2"><StatusPill status={configQ.data.status} />{mayEdit && <Button variant="primary" onClick={doPublish} loading={publish.isPending}><UploadCloud className="h-4 w-4" /> Publish</Button>}</span>}
       />
 
