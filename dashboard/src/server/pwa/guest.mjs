@@ -10,7 +10,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "node:crypto";
 
-function sb() {
+export function sb() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) { const e = new Error("Supabase env not configured."); e.status = 500; throw e; }
@@ -50,7 +50,7 @@ function tokenOk(provided, stored) {
 }
 
 /** Resolve hotel + room + room-type and validate the token. Returns ctx or null (→403). */
-async function authGuest(client, slug, roomNumber, token) {
+export async function authGuest(client, slug, roomNumber, token) {
   const hotel = unwrap(await client.from("hotels").select("id,name,slug,settings").eq("slug", slug).maybeSingle(), "hotel");
   if (!hotel) return null;
   const room = unwrap(await client.from("rooms").select("*").eq("hotel_id", hotel.id).eq("room_number", String(roomNumber)).eq("active", true).maybeSingle(), "room");
@@ -225,4 +225,61 @@ export async function splitToday({ slug } = {}) {
     else upcoming.push(map(e));
   }
   return { status: 200, body: { ok: true, today, thisWeek, upcoming } };
+}
+
+// ── guest actions (writes) ───────────────────────────────────────────────────
+const PRIORITY = { low: "low", normal: "normal", high: "high", urgent: "urgent" };
+/** Map a human category label to the request_type slug the dashboard uses. */
+function requestTypeFrom(category) {
+  const c = String(category || "").toLowerCase();
+  if (/housekeep|towel|clean|linen|amenit/.test(c)) return "housekeeping";
+  if (/maint|repair|broken|leak|fix|aircon|ac |heating/.test(c)) return "maintenance";
+  return "front_desk";
+}
+
+/** POST /api/pwa-request → create a guest request (shows up in the dashboard). { ok, requestId } */
+export async function createRequest(p) {
+  if (!p.room) return NOROOM;
+  if (!p.category) return { status: 400, body: { ok: false, error: "Missing category" } };
+  if (!p.message) return { status: 400, body: { ok: false, error: "Missing message" } };
+  const client = sb();
+  const ctx = await authGuest(client, p.slug, p.room, p.token);
+  if (!ctx) return DENIED;
+  // Fold concierge extras into the description so nothing is lost.
+  const extras = [
+    p.guestName && `Guest: ${p.guestName}`,
+    p.date && `Date: ${p.date}`, p.time && `Time: ${p.time}`,
+    p.from && `From: ${p.from}`, p.to && `To: ${p.to}`,
+    p.guests && `People: ${p.guests}`, p.partnerName && `Partner: ${p.partnerName}`,
+  ].filter(Boolean).join(" · ");
+  const description = [p.message, extras].filter(Boolean).join("\n\n");
+  const priority = PRIORITY[String(p.priority || "normal").toLowerCase()] || "normal";
+  const row = unwrap(await client.from("guest_requests").insert({
+    hotel_id: ctx.hotel.id, room_id: ctx.room.id,
+    request_type: requestTypeFrom(p.category), title: String(p.category).slice(0, 120),
+    description, priority, status: "new", source: "guest_pwa",
+  }).select("id").single(), "create_request");
+  return { status: 201, body: { ok: true, requestId: row.id } };
+}
+
+/** POST /api/pwa-feedback → post-checkout feedback. { ok, feedbackId } */
+export async function submitFeedback(p) {
+  if (!p.room) return NOROOM;
+  const client = sb();
+  const ctx = await authGuest(client, p.slug, p.room, p.token);
+  if (!ctx) return DENIED;
+  const toInt = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; };
+  const overall = toInt(p.overall);
+  // feedback table has rating+message only (no per-dimension columns) — fold sub-scores into the message.
+  const subs = [
+    p.room_score != null && `Room ${toInt(p.room_score)}`, p.staff != null && `Staff ${toInt(p.staff)}`,
+    p.location != null && `Location ${toInt(p.location)}`, p.cleanliness != null && `Cleanliness ${toInt(p.cleanliness)}`,
+  ].filter(Boolean).join(" · ");
+  const message = [p.comment, subs && `(${subs})`].filter(Boolean).join("\n");
+  const row = unwrap(await client.from("feedback").insert({
+    hotel_id: ctx.hotel.id, room_id: ctx.room.id,
+    rating: overall, category: "stay", message: message || null,
+    follow_up_requested: false, status: "new", source: "guest_pwa",
+  }).select("id").single(), "feedback");
+  return { status: 201, body: { ok: true, feedbackId: row.id } };
 }
