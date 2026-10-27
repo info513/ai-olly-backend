@@ -85,6 +85,7 @@ export async function ask({ slug, room, token, question }) {
     return { status: 200, body: { ok: true, answer: answer || handoff } };
   } catch (e) {
     // Never leave the guest without a reply — hand off to reception on any model/API error.
-    return { status: 200, body: { ok: true, answer: handoff } };
+    const _err = String((e && e.message) || e).replace(/sk-[A-Za-z0-9_-]+/g, "sk-***").slice(0, 300);
+    return { status: 200, body: { ok: true, answer: handoff, _err } };
   }
 }
