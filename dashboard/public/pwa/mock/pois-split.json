@@ -1,0 +1,13 @@
+[
+  { "id": "peristyle",    "name": "Peristyle",                 "category": "Roman",         "distanceM": 50   },
+  { "id": "riva",         "name": "Riva Promenade",            "category": "Waterfront",    "distanceM": 100  },
+  { "id": "cathedral",    "name": "Cathedral of St Domnius",   "category": "Church",        "distanceM": 80   },
+  { "id": "vestibule",    "name": "Vestibule",                 "category": "Roman",         "distanceM": 60   },
+  { "id": "golden-gate",  "name": "Golden Gate",               "category": "Roman",         "distanceM": 200  },
+  { "id": "cellars",      "name": "Diocletian's Cellars",      "category": "Roman",         "distanceM": 70   },
+  { "id": "bacvice",      "name": "Bačvice Beach",             "category": "Beach",         "distanceM": 800  },
+  { "id": "green-market", "name": "Green Market",              "category": "Market",        "distanceM": 400  },
+  { "id": "varos",        "name": "Varoš Quarter",             "category": "Neighbourhood", "distanceM": 300  },
+  { "id": "mestrovic",    "name": "Meštrović Gallery",         "category": "Museum",        "distanceM": 1200 },
+  { "id": "city-museum",  "name": "City Museum",               "category": "Museum",        "distanceM": 150  }
+]

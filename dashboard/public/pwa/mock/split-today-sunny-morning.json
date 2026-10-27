@@ -1,0 +1,12 @@
+{
+  "mode": "sunny",
+  "timeOfDay": "morning",
+  "moodTitle": "A perfect morning for the stones",
+  "moodSub": "Sunny · 26° · Ideal for the old town before noon",
+  "pois": [
+    { "id": "peristyle",  "name": "Peristyle",               "distanceM": 50  },
+    { "id": "vestibule",  "name": "Vestibule",               "distanceM": 60  },
+    { "id": "cathedral",  "name": "Cathedral of St Domnius", "distanceM": 80  },
+    { "id": "riva",       "name": "Riva Promenade",          "distanceM": 100 }
+  ]
+}

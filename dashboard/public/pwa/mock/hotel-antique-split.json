@@ -1,0 +1,14 @@
+{
+  "propertyId": "antique-split",
+  "name": "Antique Split",
+  "city": "Split, HR",
+  "coordinates": [43.5081, 16.4402],
+  "silhouetteSvg": "/assets/silhouettes/split.svg",
+  "assistantName": "Dioclea",
+  "culturalSeries": {
+    "title": "Whispers of the Palace",
+    "episodes": 9,
+    "active": true
+  },
+  "supportHours": "9–22h"
+}
