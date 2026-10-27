@@ -51,7 +51,7 @@ function tokenOk(provided, stored) {
 
 /** Resolve hotel + room + room-type and validate the token. Returns ctx or null (→403). */
 export async function authGuest(client, slug, roomNumber, token) {
-  const hotel = unwrap(await client.from("hotels").select("id,name,slug,settings").eq("slug", slug).maybeSingle(), "hotel");
+  const hotel = unwrap(await client.from("hotels").select("id,name,slug,settings,reception_phone,reception_mobile,reception_email,check_in_time,check_out_time").eq("slug", slug).maybeSingle(), "hotel");
   if (!hotel) return null;
   const room = unwrap(await client.from("rooms").select("*").eq("hotel_id", hotel.id).eq("room_number", String(roomNumber)).eq("active", true).maybeSingle(), "room");
   if (!room) return null;
