@@ -725,8 +725,8 @@ function initCityMap() {
   );
 
   // CartoDB Voyager — clean, minimal tiles
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '\u00a9 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> \u00a9 <a href="https://carto.com/attributions">CARTO</a>',
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '\u00a9 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     subdomains: 'abcd',
     maxZoom: 20,
   }).addTo(cityMapObj);
@@ -1151,8 +1151,8 @@ function initRouteMap() {
   routeMapObj = L.map('route-map-leaflet').setView([startCoords.lat, startCoords.lng], 14);
 
   // CartoDB Voyager — consistent with city map
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '\u00a9 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> \u00a9 <a href="https://carto.com/attributions">CARTO</a>',
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '\u00a9 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     subdomains: 'abcd',
     maxZoom: 20,
   }).addTo(routeMapObj);
