@@ -42,7 +42,7 @@ async function buildContext(client, ctx) {
     .map((x) => `- ${x.title}: ${x.short_description || blocks(x.body_content)}`.slice(0, 300)).join("\n"));
   if (pois.length) lines.push("\nNEARBY (Split, curated):\n" + pois.slice(0, 18)
     .map((p) => `- ${p.name}${p.walking_time_minutes != null ? ` (${p.walking_time_minutes} min walk)` : ""}: ${p.short_description || ""}`.slice(0, 200)).join("\n"));
-  return { context: lines.join("\n"), receptionPhone: hotel.reception_phone || s.emergency_number || "" };
+  return { context: lines.join("\n"), receptionPhone: hotel.reception_phone || "" };
 }
 
 function systemPrompt(hotelName, receptionPhone, context) {
@@ -53,7 +53,7 @@ RULES:
 - For HOTEL-SPECIFIC facts (services, amenities, room, WiFi, hours, policies, prices), use ONLY the HOTEL DATA below. If the answer is not in the data, do NOT guess — briefly say you'll connect them with reception${receptionPhone ? ` (${receptionPhone})` : ""}.
 - For general Split / city / travel questions you MAY use general knowledge, but keep it brief and suggest confirming details locally.
 - Never invent prices, hours, phone numbers, or policies.
-- Be friendly and short (2–4 sentences). No markdown headers.
+- Be friendly and short (2–4 sentences). Write in PLAIN TEXT only — no markdown, no asterisks, no headings.
 
 === HOTEL DATA ===
 ${context}
@@ -85,7 +85,6 @@ export async function ask({ slug, room, token, question }) {
     return { status: 200, body: { ok: true, answer: answer || handoff } };
   } catch (e) {
     // Never leave the guest without a reply — hand off to reception on any model/API error.
-    const _err = String((e && e.message) || e).replace(/sk-[A-Za-z0-9_-]+/g, "sk-***").slice(0, 300);
-    return { status: 200, body: { ok: true, answer: handoff, _err } };
+    return { status: 200, body: { ok: true, answer: handoff } };
   }
 }
