@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <!-- Served at /pwa/ on Vercel, which 308-strips the trailing slash to /pwa; this base
+       keeps relative asset paths (config.js, app.js, media, style.css) resolving under /pwa/.
+       API calls use absolute /api/... and are unaffected. -->
+  <base href="/pwa/">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
