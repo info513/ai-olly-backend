@@ -105,6 +105,13 @@ export function useRequestActions(hotelId?: string) {
     const { error } = await sb().from("request_events").insert({ request_id: id, hotel_id: e.hotelId, event_type: e.eventType, note: e.note ?? null, is_internal: e.isInternal ?? false });
     if (error) throw error;
   };
+  // Best-effort guest push when a request status changes — never blocks or fails the update.
+  const notifyGuest = async (id: string) => {
+    try {
+      const { data } = await sb().auth.getSession();
+      await fetch("/api/pwa-notify", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${data.session?.access_token ?? ""}` }, body: JSON.stringify({ requestId: id }) });
+    } catch { /* push is best-effort */ }
+  };
 
   return {
     setStatus: useMutation({
@@ -113,7 +120,7 @@ export function useRequestActions(hotelId?: string) {
         if (status === "acknowledged") row.acknowledged_at = new Date().toISOString();
         if (status === "resolved") row.resolved_at = new Date().toISOString();
         if (status === "closed") row.closed_at = new Date().toISOString();
-        await patch(id, row); return id;
+        await patch(id, row); void notifyGuest(id); return id;
       },
       onSuccess: invalidate,
     }),

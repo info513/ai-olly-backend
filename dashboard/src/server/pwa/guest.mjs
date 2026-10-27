@@ -262,6 +262,22 @@ export async function createRequest(p) {
   return { status: 201, body: { ok: true, requestId: row.id } };
 }
 
+/** POST /api/pwa-push-subscribe → store the guest's push subscription for this room. { ok } */
+export async function subscribePush(p) {
+  if (!p.room) return NOROOM;
+  const sub = p.subscription;
+  if (!sub || !sub.endpoint) return { status: 400, body: { ok: false, error: "Missing subscription" } };
+  const client = sb();
+  const ctx = await authGuest(client, p.slug, p.room, p.token);
+  if (!ctx) return DENIED;
+  unwrap(await client.from("push_subscriptions").upsert({
+    hotel_id: ctx.hotel.id, room_id: ctx.room.id,
+    endpoint: sub.endpoint, p256dh: sub.keys?.p256dh ?? null, auth_key: sub.keys?.auth ?? null,
+    user_agent: (p.userAgent || "").slice(0, 300) || null, active: true, last_used_at: new Date().toISOString(),
+  }, { onConflict: "endpoint" }), "push_subscribe");
+  return { status: 200, body: { ok: true } };
+}
+
 /** POST /api/pwa-feedback → post-checkout feedback. { ok, feedbackId } */
 export async function submitFeedback(p) {
   if (!p.room) return NOROOM;
