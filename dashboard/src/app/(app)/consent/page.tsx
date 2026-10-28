@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FileSignature, ArrowRight, ShieldCheck, FileText } from "lucide-react";
+import { FileSignature, ArrowRight, ShieldCheck, FileText, TabletSmartphone } from "lucide-react";
 import { useHotel } from "@/providers/hotel-provider";
 import { useConsentTemplates, signableTemplates, useConsents } from "@/data/consents";
 import { PageHeader } from "@/components/content/page-header";
@@ -22,6 +22,15 @@ export default function ConsentHome() {
   return (
     <div className="mx-auto max-w-[1100px] p-6">
       <PageHeader title="Consent" subtitle="Signed consent records and the templates guests sign from." />
+
+      <Link href="/consent-kiosk" target="_blank" className="mb-4 flex items-center gap-3 rounded-xl border border-brand-goldDeep/40 bg-brand-navy/40 p-4 transition-colors hover:border-brand-goldDeep">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-cream text-brand-navy"><TabletSmartphone className="h-5 w-5" /></span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-medium text-ink-primary">Open tablet kiosk</div>
+          <div className="text-[12px] text-ink-tertiary">A locked, full-screen list of guests who still need to sign — hand the tablet over, they read and sign with a pen.</div>
+        </div>
+        <ArrowRight className="h-4 w-4 text-ink-tertiary" />
+      </Link>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Link href="/consent/templates">
